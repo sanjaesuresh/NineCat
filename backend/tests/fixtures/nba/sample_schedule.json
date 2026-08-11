@@ -1,0 +1,52 @@
+[
+  {
+    "game_id": "0022500001",
+    "game_date": "2025-10-25",
+    "home_team_id": 1610612752,
+    "home_team_name": "New York Knicks",
+    "home_team_abbreviation": "NYK",
+    "away_team_id": 1610612738,
+    "away_team_name": "Boston Celtics",
+    "away_team_abbreviation": "BOS"
+  },
+  {
+    "game_id": "0022500010",
+    "game_date": "2025-11-03",
+    "home_team_id": 1610612752,
+    "home_team_name": "New York Knicks",
+    "home_team_abbreviation": "NYK",
+    "away_team_id": 1610612738,
+    "away_team_name": "Boston Celtics",
+    "away_team_abbreviation": "BOS"
+  },
+  {
+    "game_id": "0022500011",
+    "game_date": "2025-11-04",
+    "home_team_id": 1610612738,
+    "home_team_name": "Boston Celtics",
+    "home_team_abbreviation": "BOS",
+    "away_team_id": 1610612748,
+    "away_team_name": "Miami Heat",
+    "away_team_abbreviation": "MIA"
+  },
+  {
+    "game_id": "0022500012",
+    "game_date": "2025-11-05",
+    "home_team_id": 1610612751,
+    "home_team_name": "Brooklyn Nets",
+    "home_team_abbreviation": "BKN",
+    "away_team_id": 1610612748,
+    "away_team_name": "Miami Heat",
+    "away_team_abbreviation": "MIA"
+  },
+  {
+    "game_id": "0022500013",
+    "game_date": "2025-11-06",
+    "home_team_id": 1610612738,
+    "home_team_name": "Boston Celtics",
+    "home_team_abbreviation": "BOS",
+    "away_team_id": 1610612752,
+    "away_team_name": "New York Knicks",
+    "away_team_abbreviation": "NYK"
+  }
+]

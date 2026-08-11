@@ -1,0 +1,3 @@
+# NineCat
+
+NineCat is a fantasy basketball analytics web app for Yahoo Fantasy 9-category leagues: it syncs your league and roster, builds a deterministic "build profile" across the nine scoring categories (FG%, FT%, 3PM, PTS, REB, AST, ST, BLK, TO), and surfaces standings, matchups, and player data in a dashboard. The backend is a FastAPI app in `backend/` — run it with `cd backend && uv run uvicorn ninecat.main:create_app --factory --reload` (serves on `http://localhost:8000`). The frontend is a Next.js app in `frontend/` — once scaffolded, run it with `cd frontend && npm run dev` (serves on `http://localhost:3000`).
