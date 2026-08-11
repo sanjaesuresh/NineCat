@@ -1,0 +1,22 @@
+{
+  "fantasy_content": {
+    "league": [
+      {
+        "league_key": "466.l.12345",
+        "name": "Nine Cat Nation"
+      },
+      {
+        "settings": [
+          {
+            "draft_type": "live",
+            "max_weekly_adds": "4",
+            "roster_positions": {
+              "0": { "roster_position": { "position": "PG", "position_type": "P", "count": 1 } },
+              "count": 1
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

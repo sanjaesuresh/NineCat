@@ -1,0 +1,75 @@
+{
+  "fantasy_content": {
+    "users": {
+      "0": {
+        "user": [
+          [
+            { "guid": "ABC123XYZ" }
+          ],
+          {
+            "games": [
+              {
+                "game": [
+                  {
+                    "game_key": "466",
+                    "game_id": "466",
+                    "name": "Basketball",
+                    "code": "nba",
+                    "type": "full",
+                    "season": "2024"
+                  },
+                  {
+                    "leagues": {
+                      "0": {
+                        "league": [
+                          {
+                            "league_key": "466.l.12345",
+                            "league_id": "12345",
+                            "name": "Nine Cat Nation",
+                            "season": "2024",
+                            "scoring_type": "head",
+                            "num_teams": "10"
+                          }
+                        ]
+                      },
+                      "count": 1
+                    }
+                  }
+                ]
+              },
+              {
+                "game": [
+                  {
+                    "game_key": "454",
+                    "game_id": "454",
+                    "name": "Basketball",
+                    "code": "nba",
+                    "type": "full",
+                    "season": "2023"
+                  },
+                  {
+                    "leagues": [
+                      {
+                        "league": [
+                          {
+                            "league_key": "454.l.67890",
+                            "league_id": "67890",
+                            "name": "Old Rivals League",
+                            "season": "2023",
+                            "scoring_type": "head",
+                            "num_teams": "12"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "count": 1
+    }
+  }
+}

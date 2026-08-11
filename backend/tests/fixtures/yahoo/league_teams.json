@@ -1,0 +1,39 @@
+{
+  "fantasy_content": {
+    "league": [
+      {
+        "league_key": "466.l.12345",
+        "name": "Nine Cat Nation"
+      },
+      {
+        "teams": [
+          {
+            "team": [
+              [
+                { "team_key": "466.l.12345.t.1" },
+                { "team_id": "1" },
+                { "name": "Air Bud" },
+                {
+                  "team_logos": [
+                    { "team_logo": { "size": "large", "url": "https://s.yimg.com/logos/airbud.png" } }
+                  ]
+                },
+                { "managers": [ { "manager": { "manager_id": "1", "nickname": "Sanjae", "guid": "GUID1" } } ] }
+              ]
+            ]
+          },
+          {
+            "team": [
+              [
+                { "team_key": "466.l.12345.t.2" },
+                { "team_id": "2" },
+                { "name": "Rebound City" },
+                { "managers": [ { "manager": { "manager_id": "2", "nickname": "Jordan", "guid": "GUID2" } } ] }
+              ]
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

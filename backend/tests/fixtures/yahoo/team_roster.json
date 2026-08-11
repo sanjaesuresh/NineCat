@@ -1,0 +1,72 @@
+{
+  "fantasy_content": {
+    "team": [
+      [
+        { "team_key": "466.l.12345.t.1" },
+        { "name": "Air Bud" }
+      ],
+      {
+        "roster": {
+          "coverage_type": "week",
+          "week": "3",
+          "date": "2025-11-05",
+          "is_editable": "1",
+          "0": {
+            "players": {
+              "0": {
+                "player": [
+                  [
+                    { "player_key": "466.p.5583" },
+                    { "player_id": "5583" },
+                    { "name": { "full": "LeBron James", "first": "LeBron", "last": "James" } },
+                    { "editorial_team_abbr": "LAL" },
+                    { "display_position": "SF,PF" },
+                    { "status": "INJ" },
+                    {
+                      "eligible_positions": [
+                        { "position": "SF" },
+                        { "position": "PF" }
+                      ]
+                    }
+                  ],
+                  {
+                    "selected_position": [
+                      { "coverage_type": "week" },
+                      { "week": "3" },
+                      { "position": "SF" }
+                    ]
+                  }
+                ]
+              },
+              "1": {
+                "player": [
+                  [
+                    { "player_key": "466.p.4612" },
+                    { "player_id": "4612" },
+                    { "name": { "full": "Nikola Jokic", "first": "Nikola", "last": "Jokic" } },
+                    { "editorial_team_abbr": "DEN" },
+                    { "display_position": "C" },
+                    {
+                      "eligible_positions": {
+                        "0": { "position": "C" },
+                        "count": 1
+                      }
+                    }
+                  ],
+                  {
+                    "selected_position": [
+                      { "coverage_type": "week" },
+                      { "week": "3" },
+                      { "position": "C" }
+                    ]
+                  }
+                ]
+              },
+              "count": 2
+            }
+          }
+        }
+      }
+    ]
+  }
+}
