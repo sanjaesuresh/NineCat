@@ -1,6 +1,15 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Identity, Integer, Text, func
+from sqlalchemy import (
+    BigInteger,
+    DateTime,
+    ForeignKey,
+    Identity,
+    Integer,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -81,10 +90,37 @@ class Team(Base):
     )
 
 
+class Standing(Base):
+    """A team's rank/record snapshot within a league, as last synced from Yahoo."""
+
+    __tablename__ = "standings"
+    # one snapshot row per team per league: the sync upserts this row rather
+    # than ever inserting a duplicate for a re-synced league
+    __table_args__ = (UniqueConstraint("league_id", "team_id"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    league_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("leagues.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    team_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("teams.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    rank: Mapped[int] = mapped_column(Integer, nullable=False)
+    wins: Mapped[int] = mapped_column(Integer, nullable=False)
+    losses: Mapped[int] = mapped_column(Integer, nullable=False)
+    ties: Mapped[int] = mapped_column(Integer, nullable=False)
+    synced_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
 class RosterSlot(Base):
     """A player rostered on a team, as last synced from Yahoo."""
 
     __tablename__ = "roster_slots"
+    # sync's idempotency key for the full-roster delete-then-insert replace;
+    # matches the constraint the migration creates at the db level
+    __table_args__ = (UniqueConstraint("team_id", "yahoo_player_key"),)
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
     team_id: Mapped[int] = mapped_column(
