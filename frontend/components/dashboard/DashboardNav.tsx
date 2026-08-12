@@ -21,8 +21,10 @@ export default function DashboardNav({
   const onTeam = pathname === teamHref;
   const onSettings = pathname === settingsHref;
 
+  // inline-flex + py-1.5 pads the link's hit area to a ~24px target (WCAG 2.2
+  // 2.5.8) even though the 12px mono text alone only measures ~16px tall
   const linkClass = (active: boolean) =>
-    `font-mono text-xs uppercase tracking-wide underline decoration-rule underline-offset-4 ${
+    `inline-flex items-center py-1.5 font-mono text-xs uppercase tracking-wide underline decoration-rule underline-offset-4 ${
       active ? "text-ink decoration-ink" : "text-ink/80 hover:text-ink hover:decoration-ink"
     }`;
 
@@ -32,7 +34,7 @@ export default function DashboardNav({
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
           <Link
             href="/dashboard"
-            className="font-mono text-xs uppercase tracking-wide text-ink/70 underline decoration-rule underline-offset-4 hover:text-ink hover:decoration-ink"
+            className="inline-flex items-center py-1.5 font-mono text-xs uppercase tracking-wide text-ink/70 underline decoration-rule underline-offset-4 hover:text-ink hover:decoration-ink"
           >
             All leagues
           </Link>
@@ -49,7 +51,7 @@ export default function DashboardNav({
             <span
               key={tool}
               aria-disabled="true"
-              className="inline-flex items-center gap-1.5 font-mono text-xs uppercase tracking-wide text-ink/50"
+              className="inline-flex items-center gap-1.5 font-mono text-xs uppercase tracking-wide text-ink/70"
             >
               {tool}
               <span className="border border-amber px-1 py-0.5 text-[0.6rem] leading-none text-ink/70">

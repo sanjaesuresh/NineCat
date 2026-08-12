@@ -35,6 +35,9 @@ export interface Matchup {
 
 export interface LeagueOverviewResponse {
   standings: StandingsEntry[];
+  // the caller's own team id in this league, or null if unclaimed/unlinked —
+  // lets the UI highlight "my" standings row without guessing from matchup order
+  my_team_id: number | null;
   matchup: Matchup | null;
   stale: boolean;
   synced_at: string;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getMe, syncLeagues, isUnauthorized, ApiError, type League } from "@/lib/api";
 import LeaguePickerCard from "@/components/dashboard/LeaguePickerCard";
@@ -30,16 +31,23 @@ export default function DashboardHome() {
     }
   }
 
-  async function resolve(current: League[]) {
+  // 0/1/many branching shared by the initial load and the manual "sync again"
+  // action; returns true once resolved to a terminal (non-syncing) status.
+  function settle(current: League[]): boolean {
     if (current.length === 1) {
       router.replace(`/dashboard/${current[0].id}`);
-      return;
+      return true;
     }
     if (current.length > 1) {
       setLeagues(current);
       setStatus("picker");
-      return;
+      return true;
     }
+    return false;
+  }
+
+  async function resolve(current: League[]) {
+    if (settle(current)) return;
     // zero leagues: try one automatic sync before showing the empty state —
     // covers the common case of a first-time sign-in that hasn't synced yet
     if (hasAutoSynced.current) {
@@ -47,17 +55,15 @@ export default function DashboardHome() {
       return;
     }
     hasAutoSynced.current = true;
+    await runSync();
+  }
+
+  async function runSync() {
     setStatus("syncing");
+    setErrorMessage(null);
     try {
       const synced = await syncLeagues();
-      if (synced.length === 1) {
-        router.replace(`/dashboard/${synced[0].id}`);
-      } else if (synced.length > 1) {
-        setLeagues(synced);
-        setStatus("picker");
-      } else {
-        setStatus("empty");
-      }
+      if (!settle(synced)) setStatus("empty");
     } catch (err) {
       handleError(err);
     }
@@ -76,43 +82,27 @@ export default function DashboardHome() {
     setStatus("error");
   }
 
-  async function handleManualSync() {
-    setStatus("syncing");
-    setErrorMessage(null);
-    try {
-      const synced = await syncLeagues();
-      await resolveAfterManualSync(synced);
-    } catch (err) {
-      handleError(err);
-    }
-  }
-
-  async function resolveAfterManualSync(synced: League[]) {
-    if (synced.length === 1) {
-      router.replace(`/dashboard/${synced[0].id}`);
-    } else if (synced.length > 1) {
-      setLeagues(synced);
-      setStatus("picker");
-    } else {
-      setStatus("empty");
-    }
-  }
-
   useEffect(() => {
+    // standard fetch-on-mount: load() only sets the status that useState already
+    // initializes it to; the retry path re-invokes the same function from a click handler
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- load() only needs to run once on mount
   }, []);
 
   return (
-    <main className="mx-auto max-w-4xl px-6 py-14 sm:px-10 sm:py-20">
+    <main className="mx-auto min-w-0 w-full max-w-4xl px-6 py-14 sm:px-10 sm:py-20">
       <div className="flex items-baseline justify-between gap-4">
         <h1 className="font-display text-3xl font-semibold text-ink">Your leagues</h1>
         <LogoutButton />
       </div>
 
       {(status === "loading" || status === "syncing") && (
-        <div className="mt-8 space-y-4">
-          <p className="font-mono text-xs uppercase tracking-wide text-ink/70">
+        <div className="mt-8 space-y-4" aria-busy="true">
+          <p role="status" className="sr-only">
+            {status === "syncing" ? "Syncing leagues…" : "Loading leagues…"}
+          </p>
+          <p className="font-mono text-xs uppercase tracking-wide text-ink/70" aria-hidden="true">
             {status === "syncing" ? "Syncing with Yahoo…" : "Loading…"}
           </p>
           <SkeletonCard />
@@ -134,18 +124,18 @@ export default function DashboardHome() {
           </p>
           <button
             type="button"
-            onClick={handleManualSync}
+            onClick={runSync}
             className="mt-5 border-2 border-ink bg-ink px-5 py-2.5 font-mono text-sm uppercase tracking-wide text-paper transition-colors hover:bg-paper hover:text-ink"
           >
             Sync again
           </button>
           <p className="mt-4">
-            <a
+            <Link
               href="/"
               className="font-mono text-xs uppercase tracking-wide text-ink/70 underline decoration-rule underline-offset-4 hover:text-ink hover:decoration-ink"
             >
               Back to NineCat
-            </a>
+            </Link>
           </p>
         </div>
       )}

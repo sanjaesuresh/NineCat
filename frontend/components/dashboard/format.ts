@@ -12,18 +12,29 @@ const PERCENT_CATEGORIES = new Set(["FG%", "FT%"]);
 export function formatStatValue(category: string, value: unknown): string {
   if (value === null || value === undefined) return EM_DASH;
 
+  // matchup category_totals arrive as JSON strings ("0.471") even when the
+  // underlying value is numeric, while roster averages arrive as real numbers
+  // — coerce numeric-looking strings first so both sources format identically
+  // (e.g. "48.2%") instead of one leaking the raw decimal string through
+  let numeric: number | null = null;
   if (typeof value === "number") {
-    if (!Number.isFinite(value)) return EM_DASH;
+    numeric = value;
+  } else if (typeof value === "string" && value.trim() !== "" && Number.isFinite(Number(value))) {
+    numeric = Number(value);
+  }
+
+  if (numeric !== null) {
+    if (!Number.isFinite(numeric)) return EM_DASH;
     if (PERCENT_CATEGORIES.has(category)) {
       // ratio (<=1) vs already-percent (>1): scale only the ratio form so both
       // conventions render as a normal percentage instead of "0.5%" or "4520%"
-      const percent = Math.abs(value) <= 1 ? value * 100 : value;
+      const percent = Math.abs(numeric) <= 1 ? numeric * 100 : numeric;
       return `${percent.toFixed(1)}%`;
     }
-    return value.toFixed(1);
+    return numeric.toFixed(1);
   }
 
-  // backend may already send a formatted string (e.g. "45.2%") — pass it through
+  // backend may already send a non-numeric formatted string (e.g. "Q1") — pass it through
   if (typeof value === "string" && value.trim() !== "") return value;
 
   return EM_DASH;
@@ -60,11 +71,27 @@ export function classifyInjury(status: string | null): InjuryDisplay | null {
 
 export type BuildTone = "strong" | "punt" | "average";
 
-/** Normalizes a backend build-profile label into the three tones the strip renders. */
-export function classifyBuildLabel(label: unknown): BuildTone {
-  if (typeof label !== "string") return "average";
+const BUILD_TONES = new Set<BuildTone>(["strong", "punt", "average"]);
+
+/**
+ * Normalizes a backend build-profile label into one of the three known tones.
+ * Returns null for anything else (missing, empty, or an unrecognized string) —
+ * an unclassified category must render as an explicit no-data cell, never
+ * silently default to "average" and pretend it was classified.
+ */
+export function classifyBuildLabel(label: unknown): BuildTone | null {
+  if (typeof label !== "string") return null;
   const normalized = label.trim().toLowerCase();
-  if (normalized.includes("strong")) return "strong";
-  if (normalized.includes("punt")) return "punt";
-  return "average";
+  return BUILD_TONES.has(normalized as BuildTone) ? (normalized as BuildTone) : null;
+}
+
+/**
+ * Signs and formats a mean z-score for the build-profile strip (e.g. "+0.42 z",
+ * "−0.11 z"). Deliberately separate from formatStatValue, which applies a
+ * percent heuristic that doesn't apply to z-scores at all.
+ */
+export function formatZScore(value: unknown): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) return EM_DASH;
+  const sign = value < 0 ? "−" : "+"; // U+2212 minus sign, not a hyphen
+  return `${sign}${Math.abs(value).toFixed(2)} z`;
 }

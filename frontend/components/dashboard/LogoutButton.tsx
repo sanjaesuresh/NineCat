@@ -17,6 +17,8 @@ export default function LogoutButton({ className }: { className?: string }) {
     } catch {
       // ignore — redirect happens regardless, see comment above
     } finally {
+      // hard navigation is deliberate here too — see settings page comment
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.href = "/";
     }
   }
@@ -28,7 +30,8 @@ export default function LogoutButton({ className }: { className?: string }) {
       disabled={pending}
       className={
         className ??
-        "font-mono text-xs uppercase tracking-wide text-ink underline decoration-rule underline-offset-4 hover:decoration-ink disabled:opacity-60"
+        // inline-flex + py-1.5 pads the hit area to a ~24px target (WCAG 2.2 2.5.8)
+        "inline-flex items-center py-1.5 font-mono text-xs uppercase tracking-wide text-ink underline decoration-rule underline-offset-4 hover:decoration-ink disabled:opacity-60"
       }
     >
       {pending ? "Signing out…" : "Log out"}

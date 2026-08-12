@@ -376,11 +376,12 @@ def test_overview_returns_standings_and_matchup(db_session):
 
     assert response.status_code == 200
     body = response.json()
-    assert set(body.keys()) == {"standings", "matchup", "stale", "synced_at"}
+    assert set(body.keys()) == {"standings", "my_team_id", "matchup", "stale", "synced_at"}
     assert len(body["standings"]) == 2
     assert set(body["standings"][0].keys()) == {"team_id", "name", "rank", "wins", "losses", "ties"}
     assert body["standings"][0]["rank"] == 1
     assert body["standings"][0]["team_id"] == team.id
+    assert body["my_team_id"] == team.id
     # category_totals keys become JSON strings even though MatchupTeam stores int keys
     assert body["matchup"] == {
         "week": 5,

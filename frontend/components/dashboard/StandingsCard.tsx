@@ -2,12 +2,11 @@ import type { StandingsEntry } from "@/lib/api";
 
 export default function StandingsCard({
   standings,
-  highlightTeamName,
+  myTeamId,
 }: {
   standings: StandingsEntry[];
-  // best-effort: the overview contract doesn't mark which team is the caller's,
-  // so callers pass the current matchup's first team name as a heuristic match
-  highlightTeamName?: string;
+  // overview.my_team_id — null when the caller has no linked team in this league
+  myTeamId: number | null;
 }) {
   if (standings.length === 0) {
     return (
@@ -17,8 +16,10 @@ export default function StandingsCard({
     );
   }
 
+  // relative: keeps absolutely-positioned sr-only children clipped inside this
+  // scroll container instead of escaping to the initial containing block
   return (
-    <div className="overflow-x-auto border border-rule">
+    <div className="relative overflow-x-auto border border-rule">
       <table className="w-full border-collapse text-left">
         <caption className="sr-only">League standings</caption>
         <thead>
@@ -42,7 +43,7 @@ export default function StandingsCard({
         </thead>
         <tbody>
           {standings.map((team) => {
-            const isMine = highlightTeamName !== undefined && team.name === highlightTeamName;
+            const isMine = myTeamId !== null && team.team_id === myTeamId;
             return (
               <tr
                 key={team.team_id}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { ApiError } from "@/lib/api";
 
 /**
@@ -31,6 +31,11 @@ export default function ConfirmDialog({
   onConfirm: () => Promise<void>;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  // two ConfirmDialogs can be mounted on the same page (disconnect + delete on
+  // settings) — a hardcoded id would make the second dialog's title announce
+  // the first's, since aria-labelledby resolves by id, not by DOM proximity
+  const titleId = useId();
+  const descriptionId = useId();
   const [typedPhrase, setTypedPhrase] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -78,12 +83,15 @@ export default function ConfirmDialog({
           if (e.target === dialogRef.current) close();
         }}
         className="w-full max-w-md border-2 border-ink bg-paper p-6 text-ink backdrop:bg-ink/40"
-        aria-labelledby="confirm-dialog-title"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
       >
-        <h2 id="confirm-dialog-title" className="font-display text-lg font-semibold text-ink">
+        <h2 id={titleId} className="font-display text-lg font-semibold text-ink">
           {title}
         </h2>
-        <p className="mt-2 text-sm text-ink/90">{description}</p>
+        <p id={descriptionId} className="mt-2 text-sm text-ink/90">
+          {description}
+        </p>
 
         {requirePhrase && (
           <label className="mt-4 block">

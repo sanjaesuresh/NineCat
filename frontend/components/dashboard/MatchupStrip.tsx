@@ -1,6 +1,7 @@
 import type { Matchup } from "@/lib/api";
 import { CATEGORIES } from "@/components/categories";
 import { formatStatValue } from "./format";
+import { STAT_ID_BY_LABEL } from "./categoryKeys";
 
 export default function MatchupStrip({ matchup }: { matchup: Matchup | null }) {
   if (!matchup) {
@@ -14,8 +15,10 @@ export default function MatchupStrip({ matchup }: { matchup: Matchup | null }) {
     );
   }
 
+  // relative: keeps absolutely-positioned sr-only children clipped inside this
+  // scroll container instead of escaping to the initial containing block
   return (
-    <div className="overflow-x-auto border border-rule">
+    <div className="relative overflow-x-auto border border-rule">
       <table className="w-full border-collapse text-left">
         <caption className="px-3 py-2 text-left font-mono text-xs uppercase tracking-[0.15em] text-ink/70">
           Week {matchup.week} matchup
@@ -45,7 +48,8 @@ export default function MatchupStrip({ matchup }: { matchup: Matchup | null }) {
                   key={cat}
                   className="whitespace-nowrap border-l border-rule px-2 py-2 text-center font-mono text-sm text-ink"
                 >
-                  {formatStatValue(cat, team.category_totals?.[cat])}
+                  {/* category_totals is keyed by Yahoo stat id (JSON string), not the display label */}
+                  {formatStatValue(cat, team.category_totals?.[STAT_ID_BY_LABEL[cat]])}
                 </td>
               ))}
             </tr>

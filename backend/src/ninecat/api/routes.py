@@ -255,6 +255,9 @@ def league_overview(
 
     return {
         "standings": standings,
+        # lets the frontend highlight the caller's own row without guessing from
+        # matchup order (which team appears first isn't a reliable signal)
+        "my_team_id": users_team.id if users_team is not None else None,
         "matchup": matchup,
         "stale": stale,
         "synced_at": league.synced_at.isoformat(),

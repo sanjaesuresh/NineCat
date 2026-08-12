@@ -3,6 +3,7 @@ import { CATEGORIES } from "@/components/categories";
 import PlayerAvatar from "./PlayerAvatar";
 import InjuryBadge from "./InjuryBadge";
 import { formatStatValue } from "./format";
+import { CONTRACT_KEY_BY_LABEL } from "./categoryKeys";
 
 /**
  * The signature box-score treatment applied to a roster: one row per player,
@@ -18,8 +19,11 @@ export default function RosterTable({ roster }: { roster: RosterPlayer[] }) {
     );
   }
 
+  // relative: makes this the positioning context for absolutely-positioned
+  // sr-only children so they stay clipped inside the scroll container
+  // instead of escaping to the initial containing block and stretching the page
   return (
-    <div className="overflow-x-auto border border-rule">
+    <div className="relative overflow-x-auto border border-rule">
       <table className="w-full min-w-[640px] border-collapse text-left">
         <caption className="sr-only">Your roster, with 9-category averages</caption>
         <thead>
@@ -62,7 +66,8 @@ export default function RosterTable({ roster }: { roster: RosterPlayer[] }) {
                   key={cat}
                   className="whitespace-nowrap border-l border-rule px-2 py-2 text-center font-mono text-sm text-ink"
                 >
-                  {formatStatValue(cat, player.averages?.[cat])}
+                  {/* averages is keyed by contract key (e.g. "fg_pct"), not the display label */}
+                  {formatStatValue(cat, player.averages?.[CONTRACT_KEY_BY_LABEL[cat]])}
                 </td>
               ))}
             </tr>
