@@ -36,10 +36,25 @@ from ninecat.models import (
 from ninecat.yahoo.gateway import _path_hash
 
 FAKE_TOKEN_PAYLOAD = {
+    # regression fixture: yahoo's real token response has NO xoauth_yahoo_guid key
+    # (live-verified keys=['access_token','expires_in','refresh_token','token_type']) --
+    # the guid now only ever comes from the separate FAKE_USERS_PAYLOAD fetch below
     "access_token": "fake-access-token",
     "refresh_token": "fake-refresh-token-plaintext",
     "expires_in": 3600,
-    "xoauth_yahoo_guid": "yahoo-guid-1",
+    "token_type": "bearer",
+}
+
+# shape of a real GET .../users;use_login=1?format=json body: user is wrapped
+# under a "0" key, and its attributes arrive as a list of single-key dicts that
+# must be merged (same yahoo quirk yahoo/parsers.py's _merge_attrs handles)
+FAKE_USERS_PAYLOAD = {
+    "fantasy_content": {
+        "users": {
+            "0": {"user": [[{"guid": "yahoo-guid-1"}]]},
+            "count": 1,
+        }
+    }
 }
 
 
@@ -90,11 +105,26 @@ def _app(db_session, token_handler=None) -> FastAPI:
 
 
 def _ok_token_handler(request: httpx.Request) -> httpx.Response:
-    return httpx.Response(200, json=FAKE_TOKEN_PAYLOAD)
+    # the callback now makes two calls: POST .../get_token, then GET
+    # .../users;use_login=1 for the guid -- route on path so both are served
+    # by this one MockTransport handler
+    if request.url.path == "/oauth2/get_token":
+        return httpx.Response(200, json=FAKE_TOKEN_PAYLOAD)
+    return httpx.Response(200, json=FAKE_USERS_PAYLOAD)
 
 
 def _yahoo_error_handler(request: httpx.Request) -> httpx.Response:
+    # token exchange itself fails here, so the callback returns before ever
+    # reaching the guid fetch -- no need to branch on path
     return httpx.Response(400, json={"error": "invalid_grant"})
+
+
+def _guid_fetch_error_handler(request: httpx.Request) -> httpx.Response:
+    # token exchange succeeds, but the follow-up guid fetch 500s -- pins the
+    # new failure mode this task adds
+    if request.url.path == "/oauth2/get_token":
+        return httpx.Response(200, json=FAKE_TOKEN_PAYLOAD)
+    return httpx.Response(500, json={"error": "server_error"})
 
 
 def _login_state(client: TestClient) -> str:
@@ -219,6 +249,25 @@ def test_callback_yahoo_error_response_redirects_with_auth_error(db_session):
     assert response.status_code == 302
     assert response.headers["location"] == f"{frontend_origin}/?auth_error=1"
     assert db_session.execute(select(User)).scalars().all() == []
+
+
+def test_callback_guid_fetch_failure_redirects_with_auth_error_and_writes_nothing(db_session):
+    # regression: token exchange succeeding is not enough on its own anymore --
+    # a failed follow-up guid fetch must still land on auth_error with no DB writes,
+    # same as every other failure mode in this callback
+    client = _client(_app(db_session, token_handler=_guid_fetch_error_handler))
+    state = _login_state(client)
+
+    response = client.get(
+        f"/auth/yahoo/callback?code=fake-code&state={state}", follow_redirects=False
+    )
+
+    frontend_origin = get_settings().frontend_origin
+    assert response.status_code == 302
+    assert response.headers["location"] == f"{frontend_origin}/?auth_error=1"
+    assert SESSION_COOKIE_NAME not in response.cookies
+    assert db_session.execute(select(User)).scalars().all() == []
+    assert db_session.execute(select(YahooToken)).scalars().all() == []
 
 
 def test_callback_missing_code_redirects_with_auth_error(db_session):

@@ -5,6 +5,7 @@ path must exactly match https://localhost:8000/auth/yahoo/callback as registered
 with Yahoo -- /api/auth/yahoo/callback would not match the registered redirect URI.
 """
 
+import logging
 import secrets
 from collections.abc import Generator
 from datetime import datetime, timedelta, timezone
@@ -41,8 +42,16 @@ from ninecat.yahoo.gateway import _path_hash
 
 router = APIRouter()
 
+# reason tags only -- never token material, values, or query params
+logger = logging.getLogger(__name__)
+
 YAHOO_AUTHORIZE_URL = "https://api.login.yahoo.com/oauth2/request_auth"
 YAHOO_TOKEN_URL = "https://api.login.yahoo.com/oauth2/get_token"
+# live-verified (2026-08): yahoo's real token response omits xoauth_yahoo_guid
+# entirely (payload keys are just access_token/expires_in/refresh_token/token_type),
+# so the guid has to be fetched separately via this fantasy API call, using the
+# access_token from the exchange above
+YAHOO_USERS_URL = "https://fantasysports.yahooapis.com/fantasy/v2/users;use_login=1"
 STATE_MAX_AGE_SECONDS = 10 * 60
 HTTP_TIMEOUT_SECONDS = 10.0
 
@@ -72,7 +81,8 @@ def get_http_client() -> Generator[httpx.Client, None, None]:
         yield client
 
 
-def _auth_error_redirect(frontend_origin: str) -> RedirectResponse:
+def _auth_error_redirect(frontend_origin: str, reason: str = "unspecified") -> RedirectResponse:
+    logger.warning("yahoo callback rejected: %s", reason)
     response = RedirectResponse(
         url=f"{frontend_origin}/?auth_error=1", status_code=status.HTTP_302_FOUND
     )
@@ -82,6 +92,28 @@ def _auth_error_redirect(frontend_origin: str) -> RedirectResponse:
         key=OAUTH_NONCE_COOKIE_NAME, httponly=True, secure=True, samesite="lax"
     )
     return response
+
+
+def _extract_yahoo_guid(payload: dict) -> str:
+    """Pull the logged-in user's guid out of a /users;use_login=1?format=json body.
+
+    Mirrors the tolerance in yahoo/parsers.py's _merge_attrs: yahoo wraps the
+    single user under a "0" key, and that user's attributes arrive as EITHER a
+    plain dict OR a list of single-key dicts that must be merged -- accept both
+    rather than assuming one, same as every other yahoo response shape in this
+    codebase. Any KeyError/TypeError/IndexError here is a parse miss and must be
+    caught by the caller, not allowed to become an unhandled 500.
+    """
+    users = payload["fantasy_content"]["users"]
+    user_wrap = users["0"] if isinstance(users, dict) else users[0]
+    user = user_wrap["user"]
+    attrs = user[0]
+    if isinstance(attrs, list):
+        merged: dict = {}
+        for item in attrs:
+            merged.update(item)
+        attrs = merged
+    return attrs["guid"]
 
 
 @router.get("/api/auth/yahoo/login")
@@ -131,19 +163,22 @@ def yahoo_callback(
     code = request.query_params.get("code")
     state = request.query_params.get("state")
     if request.query_params.get("error") or not code or not state:
-        return _auth_error_redirect(settings.frontend_origin)
+        return _auth_error_redirect(settings.frontend_origin, "denied_or_missing_params")
 
     try:
         state_nonce = _state_serializer().loads(state, max_age=STATE_MAX_AGE_SECONDS)
     except (BadSignature, SignatureExpired):
-        return _auth_error_redirect(settings.frontend_origin)
+        return _auth_error_redirect(settings.frontend_origin, "bad_or_expired_state")
 
     # double-submit check: the signed state's nonce must match the nonce this same
     # browser was handed at /login -- a forged/replayed state from another browser
     # has no way to also supply the matching httpOnly cookie
     cookie_nonce = request.cookies.get(OAUTH_NONCE_COOKIE_NAME)
     if cookie_nonce is None or cookie_nonce != state_nonce:
-        return _auth_error_redirect(settings.frontend_origin)
+        return _auth_error_redirect(
+            settings.frontend_origin,
+            "nonce_cookie_missing" if cookie_nonce is None else "nonce_mismatch",
+        )
 
     try:
         token_response = http_client.post(
@@ -156,27 +191,75 @@ def yahoo_callback(
                 "grant_type": "authorization_code",
             },
         )
-    except httpx.HTTPError:
+    except httpx.HTTPError as exc:
         # network/timeout talking to Yahoo -- never let the exception (which could
         # echo request data, e.g. client_secret in a connection error) reach a response
-        return _auth_error_redirect(settings.frontend_origin)
+        return _auth_error_redirect(
+            settings.frontend_origin, f"token_exchange_{type(exc).__name__}"
+        )
 
     if token_response.status_code != status.HTTP_200_OK:
-        return _auth_error_redirect(settings.frontend_origin)
+        return _auth_error_redirect(
+            settings.frontend_origin, f"token_exchange_status_{token_response.status_code}"
+        )
 
     try:
         payload = token_response.json()
+        access_token: str = payload["access_token"]
         refresh_token: str = payload["refresh_token"]
         expires_in = payload["expires_in"]
-        yahoo_guid: str = payload["xoauth_yahoo_guid"]
         # timedelta raises TypeError (not ValueError) for a non-numeric seconds
         # value, e.g. Yahoo sending expires_in as a JSON string -- must stay
         # inside this try, and TypeError must stay in the except tuple below,
         # or a malformed-but-200 response escapes as an unhandled 500 instead
         # of the same auth_error redirect every other bad-payload case gets
         expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
-    except (ValueError, KeyError, TypeError):
-        return _auth_error_redirect(settings.frontend_origin)
+    except (ValueError, KeyError, TypeError) as exc:
+        # key NAMES present in the payload are safe to log; values never are
+        try:
+            present = sorted(payload.keys()) if isinstance(payload, dict) else type(payload).__name__
+        except Exception:
+            present = "unparseable"
+        return _auth_error_redirect(
+            settings.frontend_origin,
+            f"token_payload_invalid ({type(exc).__name__}); keys={present}",
+        )
+
+    # yahoo's real token response doesn't include the guid (see YAHOO_USERS_URL
+    # comment above) -- fetch it now via the fantasy API, using the same injected
+    # http_client so this call is mockable in tests exactly like the token exchange
+    try:
+        users_response = http_client.get(
+            YAHOO_USERS_URL,
+            params={"format": "json"},
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+    except httpx.HTTPError as exc:
+        # never let the exception reach a response -- it could echo the access
+        # token (e.g. in a connection error's request repr)
+        return _auth_error_redirect(settings.frontend_origin, f"guid_fetch_{type(exc).__name__}")
+
+    if users_response.status_code != status.HTTP_200_OK:
+        return _auth_error_redirect(
+            settings.frontend_origin, f"guid_fetch_status_{users_response.status_code}"
+        )
+
+    try:
+        users_payload = users_response.json()
+        yahoo_guid: str = _extract_yahoo_guid(users_payload)
+    except (ValueError, KeyError, TypeError, IndexError) as exc:
+        try:
+            present = (
+                sorted(users_payload.keys())
+                if isinstance(users_payload, dict)
+                else type(users_payload).__name__
+            )
+        except Exception:
+            present = "unparseable"
+        return _auth_error_redirect(
+            settings.frontend_origin,
+            f"guid_fetch_parse_miss ({type(exc).__name__}); keys={present}",
+        )
 
     user = db.execute(select(User).where(User.yahoo_guid == yahoo_guid)).scalar_one_or_none()
     if user is None:
