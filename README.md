@@ -25,6 +25,6 @@ Note: live Yahoo login requires HTTPS on the callback (`https://localhost:8000/a
 ## Data notes
 
 - Yahoo fixtures under `backend/tests/fixtures/yahoo/` are hand-built and must be re-recorded via the gateway's `record_fixture` helper once live API access is verified (see the fixtures README).
-- The NBA schedule and player-stat warehouse syncs from NBA.com via `nba_api`; projections import from CSV.
+- The NBA schedule and player-stat warehouse syncs from NBA.com via `nba_api`; projections import from CSV (header contract documented in `backend/src/ninecat/warehouse/projections.py`'s module docstring).
 
 Fantasy data provided by Yahoo Fantasy. NineCat is not affiliated with or endorsed by Yahoo or the NBA.
