@@ -12,6 +12,8 @@ from sqlalchemy import select
 
 from ninecat.auth.crypto import decrypt_token
 from ninecat.auth.routes import (
+    DEV_LEAGUE_KEY,
+    DEV_USER_GUID,
     OAUTH_NONCE_COOKIE_NAME,
     YAHOO_AUTHORIZE_URL,
     get_http_client,
@@ -20,7 +22,18 @@ from ninecat.auth.routes import (
 from ninecat.auth.sessions import SESSION_COOKIE_NAME, verify_session_cookie
 from ninecat.config import get_settings
 from ninecat.db import get_session
-from ninecat.models import User, YahooToken
+from ninecat.models import (
+    League,
+    NbaPlayer,
+    PlayerIdMap,
+    PlayerSeasonAverage,
+    RosterSlot,
+    Team,
+    User,
+    YahooApiCache,
+    YahooToken,
+)
+from ninecat.yahoo.gateway import _path_hash
 
 FAKE_TOKEN_PAYLOAD = {
     "access_token": "fake-access-token",
@@ -364,3 +377,121 @@ def test_logout_clears_cookie_and_returns_204(db_session):
     morsel = cookie[SESSION_COOKIE_NAME]
     assert morsel.value == ""
     assert int(morsel["max-age"]) <= 0
+
+
+# --- POST /api/auth/dev-login ---
+
+
+def test_dev_login_404_when_flag_disabled(db_session, monkeypatch: pytest.MonkeyPatch):
+    # explicit, not ambient: don't rely on whatever DEV_AUTH_ENABLED happens to
+    # be in the local .env/process env -- pin it false so this test means what it says
+    monkeypatch.setenv("DEV_AUTH_ENABLED", "false")
+    get_settings.cache_clear()
+    client = _client(_app(db_session))
+
+    response = client.post("/api/auth/dev-login")
+
+    assert response.status_code == 404
+    assert db_session.execute(select(User)).scalars().all() == []
+    assert db_session.execute(select(League)).scalars().all() == []
+
+
+def test_dev_login_seeds_dataset_and_sets_session_cookie(
+    db_session, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setenv("DEV_AUTH_ENABLED", "true")
+    get_settings.cache_clear()
+    client = _client(_app(db_session))
+
+    response = client.post("/api/auth/dev-login")
+
+    assert response.status_code == 204
+    cookie = SimpleCookie()
+    cookie.load(response.headers["set-cookie"])
+    session_user_id = verify_session_cookie(cookie[SESSION_COOKIE_NAME].value)
+    assert session_user_id is not None
+
+    user = db_session.execute(
+        select(User).where(User.yahoo_guid == DEV_USER_GUID)
+    ).scalar_one()
+    assert user.id == session_user_id
+    assert user.display_name == "Dev User"
+
+    league = db_session.execute(
+        select(League).where(League.yahoo_league_key == DEV_LEAGUE_KEY)
+    ).scalar_one()
+    teams = db_session.execute(select(Team).where(Team.league_id == league.id)).scalars().all()
+    assert len(teams) == 2
+    dev_team = next(t for t in teams if t.is_users_team)
+    assert dev_team.user_id == user.id
+
+    roster = (
+        db_session.execute(select(RosterSlot).where(RosterSlot.team_id == dev_team.id))
+        .scalars()
+        .all()
+    )
+    assert {slot.player_name for slot in roster} == {
+        "Dev Player One",
+        "Dev Player Two",
+        "Dev Player Three",
+    }
+    injured = next(s for s in roster if s.player_name == "Dev Player Two")
+    assert injured.injury_status == "INJ"
+    healthy = next(s for s in roster if s.player_name == "Dev Player One")
+    assert healthy.injury_status is None
+
+    assert len(db_session.execute(select(NbaPlayer)).scalars().all()) == 3
+    assert len(db_session.execute(select(PlayerIdMap)).scalars().all()) == 3
+    season_avgs = db_session.execute(select(PlayerSeasonAverage)).scalars().all()
+    assert len(season_avgs) == 3
+    assert all(avg.season == get_settings().current_season for avg in season_avgs)
+    assert all(avg.games_played == 70 for avg in season_avgs)
+
+
+def test_dev_login_is_idempotent(db_session, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("DEV_AUTH_ENABLED", "true")
+    get_settings.cache_clear()
+    client = _client(_app(db_session))
+
+    first = client.post("/api/auth/dev-login")
+    second = client.post("/api/auth/dev-login")
+
+    assert first.status_code == 204
+    assert second.status_code == 204
+    assert len(db_session.execute(select(User).where(User.yahoo_guid == DEV_USER_GUID)).scalars().all()) == 1
+    league = db_session.execute(
+        select(League).where(League.yahoo_league_key == DEV_LEAGUE_KEY)
+    ).scalar_one()
+    assert len(db_session.execute(select(Team).where(Team.league_id == league.id)).scalars().all()) == 2
+    assert len(db_session.execute(select(RosterSlot)).scalars().all()) == 3
+    assert len(db_session.execute(select(NbaPlayer)).scalars().all()) == 3
+    assert len(db_session.execute(select(PlayerIdMap)).scalars().all()) == 3
+    assert len(db_session.execute(select(PlayerSeasonAverage)).scalars().all()) == 3
+
+
+def test_dev_login_warms_scoreboard_cache_with_gateways_own_path_hash(
+    db_session, monkeypatch: pytest.MonkeyPatch
+):
+    # regression: this must use the gateway's real _path_hash, not a local
+    # reimplementation of the same sha256 scheme, or a future change to that
+    # scheme would silently desync the two and dev-login would 401 again
+    monkeypatch.setenv("DEV_AUTH_ENABLED", "true")
+    get_settings.cache_clear()
+    client = _client(_app(db_session))
+
+    client.post("/api/auth/dev-login")
+
+    user = db_session.execute(select(User).where(User.yahoo_guid == DEV_USER_GUID)).scalar_one()
+    expected_hash = _path_hash(f"league/{DEV_LEAGUE_KEY}/scoreboard")
+    cache_row = db_session.execute(
+        select(YahooApiCache).where(
+            YahooApiCache.user_id == user.id, YahooApiCache.path_hash == expected_hash
+        )
+    ).scalar_one()
+    first_fetched_at = cache_row.fetched_at
+
+    # a second dev-login must re-upsert (bump fetched_at), not leave a stale
+    # cache row behind -- that's what keeps the overview call's cache hit fresh
+    client.post("/api/auth/dev-login")
+    db_session.expire(cache_row)
+    assert cache_row.fetched_at > first_fetched_at

@@ -10,17 +10,34 @@ from collections.abc import Generator
 from datetime import datetime, timedelta, timezone
 
 import httpx
-from fastapi import APIRouter, Depends, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from ninecat.auth.crypto import encrypt_token
 from ninecat.auth.sessions import SESSION_COOKIE_NAME, set_session_on_response
 from ninecat.config import get_settings
 from ninecat.db import get_session
-from ninecat.models import User, YahooToken
+from ninecat.models import (
+    League,
+    NbaPlayer,
+    PlayerIdMap,
+    PlayerSeasonAverage,
+    RosterSlot,
+    Standing,
+    Team,
+    User,
+    YahooApiCache,
+    YahooToken,
+)
+# reuse the gateway's own hash scheme (not a local reimplementation) so this
+# cache-warm can never drift out of sync with what YahooGateway.get() actually
+# looks up -- if the hash algorithm or path template ever changes there, this
+# breaks loudly (ImportError / wrong-hash test failure) instead of silently
+from ninecat.yahoo.gateway import _path_hash
 
 router = APIRouter()
 
@@ -207,4 +224,263 @@ def logout() -> Response:
     # attributes must match what set_session_on_response set at login, or the
     # browser treats this as a different cookie and won't actually delete it
     response.delete_cookie(key=SESSION_COOKIE_NAME, httponly=True, secure=True, samesite="lax")
+    return response
+
+
+# --- POST /api/auth/dev-login ---
+#
+# Seeds (idempotently) a fixed dev dataset and logs into it -- exists purely so
+# Playwright/local smoke testing can reach the dashboard without a real Yahoo
+# OAuth round trip. Gated 404 behind Settings.dev_auth_enabled, which defaults
+# False and is never set true in a real deployment's env, so this route is
+# unreachable (not just inert) in prod.
+
+DEV_USER_GUID = "DEVUSER"
+DEV_LEAGUE_KEY = "nba.l.999999"
+DEV_TEAM_KEY = "nba.l.999999.t.1"
+DEV_OTHER_TEAM_KEY = "nba.l.999999.t.2"
+DEV_LEAGUE_SEASON = 2025
+
+# natural-key seed data for the three roster players; nba_person_id values live
+# in a 900000+ block that no real nba_api sync will ever produce, so a dev run
+# can never collide with real warehouse data
+_DEV_PLAYERS = [
+    {
+        "person_id": 900001,
+        "name": "Dev Player One",
+        "position": "PG",
+        "injury_status": None,
+        "averages": {
+            "fgm": 6.0, "fga": 13.0, "ftm": 4.0, "fta": 5.0, "tpm": 2.0,
+            "pts": 18.0, "reb": 4.0, "ast": 7.0, "stl": 1.2, "blk": 0.3, "tov": 2.5,
+        },
+    },
+    {
+        "person_id": 900002,
+        "name": "Dev Player Two",
+        "position": "C",
+        "injury_status": "INJ",
+        "averages": {
+            "fgm": 8.0, "fga": 14.0, "ftm": 5.0, "fta": 7.0, "tpm": 0.0,
+            "pts": 21.0, "reb": 11.0, "ast": 2.0, "stl": 0.7, "blk": 1.8, "tov": 2.0,
+        },
+    },
+    {
+        "person_id": 900003,
+        "name": "Dev Player Three",
+        "position": "SG",
+        "injury_status": None,
+        "averages": {
+            "fgm": 5.0, "fga": 11.0, "ftm": 2.0, "fta": 3.0, "tpm": 2.5,
+            "pts": 14.5, "reb": 3.5, "ast": 3.0, "stl": 1.0, "blk": 0.2, "tov": 1.5,
+        },
+    },
+]  # fmt: skip
+
+
+def _get_or_create_user(db: Session) -> User:
+    user = db.execute(select(User).where(User.yahoo_guid == DEV_USER_GUID)).scalar_one_or_none()
+    if user is None:
+        user = User(yahoo_guid=DEV_USER_GUID, display_name="Dev User")
+        db.add(user)
+        db.flush()
+    return user
+
+
+def _get_or_create_league(db: Session) -> League:
+    league = db.execute(
+        select(League).where(League.yahoo_league_key == DEV_LEAGUE_KEY)
+    ).scalar_one_or_none()
+    if league is None:
+        league = League(
+            yahoo_league_key=DEV_LEAGUE_KEY,
+            name="Dev League",
+            season=DEV_LEAGUE_SEASON,
+            num_teams=2,
+            scoring_type="head",
+            settings_json={},
+        )
+        db.add(league)
+        db.flush()
+    return league
+
+
+def _get_or_create_team(
+    db: Session,
+    league: League,
+    *,
+    team_key: str,
+    name: str,
+    is_users_team: bool,
+    user_id: int | None,
+) -> Team:
+    team = db.execute(select(Team).where(Team.yahoo_team_key == team_key)).scalar_one_or_none()
+    if team is None:
+        team = Team(
+            league_id=league.id,
+            yahoo_team_key=team_key,
+            name=name,
+            is_users_team=is_users_team,
+            user_id=user_id,
+        )
+        db.add(team)
+        db.flush()
+    return team
+
+
+def _get_or_create_standing(
+    db: Session, league: League, team: Team, *, rank: int, wins: int, losses: int, ties: int
+) -> None:
+    existing = db.execute(
+        select(Standing).where(Standing.league_id == league.id, Standing.team_id == team.id)
+    ).scalar_one_or_none()
+    if existing is None:
+        db.add(
+            Standing(
+                league_id=league.id, team_id=team.id, rank=rank, wins=wins, losses=losses, ties=ties
+            )
+        )
+        db.flush()
+
+
+def _get_or_create_roster_slot(
+    db: Session, team: Team, *, player_key: str, name: str, position: str, injury_status: str | None
+) -> None:
+    existing = db.execute(
+        select(RosterSlot).where(
+            RosterSlot.team_id == team.id, RosterSlot.yahoo_player_key == player_key
+        )
+    ).scalar_one_or_none()
+    if existing is None:
+        db.add(
+            RosterSlot(
+                team_id=team.id,
+                yahoo_player_key=player_key,
+                player_name=name,
+                position=position,
+                injury_status=injury_status,
+            )
+        )
+        db.flush()
+
+
+def _get_or_create_nba_player(db: Session, *, person_id: int, full_name: str) -> NbaPlayer:
+    player = db.execute(
+        select(NbaPlayer).where(NbaPlayer.nba_person_id == person_id)
+    ).scalar_one_or_none()
+    if player is None:
+        player = NbaPlayer(nba_person_id=person_id, full_name=full_name)
+        db.add(player)
+        db.flush()
+    return player
+
+
+def _get_or_create_player_id_map(
+    db: Session, *, yahoo_player_key: str, yahoo_name: str, nba_player_id: int
+) -> None:
+    existing = db.execute(
+        select(PlayerIdMap).where(PlayerIdMap.yahoo_player_key == yahoo_player_key)
+    ).scalar_one_or_none()
+    if existing is None:
+        db.add(
+            PlayerIdMap(
+                nba_player_id=nba_player_id,
+                yahoo_player_key=yahoo_player_key,
+                yahoo_name=yahoo_name,
+                match_method="exact",
+            )
+        )
+        db.flush()
+
+
+def _get_or_create_season_average(
+    db: Session, *, nba_player_id: int, season: str, averages: dict[str, float]
+) -> None:
+    existing = db.execute(
+        select(PlayerSeasonAverage).where(
+            PlayerSeasonAverage.nba_player_id == nba_player_id,
+            PlayerSeasonAverage.season == season,
+        )
+    ).scalar_one_or_none()
+    if existing is None:
+        db.add(PlayerSeasonAverage(nba_player_id=nba_player_id, season=season, games_played=70, **averages))
+        db.flush()
+
+
+def _warm_scoreboard_cache(db: Session, *, user_id: int, league_key: str) -> None:
+    """Pre-populate the Yahoo scoreboard cache for the dev league.
+
+    GET /api/leagues/{id}/overview calls the real YahooClient for the live
+    matchup, which would try to refresh a Yahoo access token the dev user
+    doesn't have and 401 the whole dashboard. A fresh cache row, keyed with
+    the gateway's own _path_hash (not a reimplementation of it), makes the
+    gateway serve this canned "no matchups" payload instead of ever touching
+    the token refresh / network path. Always re-upserted (not get-or-create)
+    so the cache is fresh -- and thus actually hit -- on every dev-login call.
+    """
+    resource_path = f"league/{league_key}/scoreboard"
+    path_hash = _path_hash(resource_path)
+    payload = {
+        "fantasy_content": {
+            "league": [
+                {"league_key": league_key, "name": "Dev League"},
+                {"scoreboard": [{"matchups": {"count": 0}}]},
+            ]
+        }
+    }
+    stmt = pg_insert(YahooApiCache).values(
+        user_id=user_id, path_hash=path_hash, payload=payload, fetched_at=datetime.now(timezone.utc)
+    )
+    stmt = stmt.on_conflict_do_update(
+        index_elements=["user_id", "path_hash"],
+        set_={"payload": stmt.excluded.payload, "fetched_at": stmt.excluded.fetched_at},
+    )
+    db.execute(stmt)
+    db.flush()
+
+
+@router.post("/api/auth/dev-login", status_code=status.HTTP_204_NO_CONTENT)
+def dev_login(db: Session = Depends(get_session)) -> Response:
+    settings = get_settings()
+    # this flag can never be true in prod (see module comment above) -- this
+    # assertion is the entire access control for an otherwise unauthenticated,
+    # data-seeding endpoint
+    if not settings.dev_auth_enabled:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+
+    user = _get_or_create_user(db)
+    league = _get_or_create_league(db)
+    dev_team = _get_or_create_team(
+        db, league, team_key=DEV_TEAM_KEY, name="Dev Team", is_users_team=True, user_id=user.id
+    )
+    other_team = _get_or_create_team(
+        db, league, team_key=DEV_OTHER_TEAM_KEY, name="Rival Team", is_users_team=False, user_id=None
+    )
+    _get_or_create_standing(db, league, dev_team, rank=1, wins=10, losses=5, ties=0)
+    _get_or_create_standing(db, league, other_team, rank=2, wins=7, losses=8, ties=0)
+
+    for spec in _DEV_PLAYERS:
+        player_key = f"{DEV_LEAGUE_KEY}.p.{spec['person_id']}"
+        _get_or_create_roster_slot(
+            db,
+            dev_team,
+            player_key=player_key,
+            name=spec["name"],
+            position=spec["position"],
+            injury_status=spec["injury_status"],
+        )
+        nba_player = _get_or_create_nba_player(
+            db, person_id=spec["person_id"], full_name=spec["name"]
+        )
+        _get_or_create_player_id_map(
+            db, yahoo_player_key=player_key, yahoo_name=spec["name"], nba_player_id=nba_player.id
+        )
+        _get_or_create_season_average(
+            db, nba_player_id=nba_player.id, season=settings.current_season, averages=spec["averages"]
+        )
+
+    _warm_scoreboard_cache(db, user_id=user.id, league_key=DEV_LEAGUE_KEY)
+
+    response = Response(status_code=status.HTTP_204_NO_CONTENT)
+    set_session_on_response(response, user.id)
     return response

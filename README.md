@@ -22,6 +22,17 @@ Note: live Yahoo login requires HTTPS on the callback (`https://localhost:8000/a
 - Backend: `cd backend && uv run pytest` (needs the docker Postgres up; DB-backed tests roll back per test and skip cleanly if Postgres is down). No live Yahoo or NBA calls — everything runs against recorded fixtures.
 - Frontend: `cd frontend && npx vitest run`, plus `npm run lint` and `npm run build`.
 
+## E2E smoke test
+
+Playwright drives the real stack end to end (landing page → dev-login → dashboard → settings), using a gated `POST /api/auth/dev-login` route (backend only, 404s unless `DEV_AUTH_ENABLED=true`) to skip live Yahoo OAuth.
+
+1. `cd backend && docker compose up -d && uv run alembic upgrade head`
+2. `cd backend && DEV_AUTH_ENABLED=true uv run uvicorn ninecat.main:create_app --factory` → http://localhost:8000
+3. `cd frontend && npm run dev` → http://localhost:3000
+4. `cd frontend && npx playwright test` (or `npm run test:e2e`)
+
+Dev-login seeds a small fixed dataset (idempotent — safe to re-run) directly into the docker Postgres instance; if that instance is shared with `uv run pytest`, delete the seeded rows (`yahoo_guid='DEVUSER'`, `yahoo_league_key='nba.l.999999'`, `nba_person_id IN (900001,900002,900003)`) before running the backend suite again.
+
 ## Data notes
 
 - Yahoo fixtures under `backend/tests/fixtures/yahoo/` are hand-built and must be re-recorded via the gateway's `record_fixture` helper once live API access is verified (see the fixtures README).
