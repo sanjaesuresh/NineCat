@@ -1,5 +1,6 @@
 from ninecat.models.cache import YahooApiCache
 from ninecat.models.core import League, RosterSlot, Standing, Team, User, YahooToken
+from ninecat.models.jobs import JobRun
 from ninecat.models.warehouse import (
     NbaGame,
     NbaPlayer,
@@ -10,6 +11,7 @@ from ninecat.models.warehouse import (
 )
 
 __all__ = [
+    "JobRun",
     "League",
     "NbaGame",
     "NbaPlayer",

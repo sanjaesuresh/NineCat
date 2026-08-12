@@ -17,7 +17,11 @@ config = context.config
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # disable_existing_loggers=False: the default (True) permanently disables
+    # every logger not listed in alembic.ini -- including app loggers like
+    # ninecat.jobs.scheduler -- for the rest of the process once any in-process
+    # alembic command runs (e.g. from a test's migration check)
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 # models' metadata lives on ninecat.db.Base; future model modules attach their
 # tables to it by importing Base, so autogenerate sees them without edits here
