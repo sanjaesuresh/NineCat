@@ -1,0 +1,66 @@
+@import "tailwindcss";
+
+/*
+ * NineCat design tokens — "sports almanac / box score" system.
+ * Paper + ink carry all body text (near-max contrast in both themes);
+ * court/amber/alert are used only as borders, dots and fills, never as
+ * text-on-background pairs, so accent hues can't create a contrast failure.
+ */
+:root {
+  --paper: #e7e2d2; /* ledger paper */
+  --ink: #1c1a14; /* scoreboard ink */
+  --court: #1f6f4a; /* hardwood green — primary accent, live states */
+  --amber: #9c5f14; /* bench amber — coming-soon accent */
+  --rule: #b7ae96; /* chalk-line hairlines */
+  --alert: #a3311c; /* foul red — error states */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #17160f;
+    --ink: #ede7d6;
+    --court: #3fae79;
+    --amber: #e3a339;
+    --rule: #4b4736;
+    --alert: #e0604a;
+  }
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --color-court: var(--court);
+  --color-amber: var(--amber);
+  --color-rule: var(--rule);
+  --color-alert: var(--alert);
+  --font-display: var(--font-zilla-slab);
+  --font-body: var(--font-source-serif);
+  --font-mono: var(--font-space-mono);
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body), ui-serif, Georgia, serif;
+}
+
+/* visible keyboard focus everywhere, independent of any accent-color choice */
+:focus-visible {
+  outline: 2px solid var(--court);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--court);
+  color: var(--paper);
+}
+
+/* respect reduced-motion preference for the few hover transitions we use */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
