@@ -14,6 +14,7 @@ unwrapping is owned here so client.py can stay a thin path-compose-and-call laye
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 
@@ -107,6 +108,14 @@ class MatchupTeam:
 class Matchup:
     week: int
     teams: list[MatchupTeam]
+
+
+@dataclass(frozen=True)
+class UserTeamInfo:
+    """One of the current user's own teams (Task 13: who to link as Team.user_id)."""
+
+    team_key: str
+    league_key: str
 
 
 # --- shared unwrapping helpers ---
@@ -483,3 +492,54 @@ def parse_scoreboard(raw: dict) -> list[Matchup]:
         matchups.append(Matchup(week=week, teams=matchup_teams))
 
     return matchups
+
+
+# --- get_user_teams ---
+
+# a yahoo team_key is "<game_key>.l.<league_id>.t.<team_id>"; the league_key is
+# everything up to (not including) the trailing ".t.<team_id>" segment -- yahoo's
+# user-scoped teams collection carries no separate league_key field, so this is
+# the only way to recover it without a second API call per team
+_LEAGUE_KEY_FROM_TEAM_KEY = re.compile(r"^(?P<league_key>.+\.l\.[^.]+)\.t\.[^.]+$")
+
+
+def _league_key_from_team_key(team_key: str, path: str) -> str:
+    match = _LEAGUE_KEY_FROM_TEAM_KEY.match(team_key)
+    if not match:
+        raise YahooParseError(path)
+    return match.group("league_key")
+
+
+def parse_user_teams(raw: dict) -> list[UserTeamInfo]:
+    fc = _get(raw, "fantasy_content", "fantasy_content")
+    users = _get(fc, "users", "fantasy_content.users")
+    teams: list[UserTeamInfo] = []
+
+    for i, user_wrap in enumerate(_collection_items(users, "fantasy_content.users")):
+        user_path = f"fantasy_content.users[{i}]"
+        user = _get(user_wrap, "user", user_path)
+        games_section = _find_section(user, "games", f"{user_path}.user")
+
+        for j, game_wrap in enumerate(_collection_items(games_section, f"{user_path}.user.games")):
+            game_path = f"{user_path}.user.games[{j}]"
+            game = _get(game_wrap, "game", game_path)
+            teams_section = _find_section(game, "teams", f"{game_path}.game")
+
+            for k, team_wrap in enumerate(
+                _collection_items(teams_section, f"{game_path}.game.teams")
+            ):
+                team_path = f"{game_path}.game.teams[{k}]"
+                team_list = _get(team_wrap, "team", team_path)
+                attrs_list = team_list[0] if isinstance(team_list, list) else team_list
+                attrs = _merge_attrs(attrs_list, f"{team_path}.team")
+                team_key = _get(attrs, "team_key", f"{team_path}.team")
+                teams.append(
+                    UserTeamInfo(
+                        team_key=team_key,
+                        league_key=_league_key_from_team_key(
+                            team_key, f"{team_path}.team.team_key"
+                        ),
+                    )
+                )
+
+    return teams

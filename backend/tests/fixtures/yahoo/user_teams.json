@@ -1,0 +1,69 @@
+{
+  "fantasy_content": {
+    "users": {
+      "0": {
+        "user": [
+          [
+            { "guid": "ABC123XYZ" }
+          ],
+          {
+            "games": [
+              {
+                "game": [
+                  {
+                    "game_key": "466",
+                    "game_id": "466",
+                    "name": "Basketball",
+                    "code": "nba",
+                    "type": "full",
+                    "season": "2024"
+                  },
+                  {
+                    "teams": {
+                      "0": {
+                        "team": [
+                          [
+                            { "team_key": "466.l.12345.t.1" },
+                            { "team_id": "1" },
+                            { "name": "Air Bud" }
+                          ]
+                        ]
+                      },
+                      "count": 1
+                    }
+                  }
+                ]
+              },
+              {
+                "game": [
+                  {
+                    "game_key": "454",
+                    "game_id": "454",
+                    "name": "Basketball",
+                    "code": "nba",
+                    "type": "full",
+                    "season": "2023"
+                  },
+                  {
+                    "teams": [
+                      {
+                        "team": [
+                          [
+                            { "team_key": "454.l.67890.t.7" },
+                            { "team_id": "7" },
+                            { "name": "Old Rivals" }
+                          ]
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "count": 1
+    }
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "fantasy_content": {
+    "league": [
+      {
+        "league_key": "466.l.12345",
+        "name": "Nine Cat Nation"
+      },
+      {
+        "scoreboard": [
+          {
+            "matchups": {
+              "0": {
+                "matchup": {
+                  "week": "5",
+                  "0": {
+                    "teams": {
+                      "0": {
+                        "team": [
+                          [
+                            { "team_key": "466.l.12345.t.1" },
+                            { "name": "Air Bud" }
+                          ],
+                          {
+                            "team_stats": {
+                              "stats": [
+                                { "stat": { "stat_id": "5", "value": ".490" } },
+                                { "stat": { "stat_id": "19", "value": "30" } }
+                              ]
+                            }
+                          }
+                        ]
+                      },
+                      "1": {
+                        "team": [
+                          [
+                            { "team_key": "466.l.12345.t.2" },
+                            { "name": "Rebound City" }
+                          ],
+                          {
+                            "team_stats": {
+                              "stats": [
+                                { "stat": { "stat_id": "5", "value": ".510" } },
+                                { "stat": { "stat_id": "19", "value": "35" } }
+                              ]
+                            }
+                          }
+                        ]
+                      },
+                      "count": 2
+                    }
+                  }
+                }
+              },
+              "count": 1
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

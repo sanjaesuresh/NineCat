@@ -198,6 +198,43 @@ def test_get_scoreboard_parses_two_matchups_with_category_totals_keyed_by_stat_i
     ]
 
 
+def test_get_scoreboard_without_week_omits_week_param_and_uses_response_week():
+    gateway = _StubGateway(
+        {f"league/{LEAGUE_KEY}/scoreboard": _load("league_scoreboard_current_week.json")}
+    )
+    client = YahooClient(gateway)
+
+    matchups = client.get_scoreboard(LEAGUE_KEY)
+
+    assert len(matchups) == 1
+    assert matchups[0].week == 5
+    assert [t.name for t in matchups[0].teams] == ["Air Bud", "Rebound City"]
+    assert gateway.calls == [(f"league/{LEAGUE_KEY}/scoreboard", SCOREBOARD_CACHE_TTL_SECONDS)]
+
+
+# --- get_user_teams ---
+
+
+def test_get_user_teams_derives_league_key_from_team_key_prefix():
+    gateway = _StubGateway(
+        {"users;use_login=1/games;game_keys=nba/teams": _load("user_teams.json")}
+    )
+    client = YahooClient(gateway)
+
+    teams = client.get_user_teams()
+
+    assert len(teams) == 2
+    # first game's teams arrive as a numeric-key+count dict in the fixture
+    assert teams[0].team_key == "466.l.12345.t.1"
+    assert teams[0].league_key == "466.l.12345"
+    # second game's teams arrive as a plain array -- exercises the other branch
+    assert teams[1].team_key == "454.l.67890.t.7"
+    assert teams[1].league_key == "454.l.67890"
+    assert gateway.calls == [
+        ("users;use_login=1/games;game_keys=nba/teams", TEAMS_CACHE_TTL_SECONDS)
+    ]
+
+
 # --- malformed fixture -> clear YahooParseError, not a bare KeyError ---
 
 

@@ -17,12 +17,14 @@ from ninecat.yahoo.parsers import (
     RosterEntry,
     StandingEntry,
     TeamInfo,
+    UserTeamInfo,
     parse_league_settings,
     parse_league_teams,
     parse_scoreboard,
     parse_standings,
     parse_team_roster,
     parse_user_leagues,
+    parse_user_teams,
 )
 
 # cache TTLs, one per resource kind -- how volatile each resource is in practice
@@ -52,6 +54,14 @@ class YahooClient:
         )
         return parse_user_leagues(raw)
 
+    def get_user_teams(self) -> list[UserTeamInfo]:
+        # same TTL as get_league_teams -- rosters/teams don't churn within a day,
+        # and this is Task 13's way of discovering which Team row is "mine"
+        raw = self._gateway.get(
+            "users;use_login=1/games;game_keys=nba/teams", TEAMS_CACHE_TTL_SECONDS
+        )
+        return parse_user_teams(raw)
+
     def get_league_settings(self, league_key: str) -> LeagueSettings:
         raw = self._gateway.get(f"league/{league_key}/settings", SETTINGS_CACHE_TTL_SECONDS)
         return parse_league_settings(raw)
@@ -68,8 +78,12 @@ class YahooClient:
         raw = self._gateway.get(f"league/{league_key}/standings", STANDINGS_CACHE_TTL_SECONDS)
         return parse_standings(raw)
 
-    def get_scoreboard(self, league_key: str, week: int) -> list[Matchup]:
-        raw = self._gateway.get(
-            f"league/{league_key}/scoreboard;week={week}", SCOREBOARD_CACHE_TTL_SECONDS
-        )
+    def get_scoreboard(self, league_key: str, week: int | None = None) -> list[Matchup]:
+        # week=None omits the ;week= filter entirely -- yahoo then returns whatever
+        # week is "current" for the league (in-season) instead of erroring, which is
+        # exactly what the dashboard's live matchup view wants
+        path = f"league/{league_key}/scoreboard"
+        if week is not None:
+            path = f"{path};week={week}"
+        raw = self._gateway.get(path, SCOREBOARD_CACHE_TTL_SECONDS)
         return parse_scoreboard(raw)

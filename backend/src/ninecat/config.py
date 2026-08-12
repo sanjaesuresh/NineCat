@@ -25,6 +25,13 @@ class Settings(BaseSettings):
     database_url: str
     frontend_origin: str = "http://localhost:3000"
     dev_auth_enabled: bool = False
+    # which PlayerSeasonAverage.season row the dashboard (roster averages, build
+    # profile population) reads; bump this once a season when the new season's
+    # averages are worth showing instead of last year's
+    current_season: str = "2025-26"
+    # off by default so tests/dev never spin up a background scheduler thread;
+    # production sets SCHEDULER_ENABLED=true to run the nightly warehouse sync
+    scheduler_enabled: bool = False
 
 
 @lru_cache

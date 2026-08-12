@@ -21,4 +21,6 @@ adjusted against the real payloads at that point.
 | `team_roster.json` | `team/{team_key}/roster` | `get_team_roster` |
 | `league_standings.json` | `league/{league_key}/standings` | `get_standings` |
 | `league_scoreboard.json` | `league/{league_key}/scoreboard;week={week}` | `get_scoreboard` |
+| `league_scoreboard_current_week.json` | `league/{league_key}/scoreboard` (no `;week=`) | `get_scoreboard` with `week=None` |
+| `user_teams.json` | `users;use_login=1/games;game_keys=nba/teams` | `get_user_teams` |
 | `malformed_league_settings.json` | n/a — deliberately missing `stat_categories`/`scoring_type`/playoff keys, used only to test `YahooParseError` | error-path test |
