@@ -1,0 +1,53 @@
+[
+  {
+    "nba_person_id": 201939,
+    "full_name": "Stephen Curry",
+    "nba_team_id": 1610612738,
+    "games_played": 55,
+    "fgm": 9.5,
+    "fga": 19.8,
+    "ftm": 3.2,
+    "fta": 3.5,
+    "tpm": 4.8,
+    "pts": 27.1,
+    "reb": 4.4,
+    "ast": 6.0,
+    "stl": 0.9,
+    "blk": 0.3,
+    "tov": 2.8
+  },
+  {
+    "nba_person_id": 1629029,
+    "full_name": "Luka Doncic",
+    "nba_team_id": null,
+    "games_played": 60,
+    "fgm": 10.2,
+    "fga": 20.9,
+    "ftm": 6.9,
+    "fta": 8.1,
+    "tpm": 3.5,
+    "pts": 32.4,
+    "reb": 8.6,
+    "ast": 8.0,
+    "stl": 1.4,
+    "blk": 0.5,
+    "tov": 3.6
+  },
+  {
+    "nba_person_id": 1630163,
+    "full_name": "Jaren Jackson Jr",
+    "nba_team_id": 9999999,
+    "games_played": 58,
+    "fgm": 6.1,
+    "fga": 12.0,
+    "ftm": 3.9,
+    "fta": 4.8,
+    "tpm": 1.0,
+    "pts": 17.1,
+    "reb": 5.5,
+    "ast": 1.3,
+    "stl": 1.0,
+    "blk": 1.6,
+    "tov": 1.5
+  }
+]
