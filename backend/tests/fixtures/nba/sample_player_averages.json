@@ -14,7 +14,8 @@
     "ast": 6.0,
     "stl": 0.9,
     "blk": 0.3,
-    "tov": 2.8
+    "tov": 2.8,
+    "position": "Guard"
   },
   {
     "nba_person_id": 1629029,
@@ -31,7 +32,8 @@
     "ast": 8.0,
     "stl": 1.4,
     "blk": 0.5,
-    "tov": 3.6
+    "tov": 3.6,
+    "position": ""
   },
   {
     "nba_person_id": 1630163,

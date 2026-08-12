@@ -1,8 +1,14 @@
 import json
 from pathlib import Path
 
+import pytest
+from alembic import command
+from alembic.config import Config
+from alembic.script import ScriptDirectory
 from sqlalchemy import select
+from sqlalchemy.exc import OperationalError
 
+from ninecat.db import get_engine
 from ninecat.models import NbaPlayer, NbaTeam, PlayerSeasonAverage
 from ninecat.warehouse.player_stats import sync_player_averages
 
@@ -128,6 +134,76 @@ def test_sync_player_averages_rerun_with_changed_value_updates_in_place(db_sessi
     assert average.pts == 30.0
 
 
+def test_sync_player_averages_persists_position_when_present(db_session):
+    sync_player_averages(db_session, season="2025-26", fetcher=_fixture_fetcher)
+    db_session.flush()
+
+    curry = db_session.execute(
+        select(NbaPlayer).where(NbaPlayer.nba_person_id == CURRY_PERSON_ID)
+    ).scalar_one()
+    assert curry.position == "Guard"
+
+
+def test_sync_player_averages_stores_none_for_blank_or_missing_position(db_session):
+    # doncic's fixture row has an explicit blank "" position; jjj's row omits
+    # the key entirely -- both must land as None, never crash or store ""
+    sync_player_averages(db_session, season="2025-26", fetcher=_fixture_fetcher)
+    db_session.flush()
+
+    doncic = db_session.execute(
+        select(NbaPlayer).where(NbaPlayer.nba_person_id == DONCIC_PERSON_ID)
+    ).scalar_one()
+    jjj = db_session.execute(
+        select(NbaPlayer).where(NbaPlayer.nba_person_id == JJJ_PERSON_ID)
+    ).scalar_one()
+    assert doncic.position is None
+    assert jjj.position is None
+
+
+def test_sync_player_averages_rerun_with_changed_position_updates_in_place(db_session):
+    sync_player_averages(db_session, season="2025-26", fetcher=_fixture_fetcher)
+    db_session.flush()
+
+    def _repositioned_fetcher(season: str) -> list[dict]:
+        rows = json.loads(FIXTURE_PATH.read_text())
+        for row in rows:
+            if row["nba_person_id"] == CURRY_PERSON_ID:
+                row["position"] = "PG"
+        return rows
+
+    sync_player_averages(db_session, season="2025-26", fetcher=_repositioned_fetcher)
+    db_session.flush()
+    db_session.expire_all()
+
+    curry = db_session.execute(
+        select(NbaPlayer).where(NbaPlayer.nba_person_id == CURRY_PERSON_ID)
+    ).scalar_one()
+    assert curry.position == "PG"
+
+
+def test_sync_player_averages_position_blind_resync_preserves_existing_position(db_session):
+    # the nightly job's live fetcher never supplies a position (LeagueDashPlayerStats
+    # has no position column) -- a re-sync from a position-blind fetcher must not
+    # NULL out a position a prior sync/backfill already stored
+    sync_player_averages(db_session, season="2025-26", fetcher=_fixture_fetcher)
+    db_session.flush()
+
+    def _position_blind_fetcher(season: str) -> list[dict]:
+        rows = json.loads(FIXTURE_PATH.read_text())
+        for row in rows:
+            row.pop("position", None)
+        return rows
+
+    sync_player_averages(db_session, season="2025-26", fetcher=_position_blind_fetcher)
+    db_session.flush()
+    db_session.expire_all()
+
+    curry = db_session.execute(
+        select(NbaPlayer).where(NbaPlayer.nba_person_id == CURRY_PERSON_ID)
+    ).scalar_one()
+    assert curry.position == "Guard"
+
+
 def test_sync_player_averages_dedupes_duplicate_person_id_in_one_batch(db_session):
     # a fetcher could return the same player twice in one page/batch; without
     # dedupe, a single multi-row ON CONFLICT DO UPDATE hitting the same
@@ -145,3 +221,32 @@ def test_sync_player_averages_dedupes_duplicate_person_id_in_one_batch(db_sessio
     averages = db_session.execute(select(PlayerSeasonAverage)).scalars().all()
     assert len(players) == 3
     assert len(averages) == 3
+
+
+# --- migration ---
+
+BACKEND_DIR = Path(__file__).resolve().parents[1]
+PRIOR_HEAD = "f7372f04c6a5"
+
+
+def _alembic_config() -> Config:
+    cfg = Config(str(BACKEND_DIR / "alembic.ini"))
+    cfg.set_main_option("script_location", str(BACKEND_DIR / "alembic"))
+    return cfg
+
+
+def test_migration_upgrade_downgrade_upgrade_is_clean_with_single_head():
+    # skip (not fail) on a machine/CI without postgres up, matching db_session's
+    # own skip behavior elsewhere in this suite
+    try:
+        get_engine().connect().close()
+    except OperationalError as exc:
+        pytest.skip(f"Postgres unreachable: {exc}")
+
+    cfg = _alembic_config()
+    script = ScriptDirectory.from_config(cfg)
+    heads = script.get_heads()
+    assert len(heads) == 1
+
+    command.downgrade(cfg, PRIOR_HEAD)
+    command.upgrade(cfg, "head")

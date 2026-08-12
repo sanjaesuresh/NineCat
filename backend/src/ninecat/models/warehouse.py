@@ -75,6 +75,10 @@ class NbaPlayer(Base):
         BigInteger, ForeignKey("nba_teams.id", ondelete="SET NULL"), nullable=True, index=True
     )
     is_active: Mapped[bool] = mapped_column(nullable=False, default=True)
+    # coarse nba_api position string (e.g. "Guard", "Forward-Center", "PG"); nullable
+    # since not every fetcher payload carries one -- engine/positions.py maps whatever
+    # is stored here to Yahoo slot-class eligibility, falling back to UTIL-only on None
+    position: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class PlayerSeasonAverage(Base):

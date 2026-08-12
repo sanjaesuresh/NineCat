@@ -8,6 +8,7 @@ with Yahoo -- /api/auth/yahoo/callback would not match the registered redirect U
 import logging
 import secrets
 from collections.abc import Generator
+from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 
 import httpx
@@ -26,6 +27,7 @@ from ninecat.models import (
     League,
     NbaPlayer,
     PlayerIdMap,
+    PlayerProjection,
     PlayerSeasonAverage,
     RosterSlot,
     Standing,
@@ -39,6 +41,11 @@ from ninecat.models import (
 # looks up -- if the hash algorithm or path template ever changes there, this
 # breaks loudly (ImportError / wrong-hash test failure) instead of silently
 from ninecat.yahoo.gateway import _path_hash
+# reuse the real parser dataclasses (not a hand-rolled dict) so the dev
+# league's settings_json is byte-for-byte the same shape sync_league_detail
+# produces from a live Yahoo response -- the draft engine can't tell the
+# difference between dev-seeded and real settings
+from ninecat.yahoo.parsers import CategoryInfo, LeagueSettings, RosterPosition
 
 router = APIRouter()
 
@@ -135,6 +142,9 @@ def yahoo_login() -> RedirectResponse:
             "client_id": settings.yahoo_client_id,
             "redirect_uri": settings.yahoo_redirect_uri,
             "response_type": "code",
+            # fspt-r = fantasy sports read; request it explicitly -- tokens minted
+            # without it get 403 from fantasysports.yahooapis.com (live-observed)
+            "scope": "fspt-r",
             "state": state,
         },
     )
@@ -241,7 +251,7 @@ def yahoo_callback(
 
     if users_response.status_code != status.HTTP_200_OK:
         return _auth_error_redirect(
-            settings.frontend_origin, f"guid_fetch_status_{users_response.status_code}"
+            settings.frontend_origin, f"guid_fetch_status_{users_response.status_code}; body={users_response.text[:200]!r}"
         )
 
     try:
@@ -324,6 +334,42 @@ DEV_TEAM_KEY = "nba.l.999999.t.1"
 DEV_OTHER_TEAM_KEY = "nba.l.999999.t.2"
 DEV_LEAGUE_SEASON = 2025
 
+# real values from tests/fixtures/yahoo/league_settings.json (a live-shaped Yahoo
+# settings response) -- keeps the dev league's roster_positions/categories/stat_ids
+# identical to what a real synced league would carry, so draft valuation math
+# (which reads stat_id + is_negative straight from settings_json) never has to
+# special-case the dev fixture
+_DEV_LEAGUE_SETTINGS = LeagueSettings(
+    categories=[
+        CategoryInfo(stat_id=5, name="Field Goal Percentage", display_name="FG%", is_negative=False),
+        CategoryInfo(stat_id=8, name="Free Throw Percentage", display_name="FT%", is_negative=False),
+        CategoryInfo(stat_id=10, name="3-point Shots Made", display_name="3PTM", is_negative=False),
+        CategoryInfo(stat_id=12, name="Points Scored", display_name="PTS", is_negative=False),
+        CategoryInfo(stat_id=15, name="Total Rebounds", display_name="REB", is_negative=False),
+        CategoryInfo(stat_id=16, name="Assists", display_name="AST", is_negative=False),
+        CategoryInfo(stat_id=17, name="Steals", display_name="ST", is_negative=False),
+        CategoryInfo(stat_id=18, name="Blocked Shots", display_name="BLK", is_negative=False),
+        # sort_order "0" (lower-is-better) -> is_negative=True, same as parse_league_settings
+        CategoryInfo(stat_id=19, name="Turnovers", display_name="TO", is_negative=True),
+    ],
+    roster_positions=[
+        RosterPosition(position="PG", count=1),
+        RosterPosition(position="SG", count=1),
+        RosterPosition(position="G", count=1),
+        RosterPosition(position="SF", count=1),
+        RosterPosition(position="PF", count=1),
+        RosterPosition(position="F", count=1),
+        RosterPosition(position="C", count=2),
+        RosterPosition(position="UTIL", count=3),
+        RosterPosition(position="BN", count=3),
+        RosterPosition(position="IL", count=2),
+    ],
+    max_weekly_adds=4,
+    playoff_start_week=20,
+    num_playoff_teams=4,
+)
+DEV_LEAGUE_SETTINGS_JSON = asdict(_DEV_LEAGUE_SETTINGS)
+
 # natural-key seed data for the three roster players; nba_person_id values live
 # in a 900000+ block that no real nba_api sync will ever produce, so a dev run
 # can never collide with real warehouse data
@@ -360,6 +406,124 @@ _DEV_PLAYERS = [
     },
 ]  # fmt: skip
 
+# draftable pool: ~72 real, recognizable NBA players (names only -- these are
+# hand-modeled realistic per-game lines for a demo, not licensed/official
+# projections) spanning every position with plausible scarcity (few truly
+# elite centers, deep guard/wing pool), and covering archetypes a knowledgeable
+# fantasy player expects to see: two-way stars, punt-FT rim protectors, 3PM
+# specialists, high-assist/low-scoring floor generals, and several
+# injury-flagged players (low "games") for punt/risk scenarios. person_id
+# block 900101-900199 extends the 900001-900003 dev-roster block without
+# collision. Row shape: (person_id, name, position, games, fgm, fga, ftm,
+# fta, tpm, reb, ast, stl, blk, tov) -- pts is derived below via
+# pts = 2*fgm + tpm + ftm (equivalent to 2*(fgm-tpm) + 3*tpm + ftm), which
+# keeps every row internally consistent by construction instead of by hand
+# arithmetic.
+#
+# positions carry real dual Yahoo-style eligibility (e.g. "PF-C", "SG-SF")
+# wherever a player is actually dual-eligible in real life -- most rotation
+# bigs and wings are. A single-position tag (e.g. Jokic "C", Zion "PF") is
+# reserved for players who are genuinely single-position in real Yahoo
+# leagues. Without this, a pool that's 90%+ single-position understates
+# replacement level at PF/SF (real bigs backstop those slots via their C/PF
+# eligibility) and visibly distorts the draft board.
+_DEV_POOL_RAW: list[tuple] = [
+    (900101, "Nikola Jokic", "C", 78, 10.5, 16.0, 6.0, 7.0, 1.2, 11.5, 9.5, 1.2, 0.7, 3.0),
+    (900102, "Luka Doncic", "PG-SG", 70, 10.0, 20.5, 7.5, 9.0, 3.5, 8.5, 8.5, 1.3, 0.5, 3.7),
+    (900103, "Shai Gilgeous-Alexander", "PG-SG", 75, 10.5, 19.5, 7.0, 7.8, 1.5, 5.2, 6.2, 1.7, 1.0, 2.4),
+    (900104, "Giannis Antetokounmpo", "SF-PF", 70, 11.5, 18.5, 6.5, 10.0, 0.5, 11.5, 6.0, 1.0, 1.1, 3.3),
+    (900105, "Jayson Tatum", "SF-PF", 72, 9.5, 20.0, 5.5, 6.5, 3.0, 8.0, 4.5, 1.0, 0.6, 2.5),
+    (900106, "Tyrese Haliburton", "PG", 70, 7.0, 14.5, 3.0, 3.5, 2.8, 3.8, 10.5, 1.3, 0.5, 2.4),
+    (900107, "Anthony Edwards", "SG-SF", 75, 9.0, 19.5, 5.0, 6.0, 3.5, 5.5, 4.5, 1.3, 0.6, 3.0),
+    (900108, "Domantas Sabonis", "PF-C", 78, 8.0, 13.0, 3.5, 4.5, 0.3, 13.0, 6.0, 0.9, 0.5, 2.9),
+    (900109, "Devin Booker", "SG-PG", 68, 9.0, 19.0, 5.5, 6.3, 2.2, 4.5, 6.5, 0.9, 0.4, 2.8),
+    (900110, "Donovan Mitchell", "SG-PG", 70, 8.8, 19.0, 5.0, 5.8, 3.2, 4.3, 4.9, 1.4, 0.4, 2.7),
+    (900111, "Jalen Brunson", "PG-SG", 70, 9.0, 19.5, 5.5, 6.2, 2.5, 3.6, 7.3, 0.9, 0.2, 2.5),
+    (900112, "Trae Young", "PG", 72, 7.5, 17.5, 6.0, 6.8, 3.0, 3.0, 10.8, 1.0, 0.1, 4.2),
+    (900113, "De'Aaron Fox", "PG", 72, 8.5, 18.5, 4.5, 5.5, 1.8, 4.0, 5.8, 1.8, 0.4, 3.0),
+    (900114, "Damian Lillard", "PG", 65, 7.8, 17.0, 5.5, 6.2, 4.0, 4.2, 6.5, 0.9, 0.3, 3.0),
+    (900115, "Kawhi Leonard", "SF-PF", 50, 8.0, 15.5, 4.0, 4.5, 1.8, 6.2, 3.5, 1.5, 0.5, 1.8),
+    (900116, "Joel Embiid", "C", 45, 8.5, 16.0, 8.5, 10.0, 1.2, 9.5, 4.0, 0.9, 1.5, 3.2),
+    (900117, "Ja Morant", "PG", 55, 7.5, 16.5, 4.5, 5.8, 1.2, 4.0, 7.0, 1.0, 0.3, 3.0),
+    (900118, "Zion Williamson", "PF", 48, 8.5, 14.0, 5.0, 7.5, 0.1, 6.8, 4.8, 1.0, 0.6, 3.0),
+    (900119, "Jamal Murray", "PG-SG", 58, 7.5, 16.0, 3.5, 4.0, 2.3, 4.0, 6.0, 0.9, 0.3, 2.5),
+    (900120, "Kristaps Porzingis", "PF-C", 50, 6.5, 13.0, 4.0, 4.8, 1.8, 7.2, 1.8, 0.7, 1.7, 1.8),
+    (900121, "Paul George", "SG-SF", 58, 6.5, 14.5, 3.5, 4.2, 2.5, 5.5, 3.3, 1.4, 0.4, 2.3),
+    (900122, "Bradley Beal", "SG", 55, 7.0, 14.5, 3.0, 3.5, 1.5, 4.2, 4.5, 0.9, 0.3, 2.2),
+    (900123, "Rudy Gobert", "C", 75, 5.0, 7.5, 1.8, 3.5, 0.0, 11.5, 1.5, 0.7, 2.0, 1.8),
+    (900124, "Ivica Zubac", "C", 78, 6.5, 10.5, 2.5, 4.5, 0.0, 11.5, 2.0, 0.6, 1.1, 1.5),
+    (900125, "Clint Capela", "C", 72, 4.5, 7.0, 1.5, 3.0, 0.0, 10.5, 1.2, 0.6, 1.3, 1.3),
+    (900126, "Nic Claxton", "C", 65, 4.8, 7.5, 1.3, 2.5, 0.0, 8.5, 1.8, 0.9, 2.0, 1.4),
+    (900127, "Mitchell Robinson", "C", 58, 3.5, 5.0, 1.0, 2.2, 0.0, 8.5, 0.8, 0.5, 1.7, 1.0),
+    (900128, "Jarrett Allen", "C", 75, 6.0, 9.0, 2.5, 3.8, 0.0, 9.8, 2.8, 0.9, 1.1, 1.5),
+    (900129, "Buddy Hield", "SG", 78, 5.0, 11.5, 1.5, 1.8, 3.5, 3.5, 2.5, 0.7, 0.2, 1.3),
+    (900130, "Klay Thompson", "SG-SF", 75, 5.5, 12.5, 1.2, 1.4, 3.2, 3.2, 2.2, 0.6, 0.4, 1.0),
+    (900131, "Duncan Robinson", "SG", 72, 3.8, 8.5, 0.8, 0.9, 2.8, 2.5, 2.0, 0.5, 0.1, 1.0),
+    (900132, "Sam Merrill", "SG", 75, 3.5, 7.8, 0.9, 1.0, 2.5, 2.3, 1.8, 0.7, 0.1, 0.8),
+    (900133, "Max Strus", "SG-SF", 74, 4.0, 9.5, 1.2, 1.4, 2.7, 4.0, 2.5, 0.7, 0.2, 1.2),
+    (900134, "Malik Beasley", "SG-SF", 78, 4.5, 10.5, 1.0, 1.2, 3.0, 3.2, 1.8, 0.8, 0.2, 1.0),
+    (900135, "Tyus Jones", "PG", 75, 3.5, 7.5, 1.2, 1.4, 1.0, 2.5, 8.0, 1.1, 0.1, 1.3),
+    (900136, "T.J. McConnell", "PG", 72, 4.0, 7.5, 1.5, 1.8, 0.2, 3.0, 6.5, 1.6, 0.2, 1.5),
+    (900137, "Payton Pritchard", "PG-SG", 80, 5.5, 12.0, 1.8, 2.0, 3.2, 3.8, 4.5, 0.9, 0.2, 1.8),
+    (900138, "Jose Alvarado", "PG", 65, 3.2, 7.0, 0.8, 1.0, 1.2, 2.2, 4.5, 1.5, 0.2, 1.5),
+    (900139, "Jrue Holiday", "PG-SG", 75, 5.5, 11.5, 1.8, 2.2, 1.8, 4.8, 4.5, 1.2, 0.5, 1.7),
+    (900140, "Derrick White", "PG-SG", 78, 5.8, 12.5, 1.5, 1.8, 2.5, 4.0, 4.8, 1.1, 1.0, 1.6),
+    (900141, "Marcus Smart", "PG-SG", 65, 4.5, 10.5, 1.8, 2.2, 1.8, 3.5, 4.5, 1.5, 0.4, 2.0),
+    (900142, "Alperen Sengun", "PF-C", 78, 7.5, 14.0, 4.0, 5.5, 0.3, 9.8, 5.2, 1.2, 0.9, 3.0),
+    (900143, "Anthony Davis", "PF-C", 65, 9.5, 17.5, 5.0, 6.5, 0.5, 11.5, 3.2, 1.1, 2.0, 2.0),
+    (900144, "Bam Adebayo", "PF-C", 78, 7.5, 14.0, 4.5, 5.8, 0.5, 9.5, 4.0, 1.1, 0.8, 2.5),
+    (900145, "Karl-Anthony Towns", "PF-C", 72, 8.0, 15.5, 5.5, 6.2, 2.2, 12.5, 3.0, 0.7, 0.6, 2.8),
+    (900146, "Evan Mobley", "PF-C", 75, 7.0, 12.0, 2.8, 4.0, 0.5, 9.5, 3.2, 0.8, 1.6, 2.0),
+    (900147, "Victor Wembanyama", "PF-C", 65, 8.5, 16.5, 4.5, 5.8, 2.0, 11.0, 3.8, 1.2, 3.5, 2.8),
+    (900148, "Chet Holmgren", "PF-C", 68, 6.5, 12.0, 2.5, 3.0, 1.8, 7.8, 2.5, 0.8, 2.2, 1.8),
+    (900149, "Paolo Banchero", "SF-PF", 72, 8.5, 17.5, 5.5, 7.0, 1.5, 6.8, 4.0, 1.0, 0.5, 2.8),
+    (900150, "Franz Wagner", "SF-PF", 78, 7.5, 14.5, 4.5, 5.5, 1.2, 5.2, 4.2, 1.0, 0.4, 2.0),
+    (900151, "Jalen Williams", "SG-SF", 75, 7.0, 13.5, 3.5, 4.0, 1.3, 4.5, 4.8, 1.3, 0.6, 2.3),
+    (900152, "Scottie Barnes", "SF-PF", 75, 7.2, 14.0, 3.0, 4.2, 1.2, 8.0, 5.8, 1.1, 0.8, 2.5),
+    (900153, "Cade Cunningham", "PG", 70, 8.0, 17.5, 5.0, 6.0, 2.0, 4.5, 8.5, 1.0, 0.6, 4.2),
+    (900154, "LaMelo Ball", "PG-SG", 60, 7.5, 17.0, 4.0, 4.8, 3.2, 5.5, 7.5, 1.4, 0.4, 3.5),
+    (900155, "Coby White", "PG-SG", 78, 7.0, 15.5, 2.0, 2.5, 2.8, 4.2, 4.5, 0.8, 0.3, 2.5),
+    (900156, "Jaylen Brown", "SG-SF", 70, 8.5, 18.0, 4.0, 5.0, 2.0, 5.5, 3.5, 1.1, 0.5, 2.8),
+    (900157, "Mikal Bridges", "SG-SF", 80, 7.0, 14.5, 2.5, 3.0, 2.2, 4.5, 3.5, 1.0, 0.4, 1.8),
+    (900158, "OG Anunoby", "SF-PF", 72, 5.5, 11.5, 1.8, 2.2, 2.3, 4.8, 2.2, 1.4, 0.6, 1.5),
+    (900159, "Herbert Jones", "SF-PF", 72, 4.0, 8.5, 1.2, 1.5, 1.3, 4.0, 2.2, 1.5, 0.7, 1.2),
+    (900160, "Deni Avdija", "SF-PF", 76, 6.5, 13.5, 3.0, 3.8, 1.8, 7.5, 4.5, 1.1, 0.5, 2.2),
+    (900161, "Tyrese Maxey", "PG-SG", 78, 8.5, 18.5, 4.5, 5.2, 2.8, 3.8, 6.5, 1.2, 0.5, 2.5),
+    (900162, "Darius Garland", "PG", 65, 7.0, 15.5, 3.0, 3.5, 2.5, 2.8, 6.8, 1.0, 0.1, 2.7),
+    (900163, "Jalen Green", "SG", 72, 7.5, 17.0, 3.5, 4.2, 2.8, 4.0, 3.5, 0.8, 0.4, 2.6),
+    (900164, "Anfernee Simons", "SG-PG", 72, 6.5, 14.5, 2.5, 2.8, 3.0, 3.0, 3.8, 0.7, 0.2, 2.0),
+    (900165, "Norman Powell", "SG-SF", 76, 7.0, 14.5, 2.8, 3.2, 2.5, 3.2, 2.5, 0.9, 0.3, 1.5),
+    (900166, "Walker Kessler", "C", 72, 4.0, 6.0, 1.2, 2.2, 0.0, 9.5, 1.2, 0.6, 2.3, 1.0),
+    (900167, "Daniel Gafford", "C", 75, 4.5, 6.5, 1.5, 2.2, 0.0, 7.0, 1.0, 0.5, 1.4, 1.2),
+    (900168, "Isaiah Hartenstein", "PF-C", 72, 4.5, 7.5, 1.5, 2.2, 0.1, 8.8, 3.5, 0.9, 1.0, 1.5),
+    (900169, "Jalen Duren", "C", 74, 5.5, 8.5, 2.5, 4.5, 0.0, 10.5, 2.5, 0.7, 0.8, 2.0),
+    (900170, "Michael Porter Jr.", "SF-PF", 74, 6.5, 13.5, 1.8, 2.2, 2.5, 6.8, 1.5, 0.7, 0.4, 1.5),
+    (900171, "Brandon Ingram", "SF-PF", 65, 8.0, 17.0, 4.0, 4.8, 1.5, 5.2, 5.0, 0.8, 0.5, 2.8),
+    (900172, "RJ Barrett", "SG-SF", 76, 6.8, 15.0, 3.2, 4.0, 1.5, 5.5, 4.2, 0.8, 0.3, 2.3),
+]  # fmt: skip
+
+
+def _pool_player(row: tuple) -> dict:
+    person_id, name, position, games, fgm, fga, ftm, fta, tpm, reb, ast, stl, blk, tov = row
+    # pts derived, not hand-entered: 2*(fgm-tpm) + 3*tpm + ftm simplifies to
+    # 2*fgm + tpm + ftm -- deriving it here (rather than a 15th hand-typed
+    # column) means every row is exactly internally consistent, not just
+    # "close enough" by eyeball
+    pts = round(2 * fgm + tpm + ftm, 1)
+    return {
+        "person_id": person_id,
+        "name": name,
+        "position": position,
+        "games": games,
+        "averages": {
+            "fgm": fgm, "fga": fga, "ftm": ftm, "fta": fta, "tpm": tpm,
+            "pts": pts, "reb": reb, "ast": ast, "stl": stl, "blk": blk, "tov": tov,
+        },
+    }  # fmt: skip
+
+
+_DEV_POOL_PLAYERS = [_pool_player(row) for row in _DEV_POOL_RAW]
+
 
 def _get_or_create_user(db: Session) -> User:
     user = db.execute(select(User).where(User.yahoo_guid == DEV_USER_GUID)).scalar_one_or_none()
@@ -381,9 +545,16 @@ def _get_or_create_league(db: Session) -> League:
             season=DEV_LEAGUE_SEASON,
             num_teams=2,
             scoring_type="head",
-            settings_json={},
+            settings_json=DEV_LEAGUE_SETTINGS_JSON,
         )
         db.add(league)
+        db.flush()
+    elif league.settings_json != DEV_LEAGUE_SETTINGS_JSON:
+        # self-heal: a league seeded before this constant existed (or before it
+        # changed) would otherwise carry stale/empty settings_json forever, since
+        # get-or-create only writes on insert -- re-login is the natural point to
+        # bring it current, and it's a no-op once it matches
+        league.settings_json = DEV_LEAGUE_SETTINGS_JSON
         db.flush()
     return league
 
@@ -447,13 +618,24 @@ def _get_or_create_roster_slot(
         db.flush()
 
 
-def _get_or_create_nba_player(db: Session, *, person_id: int, full_name: str) -> NbaPlayer:
+def _get_or_create_nba_player(
+    db: Session, *, person_id: int, full_name: str, position: str | None = None
+) -> NbaPlayer:
     player = db.execute(
         select(NbaPlayer).where(NbaPlayer.nba_person_id == person_id)
     ).scalar_one_or_none()
     if player is None:
-        player = NbaPlayer(nba_person_id=person_id, full_name=full_name)
+        player = NbaPlayer(nba_person_id=person_id, full_name=full_name, position=position)
         db.add(player)
+        db.flush()
+    elif player.full_name != full_name or player.position != position:
+        # self-heal: get-or-create only writes on insert, so a row seeded
+        # before the position column existed (or before a seed constant's
+        # name/position changed) would otherwise carry stale data forever --
+        # re-login is the natural point to bring it current; no-op once it
+        # already matches (same pattern as League.settings_json above)
+        player.full_name = full_name
+        player.position = position
         db.flush()
     return player
 
@@ -477,7 +659,12 @@ def _get_or_create_player_id_map(
 
 
 def _get_or_create_season_average(
-    db: Session, *, nba_player_id: int, season: str, averages: dict[str, float]
+    db: Session,
+    *,
+    nba_player_id: int,
+    season: str,
+    averages: dict[str, float],
+    games_played: int = 70,
 ) -> None:
     existing = db.execute(
         select(PlayerSeasonAverage).where(
@@ -486,8 +673,66 @@ def _get_or_create_season_average(
         )
     ).scalar_one_or_none()
     if existing is None:
-        db.add(PlayerSeasonAverage(nba_player_id=nba_player_id, season=season, games_played=70, **averages))
+        db.add(
+            PlayerSeasonAverage(
+                nba_player_id=nba_player_id, season=season, games_played=games_played, **averages
+            )
+        )
         db.flush()
+    else:
+        # self-heal: an edited seed stat line must not be a silent no-op
+        # against a pre-existing dev row (same rationale as NbaPlayer above)
+        changed = existing.games_played != games_played
+        existing.games_played = games_played
+        for key, value in averages.items():
+            if getattr(existing, key) != value:
+                setattr(existing, key, value)
+                changed = True
+        if changed:
+            db.flush()
+
+
+def _get_or_create_projection(
+    db: Session,
+    *,
+    nba_player_id: int,
+    season: str,
+    source: str,
+    projected_games: int,
+    averages: dict[str, float],
+) -> None:
+    # mirrors _get_or_create_season_average, keyed on the projection table's
+    # actual unique constraint (nba_player_id, season, source) instead of just
+    # (nba_player_id, season), since a player can carry projections from
+    # multiple sources at once
+    existing = db.execute(
+        select(PlayerProjection).where(
+            PlayerProjection.nba_player_id == nba_player_id,
+            PlayerProjection.season == season,
+            PlayerProjection.source == source,
+        )
+    ).scalar_one_or_none()
+    if existing is None:
+        db.add(
+            PlayerProjection(
+                nba_player_id=nba_player_id,
+                season=season,
+                source=source,
+                projected_games=projected_games,
+                **averages,
+            )
+        )
+        db.flush()
+    else:
+        # self-heal: same rationale as _get_or_create_season_average above
+        changed = existing.projected_games != projected_games
+        existing.projected_games = projected_games
+        for key, value in averages.items():
+            if getattr(existing, key) != value:
+                setattr(existing, key, value)
+                changed = True
+        if changed:
+            db.flush()
 
 
 def _warm_scoreboard_cache(db: Session, *, user_id: int, league_key: str) -> None:
@@ -553,13 +798,41 @@ def dev_login(db: Session = Depends(get_session)) -> Response:
             injury_status=spec["injury_status"],
         )
         nba_player = _get_or_create_nba_player(
-            db, person_id=spec["person_id"], full_name=spec["name"]
+            db, person_id=spec["person_id"], full_name=spec["name"], position=spec["position"]
         )
         _get_or_create_player_id_map(
             db, yahoo_player_key=player_key, yahoo_name=spec["name"], nba_player_id=nba_player.id
         )
         _get_or_create_season_average(
             db, nba_player_id=nba_player.id, season=settings.current_season, averages=spec["averages"]
+        )
+
+    # draftable pool: unrostered players (no RosterSlot) so the draft board has
+    # something to rank without ever calling Yahoo. Each gets a season average
+    # AND a projection row -- the engine prefers the projection, falling back
+    # to the average, so both paths are exercised by the same dev data.
+    for spec in _DEV_POOL_PLAYERS:
+        player_key = f"{DEV_LEAGUE_KEY}.p.{spec['person_id']}"
+        nba_player = _get_or_create_nba_player(
+            db, person_id=spec["person_id"], full_name=spec["name"], position=spec["position"]
+        )
+        _get_or_create_player_id_map(
+            db, yahoo_player_key=player_key, yahoo_name=spec["name"], nba_player_id=nba_player.id
+        )
+        _get_or_create_season_average(
+            db,
+            nba_player_id=nba_player.id,
+            season=settings.current_season,
+            averages=spec["averages"],
+            games_played=spec["games"],
+        )
+        _get_or_create_projection(
+            db,
+            nba_player_id=nba_player.id,
+            season=settings.current_season,
+            source="dev-seed",
+            projected_games=spec["games"],
+            averages=spec["averages"],
         )
 
     _warm_scoreboard_cache(db, user_id=user.id, league_key=DEV_LEAGUE_KEY)

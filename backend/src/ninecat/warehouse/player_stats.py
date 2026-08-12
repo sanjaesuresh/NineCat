@@ -17,7 +17,9 @@ from ninecat.models.warehouse import NbaPlayer, NbaTeam, PlayerSeasonAverage
 # a normalized per-game stat-line row, shaped the same whether it came from
 # nba_api or a test fixture: {nba_person_id, full_name, nba_team_id (NBA.com
 # team id, or None for a free agent / not-yet-synced team), games_played,
-# fgm, fga, ftm, fta, tpm, pts, reb, ast, stl, blk, tov}
+# fgm, fga, ftm, fta, tpm, pts, reb, ast, stl, blk, tov, position (optional --
+# nba_api's coarse position string, e.g. "Guard"/"PG"/"F-C"; may be absent,
+# blank, or None, all of which are stored as NULL)}
 PlayerStatsRow = Mapping[str, Any]
 Fetcher = Callable[[str], Iterable[PlayerStatsRow]]
 
@@ -31,6 +33,13 @@ def _default_fetcher(season: str) -> list[PlayerStatsRow]:
 
     Imported lazily so importing this module (or running the test suite, which
     always injects a fetcher) never requires nba_api or network access.
+
+    LeagueDashPlayerStats' Base measure type doesn't carry a position column
+    (unlike CommonAllPlayers/PlayerIndex), so this fetcher never supplies
+    "position" -- sync_player_averages' coalesce-on-update means that's safe,
+    it just leaves whatever position a prior sync/backfill already stored
+    alone. The fixture-injected fetcher used in tests exercises the
+    persistence path with real position values.
     """
     from nba_api.stats.endpoints import leaguedashplayerstats
 
@@ -116,6 +125,9 @@ def sync_player_averages(session: Session, season: str, fetcher: Fetcher | None 
                 "full_name": row["full_name"],
                 "nba_team_id": team_internal_id_by_nba_id.get(row.get("nba_team_id")),
                 "is_active": True,
+                # blank/whitespace-only and missing are all "no position data" --
+                # normalize all of them to None rather than storing "" or "  "
+                "position": (row.get("position") or "").strip() or None,
             }
             for row in rows
         ]
@@ -126,6 +138,12 @@ def sync_player_averages(session: Session, season: str, fetcher: Fetcher | None 
             "full_name": player_insert.excluded.full_name,
             "nba_team_id": player_insert.excluded.nba_team_id,
             "is_active": player_insert.excluded.is_active,
+            # coalesce, not a bare overwrite: the nightly job's live fetcher never
+            # supplies a position (see _default_fetcher), so an unconditional
+            # excluded.position would NULL out every player's position on every
+            # nightly re-sync, wiping any future backfill. A row that DOES carry
+            # a position (fixture/backfill) still updates it in place.
+            "position": func.coalesce(player_insert.excluded.position, NbaPlayer.position),
         },
     ).returning(NbaPlayer.id, NbaPlayer.nba_person_id)
     player_internal_id_by_person_id = {
