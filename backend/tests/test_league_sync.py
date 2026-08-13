@@ -165,7 +165,10 @@ def test_sync_user_leagues_creates_league_rows(db_session):
     assert leagues[0].yahoo_league_key == "466.l.1"
     assert leagues[0].synced_at is not None
 
-    rows = db_session.scalars(select(League)).all()
+    # scope the count check to this test's own key, not the whole table -- a
+    # shared dev database can carry unrelated committed leagues (e.g. from a
+    # real e2e run) that a bare `select(League)` count would wrongly trip over
+    rows = db_session.scalars(select(League).where(League.yahoo_league_key == "466.l.1")).all()
     assert len(rows) == 1
 
 
@@ -198,7 +201,10 @@ def test_sync_user_leagues_rerun_updates_renamed_league_in_place(db_session):
     db_session.flush()
     db_session.expire_all()
 
-    rows = db_session.scalars(select(League)).all()
+    # scoped by key, not a bare table count -- proves the rerun updated the
+    # SAME row in place rather than inserting a second one, without assuming
+    # this is the only league in a shared dev database
+    rows = db_session.scalars(select(League).where(League.yahoo_league_key == "466.l.1")).all()
     assert len(rows) == 1
     assert rows[0].name == "Renamed League"
     assert rows[0].season == 2027

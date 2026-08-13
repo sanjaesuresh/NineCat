@@ -141,6 +141,14 @@ def _guid_fetch_error_handler(request: httpx.Request) -> httpx.Response:
     return httpx.Response(500, json={"error": "server_error"})
 
 
+def _row_count(session, model) -> int:
+    # snapshot a table's total row count around an action -- lets "writes nothing"
+    # assertions hold even when the shared dev database already has committed rows
+    # from an unrelated e2e run (this suite's db_session only rolls back ITS OWN
+    # writes, it can't roll back what a prior process already committed)
+    return len(session.execute(select(model)).scalars().all())
+
+
 def _login_state(client: TestClient) -> str:
     """Hit the real login endpoint to mint a validly-signed state value."""
     response = client.get("/api/auth/yahoo/login", follow_redirects=False)
@@ -214,6 +222,8 @@ def test_callback_happy_path_creates_user_and_encrypted_token(db_session):
 
 def test_callback_bad_state_redirects_with_auth_error_and_changes_nothing(db_session):
     client = _client(_app(db_session, token_handler=_ok_token_handler))
+    users_before = _row_count(db_session, User)
+    tokens_before = _row_count(db_session, YahooToken)
 
     response = client.get(
         "/auth/yahoo/callback?code=fake-code&state=not-a-real-state", follow_redirects=False
@@ -225,8 +235,8 @@ def test_callback_bad_state_redirects_with_auth_error_and_changes_nothing(db_ses
     # no session cookie on failure -- the only Set-Cookie here (if any) is the
     # error-path nonce cleanup, never a signed-in session
     assert SESSION_COOKIE_NAME not in response.cookies
-    assert db_session.execute(select(User)).scalars().all() == []
-    assert db_session.execute(select(YahooToken)).scalars().all() == []
+    assert _row_count(db_session, User) == users_before
+    assert _row_count(db_session, YahooToken) == tokens_before
 
 
 def test_callback_expired_state_redirects_with_auth_error(
@@ -240,6 +250,7 @@ def test_callback_expired_state_redirects_with_auth_error(
     client = _client(_app(db_session, token_handler=_ok_token_handler))
     state = _login_state(client)
     fake_now[0] += STATE_MAX_AGE_SECONDS + 1
+    users_before = _row_count(db_session, User)
 
     response = client.get(
         f"/auth/yahoo/callback?code=fake-code&state={state}", follow_redirects=False
@@ -248,12 +259,13 @@ def test_callback_expired_state_redirects_with_auth_error(
     frontend_origin = get_settings().frontend_origin
     assert response.status_code == 302
     assert response.headers["location"] == f"{frontend_origin}/?auth_error=1"
-    assert db_session.execute(select(User)).scalars().all() == []
+    assert _row_count(db_session, User) == users_before
 
 
 def test_callback_yahoo_error_response_redirects_with_auth_error(db_session):
     client = _client(_app(db_session, token_handler=_yahoo_error_handler))
     state = _login_state(client)
+    users_before = _row_count(db_session, User)
 
     response = client.get(
         f"/auth/yahoo/callback?code=fake-code&state={state}", follow_redirects=False
@@ -262,7 +274,7 @@ def test_callback_yahoo_error_response_redirects_with_auth_error(db_session):
     frontend_origin = get_settings().frontend_origin
     assert response.status_code == 302
     assert response.headers["location"] == f"{frontend_origin}/?auth_error=1"
-    assert db_session.execute(select(User)).scalars().all() == []
+    assert _row_count(db_session, User) == users_before
 
 
 def test_callback_guid_fetch_failure_redirects_with_auth_error_and_writes_nothing(db_session):
@@ -271,6 +283,8 @@ def test_callback_guid_fetch_failure_redirects_with_auth_error_and_writes_nothin
     # same as every other failure mode in this callback
     client = _client(_app(db_session, token_handler=_guid_fetch_error_handler))
     state = _login_state(client)
+    users_before = _row_count(db_session, User)
+    tokens_before = _row_count(db_session, YahooToken)
 
     response = client.get(
         f"/auth/yahoo/callback?code=fake-code&state={state}", follow_redirects=False
@@ -280,20 +294,21 @@ def test_callback_guid_fetch_failure_redirects_with_auth_error_and_writes_nothin
     assert response.status_code == 302
     assert response.headers["location"] == f"{frontend_origin}/?auth_error=1"
     assert SESSION_COOKIE_NAME not in response.cookies
-    assert db_session.execute(select(User)).scalars().all() == []
-    assert db_session.execute(select(YahooToken)).scalars().all() == []
+    assert _row_count(db_session, User) == users_before
+    assert _row_count(db_session, YahooToken) == tokens_before
 
 
 def test_callback_missing_code_redirects_with_auth_error(db_session):
     client = _client(_app(db_session, token_handler=_ok_token_handler))
     state = _login_state(client)
+    users_before = _row_count(db_session, User)
 
     response = client.get(f"/auth/yahoo/callback?state={state}", follow_redirects=False)
 
     frontend_origin = get_settings().frontend_origin
     assert response.status_code == 302
     assert response.headers["location"] == f"{frontend_origin}/?auth_error=1"
-    assert db_session.execute(select(User)).scalars().all() == []
+    assert _row_count(db_session, User) == users_before
 
 
 def test_callback_yahoo_denied_consent_redirects_with_auth_error(db_session):
@@ -320,6 +335,8 @@ def test_callback_missing_nonce_cookie_redirects_with_auth_error(db_session):
     state = _login_state(minting_client)
 
     victim_client = _client(_app(db_session, token_handler=_ok_token_handler))
+    users_before = _row_count(db_session, User)
+    tokens_before = _row_count(db_session, YahooToken)
     response = victim_client.get(
         f"/auth/yahoo/callback?code=fake-code&state={state}", follow_redirects=False
     )
@@ -327,8 +344,8 @@ def test_callback_missing_nonce_cookie_redirects_with_auth_error(db_session):
     frontend_origin = get_settings().frontend_origin
     assert response.status_code == 302
     assert response.headers["location"] == f"{frontend_origin}/?auth_error=1"
-    assert db_session.execute(select(User)).scalars().all() == []
-    assert db_session.execute(select(YahooToken)).scalars().all() == []
+    assert _row_count(db_session, User) == users_before
+    assert _row_count(db_session, YahooToken) == tokens_before
 
 
 def test_callback_mismatched_nonce_cookie_redirects_with_auth_error(db_session):
@@ -337,6 +354,8 @@ def test_callback_mismatched_nonce_cookie_redirects_with_auth_error(db_session):
     # tamper with the nonce cookie the login step just set, so it no longer
     # matches the nonce signed into state
     client.cookies.set(OAUTH_NONCE_COOKIE_NAME, "a-different-nonce-value")
+    users_before = _row_count(db_session, User)
+    tokens_before = _row_count(db_session, YahooToken)
 
     response = client.get(
         f"/auth/yahoo/callback?code=fake-code&state={state}", follow_redirects=False
@@ -345,8 +364,8 @@ def test_callback_mismatched_nonce_cookie_redirects_with_auth_error(db_session):
     frontend_origin = get_settings().frontend_origin
     assert response.status_code == 302
     assert response.headers["location"] == f"{frontend_origin}/?auth_error=1"
-    assert db_session.execute(select(User)).scalars().all() == []
-    assert db_session.execute(select(YahooToken)).scalars().all() == []
+    assert _row_count(db_session, User) == users_before
+    assert _row_count(db_session, YahooToken) == tokens_before
 
 
 # --- GET /auth/yahoo/callback: malformed token payload ---
@@ -361,6 +380,8 @@ def test_callback_expires_in_as_string_redirects_with_auth_error(db_session):
 
     client = _client(_app(db_session, token_handler=handler))
     state = _login_state(client)
+    users_before = _row_count(db_session, User)
+    tokens_before = _row_count(db_session, YahooToken)
 
     response = client.get(
         f"/auth/yahoo/callback?code=fake-code&state={state}", follow_redirects=False
@@ -369,8 +390,8 @@ def test_callback_expires_in_as_string_redirects_with_auth_error(db_session):
     frontend_origin = get_settings().frontend_origin
     assert response.status_code == 302
     assert response.headers["location"] == f"{frontend_origin}/?auth_error=1"
-    assert db_session.execute(select(User)).scalars().all() == []
-    assert db_session.execute(select(YahooToken)).scalars().all() == []
+    assert _row_count(db_session, User) == users_before
+    assert _row_count(db_session, YahooToken) == tokens_before
 
 
 def test_callback_non_dict_json_body_redirects_with_auth_error(db_session):
@@ -381,6 +402,8 @@ def test_callback_non_dict_json_body_redirects_with_auth_error(db_session):
 
     client = _client(_app(db_session, token_handler=handler))
     state = _login_state(client)
+    users_before = _row_count(db_session, User)
+    tokens_before = _row_count(db_session, YahooToken)
 
     response = client.get(
         f"/auth/yahoo/callback?code=fake-code&state={state}", follow_redirects=False
@@ -389,8 +412,8 @@ def test_callback_non_dict_json_body_redirects_with_auth_error(db_session):
     frontend_origin = get_settings().frontend_origin
     assert response.status_code == 302
     assert response.headers["location"] == f"{frontend_origin}/?auth_error=1"
-    assert db_session.execute(select(User)).scalars().all() == []
-    assert db_session.execute(select(YahooToken)).scalars().all() == []
+    assert _row_count(db_session, User) == users_before
+    assert _row_count(db_session, YahooToken) == tokens_before
 
 
 # --- GET /auth/yahoo/callback: reactivation ---
@@ -451,12 +474,14 @@ def test_dev_login_404_when_flag_disabled(db_session, monkeypatch: pytest.Monkey
     monkeypatch.setenv("DEV_AUTH_ENABLED", "false")
     get_settings.cache_clear()
     client = _client(_app(db_session))
+    users_before = _row_count(db_session, User)
+    leagues_before = _row_count(db_session, League)
 
     response = client.post("/api/auth/dev-login")
 
     assert response.status_code == 404
-    assert db_session.execute(select(User)).scalars().all() == []
-    assert db_session.execute(select(League)).scalars().all() == []
+    assert _row_count(db_session, User) == users_before
+    assert _row_count(db_session, League) == leagues_before
 
 
 def test_dev_login_seeds_dataset_and_sets_session_cookie(

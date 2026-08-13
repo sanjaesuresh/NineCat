@@ -210,7 +210,7 @@ def test_run_job_swallows_database_outage_and_logs(monkeypatch, caplog):
 # --- nightly_warehouse_sync ---
 
 
-def test_nightly_warehouse_sync_runs_schedule_before_averages(monkeypatch):
+def test_nightly_warehouse_sync_runs_schedule_then_averages_then_positions(monkeypatch):
     calls: list[str] = []
     monkeypatch.setattr(
         "ninecat.jobs.scheduler.sync_schedule",
@@ -220,11 +220,60 @@ def test_nightly_warehouse_sync_runs_schedule_before_averages(monkeypatch):
         "ninecat.jobs.scheduler.sync_player_averages",
         lambda session, season: calls.append("averages"),
     )
+    monkeypatch.setattr(
+        "ninecat.jobs.scheduler.sync_player_positions",
+        lambda session, season: calls.append("positions"),
+    )
 
     # session is never touched by the stubs above, only passed through
     nightly_warehouse_sync(session=object())
 
-    assert calls == ["schedule", "averages"]
+    assert calls == ["schedule", "averages", "positions"]
+
+
+def test_nightly_warehouse_sync_position_sync_failure_is_non_fatal(monkeypatch, caplog):
+    # positions runs last and must not be able to roll back schedule/averages'
+    # already-succeeded work, or fail the job -- it's logged and swallowed
+    _require_postgres()
+    job_name = "test_nightly_position_failure"
+    nba_team_id = 999003
+
+    def _stub_schedule(session, season):
+        session.add(NbaTeam(nba_team_id=nba_team_id, name="Test Team", abbreviation="TST"))
+
+    def _stub_averages(session, season):
+        pass
+
+    def _stub_positions(session, season):
+        raise RuntimeError("boom-position")
+
+    monkeypatch.setattr("ninecat.jobs.scheduler.sync_schedule", _stub_schedule)
+    monkeypatch.setattr("ninecat.jobs.scheduler.sync_player_averages", _stub_averages)
+    monkeypatch.setattr("ninecat.jobs.scheduler.sync_player_positions", _stub_positions)
+
+    try:
+        with caplog.at_level(logging.ERROR, logger="ninecat.jobs.scheduler"):
+            run_job(job_name, nightly_warehouse_sync)
+
+        verify = _fresh_session()
+        try:
+            job_run = verify.execute(
+                select(JobRun).where(JobRun.job_name == job_name)
+            ).scalar_one()
+            team = verify.execute(
+                select(NbaTeam).where(NbaTeam.nba_team_id == nba_team_id)
+            ).scalar_one_or_none()
+        finally:
+            verify.close()
+
+        # the job as a whole still succeeds, and schedule's write survives --
+        # only the position-sync exception is caught and logged
+        assert job_run.status == "success"
+        assert team is not None
+        assert "boom-position" in caplog.text
+    finally:
+        _cleanup_job_run(job_name)
+        _cleanup_nba_team(nba_team_id)
 
 
 # --- scheduler_enabled gate ---

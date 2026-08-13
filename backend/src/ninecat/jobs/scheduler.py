@@ -12,6 +12,7 @@ from ninecat.config import get_settings
 from ninecat.db import get_engine
 from ninecat.models.jobs import JobRun
 from ninecat.warehouse.nba_schedule import sync_schedule
+from ninecat.warehouse.player_positions import sync_player_positions
 from ninecat.warehouse.player_stats import sync_player_averages
 
 logger = logging.getLogger(__name__)
@@ -86,14 +87,25 @@ def run_job(job_name: str, fn: Callable[[Session], None]) -> None:
 
 
 def nightly_warehouse_sync(session: Session) -> None:
-    """Sync the current season's NBA schedule, then player averages.
+    """Sync the current season's NBA schedule, then player averages, then positions.
 
-    Order matters: sync_player_averages links each player to the NbaTeam row
-    sync_schedule creates, so the schedule must be synced first.
+    Order matters twice over: sync_player_averages links each player to the
+    NbaTeam row sync_schedule creates, so the schedule must be synced first;
+    and sync_player_positions runs LAST so any player the averages sync just
+    created gets a position in the same run rather than waiting a full day.
+    A position-sync failure is caught here (not left to propagate to run_job)
+    so it can't roll back the schedule/averages work that already succeeded --
+    it's logged and the job still reports success.
     """
     season = get_settings().current_season
     sync_schedule(session, season)
     sync_player_averages(session, season)
+    try:
+        sync_player_positions(session, season)
+    except Exception:
+        logger.exception(
+            "nightly_warehouse_sync: sync_player_positions failed, continuing"
+        )
 
 
 def register_jobs(scheduler: BaseScheduler) -> BaseScheduler:
