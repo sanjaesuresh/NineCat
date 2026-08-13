@@ -95,3 +95,20 @@ export function formatZScore(value: unknown): string {
   const sign = value < 0 ? "−" : "+"; // U+2212 minus sign, not a hyphen
   return `${sign}${Math.abs(value).toFixed(2)} z`;
 }
+
+/**
+ * Signs and formats a draft valuation number (value/base/vorp/replacement) —
+ * same convention as formatZScore but without the " z" suffix, since these
+ * aren't z-scores themselves (they're vorp-derived draft value).
+ */
+export function formatSignedNumber(value: unknown): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) return EM_DASH;
+  const sign = value < 0 ? "−" : "+";
+  return `${sign}${Math.abs(value).toFixed(2)}`;
+}
+
+/** Projected/played games count. Whole numbers render as "82", not "82.0". */
+export function formatGamesCount(value: unknown): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) return EM_DASH;
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}

@@ -38,3 +38,10 @@ export const LABEL_BY_STAT_ID: Record<string, (typeof CATEGORIES)[number]> = {
 export const STAT_ID_BY_LABEL: Record<(typeof CATEGORIES)[number], string> = Object.fromEntries(
   Object.entries(LABEL_BY_STAT_ID).map(([id, label]) => [label, id]),
 ) as Record<(typeof CATEGORIES)[number], string>;
+
+// derived from CONTRACT_KEY_BY_LABEL so the two can't drift; the draft board's
+// punt suggestions (punt/weakest fields) arrive as raw contract keys and must
+// never be printed to the user without translating through this map first
+export const LABEL_BY_CONTRACT_KEY: Record<string, (typeof CATEGORIES)[number]> = Object.fromEntries(
+  Object.entries(CONTRACT_KEY_BY_LABEL).map(([label, key]) => [key, label]),
+) as Record<string, (typeof CATEGORIES)[number]>;

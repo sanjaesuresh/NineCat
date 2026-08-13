@@ -65,6 +65,70 @@ export interface LeagueTeamResponse {
   synced_at: string;
 }
 
+export interface DraftBoardPlayer {
+  player_key: string;
+  name: string;
+  position: string | null;
+  nba_person_id: number;
+  headshot_url: string | null;
+  best_class: string;
+  projected_games: number;
+  base: number;
+  vorp: number;
+  value: number;
+  replacement: number;
+  zscores: Record<string, unknown>;
+  // "projection" or "season_average" -- lets the UI show the fallback honestly.
+  // Distinct from DraftBoardResponse.source (the projection SOURCE NAME).
+  stat_basis: string;
+}
+
+export interface DraftPuntSuggestion {
+  // canonical-order category keys (never the engine's raw hash-ordered set)
+  punt: string[];
+  score: number;
+  improvement: number;
+  pool_delta: number;
+  weakest: string;
+  weakest_mean: number;
+  rationale: string;
+}
+
+export interface DraftBoardResponse {
+  players: DraftBoardPlayer[];
+  punt_suggestions: DraftPuntSuggestion[];
+  // the projection source actually used, or null when the board is valued
+  // purely off season averages (no projections synced yet)
+  source: string | null;
+  stale: boolean;
+  synced_at: string;
+}
+
+export interface DraftRecommendation {
+  player_key: string;
+  name: string;
+  position: string | null;
+  value: number;
+  rank_score: number;
+  reasons: string[];
+  need_cats: string[];
+}
+
+export interface DraftRecommendResponse {
+  recommendations: DraftRecommendation[];
+  stale: boolean;
+  synced_at: string;
+}
+
+export interface DraftRecommendRequest {
+  my_player_keys: string[];
+  taken_player_keys: string[];
+  overall_pick: number;
+  punt?: string[];
+  limit?: number;
+  source?: string;
+}
+
 /** Thrown for any non-2xx response; callers switch on `status` (e.g. 401 -> redirect to "/"). */
 export class ApiError extends Error {
   readonly status: number;
@@ -142,6 +206,33 @@ export function getLeagueTeam(id: number): Promise<LeagueTeamResponse> {
 
 export function refreshLeague(id: number): Promise<void> {
   return requestVoid(`/api/leagues/${id}/refresh`, { method: "POST" });
+}
+
+export function getDraftBoard(
+  id: number,
+  opts?: { source?: string; punt?: string[]; myPlayerKeys?: string[] }
+): Promise<DraftBoardResponse> {
+  const params = new URLSearchParams();
+  if (opts?.source) params.set("source", opts.source);
+  // repeated ?punt=cat query params -- FastAPI's list[str] query binding expects
+  // one entry per occurrence, not a comma-joined value
+  for (const cat of opts?.punt ?? []) params.append("punt", cat);
+  // repeated ?my_player_key= -- lets a mock draft (no Yahoo roster yet) supply
+  // its own picks as the punt advisor's roster basis instead of the league roster
+  for (const key of opts?.myPlayerKeys ?? []) params.append("my_player_key", key);
+  const qs = params.toString();
+  return requestJson<DraftBoardResponse>(`/api/leagues/${id}/draft/board${qs ? `?${qs}` : ""}`);
+}
+
+export function postDraftRecommend(
+  id: number,
+  body: DraftRecommendRequest
+): Promise<DraftRecommendResponse> {
+  return requestJson<DraftRecommendResponse>(`/api/leagues/${id}/draft/recommend`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
 }
 
 export function disconnectYahoo(): Promise<void> {

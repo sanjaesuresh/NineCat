@@ -24,14 +24,20 @@ Note: live Yahoo login requires HTTPS on the callback (`https://localhost:8000/a
 
 ## E2E smoke test
 
-Playwright drives the real stack end to end (landing page → dev-login → dashboard → settings), using a gated `POST /api/auth/dev-login` route (backend only, 404s unless `DEV_AUTH_ENABLED=true`) to skip live Yahoo OAuth.
+Playwright drives the real stack end to end (landing page → dev-login → dashboard → settings, plus the draft board / punt / mock-draft flow), using a gated `POST /api/auth/dev-login` route (backend only, 404s unless `DEV_AUTH_ENABLED=true`) to skip live Yahoo OAuth.
 
 1. `cd backend && docker compose up -d && uv run alembic upgrade head`
 2. `cd backend && DEV_AUTH_ENABLED=true uv run uvicorn ninecat.main:create_app --factory` → http://localhost:8000
 3. `cd frontend && npm run dev` → http://localhost:3000
 4. `cd frontend && npx playwright test` (or `npm run test:e2e`)
 
-Dev-login seeds a small fixed dataset (idempotent — safe to re-run) directly into the docker Postgres instance; if that instance is shared with `uv run pytest`, delete the seeded rows (`yahoo_guid='DEVUSER'`, `yahoo_league_key='nba.l.999999'`, `nba_person_id IN (900001,900002,900003)`) before running the backend suite again.
+Dev-login seeds a fixed dataset (idempotent — safe to re-run) directly into the docker Postgres instance: a demo user/league, a 3-player roster (`nba_person_id` 900001-900003) and a 72-player draftable pool with projections (900101-900199). Unlike the pytest fixtures, these are real commits, and several backend tests assert *global* row counts — so if that instance is shared with `uv run pytest`, delete the seeded rows before running the backend suite again, or the suite will report failures unrelated to any code change:
+
+```sh
+docker exec $(docker ps -q --filter publish=54329) psql -U postgres -d postgres \
+  -c "delete from leagues where yahoo_league_key='nba.l.999999';" \
+  -c "delete from users where yahoo_guid='DEVUSER';"
+```
 
 ## Data notes
 
