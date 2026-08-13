@@ -41,7 +41,7 @@ export default function DashboardNav({
             All leagues
           </Link>
           {leagueName && (
-            <span className="font-display text-sm font-semibold text-ink">{leagueName}</span>
+            <span className="font-display text-sm text-ink">{leagueName}</span>
           )}
         </div>
 

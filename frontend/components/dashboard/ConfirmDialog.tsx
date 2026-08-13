@@ -86,7 +86,7 @@ export default function ConfirmDialog({
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
       >
-        <h2 id={titleId} className="font-display text-lg font-semibold text-ink">
+        <h2 id={titleId} className="font-display text-lg text-ink">
           {title}
         </h2>
         <p id={descriptionId} className="mt-2 text-sm text-ink/90">

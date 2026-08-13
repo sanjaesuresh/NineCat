@@ -1,66 +1,158 @@
 @import "tailwindcss";
 
 /*
- * NineCat design tokens — "sports almanac / box score" system.
- * Paper + ink carry all body text (near-max contrast in both themes);
- * court/amber/alert are used only as borders, dots and fills, never as
- * text-on-background pairs, so accent hues can't create a contrast failure.
+ * NineCat design tokens — "broadcast box score" system, night edition.
+ * Single dark theme now (no light/dark flip): paper is warm near-black,
+ * ink is the light "print" color, and every value below comes from the
+ * approved d-retrodata mockup's :root.
+ *
+ * TEXT-SAFE tokens (>=4.5:1 against --paper; safe as bare text/border):
+ *   --ink 12.85:1, --ink-muted, --red-ink 5.22:1, --blue-txt 7.66:1.
+ *   --court and --alert are now PINNED to --blue-txt/--red-ink (see below),
+ *   so they are text-safe too: --court 7.66:1, --alert 5.22:1.
+ *
+ * FILL-ONLY tokens (measured as bare text/border against --paper — do NOT
+ * use for text or thin borders, solid-fill/decorative use only):
+ *   --court-fill 1.52:1, --alert-fill 2.45:1, --maroon 1.32:1.
+ * These carry the mockup's original dark --blue/--red/--red-dk values for
+ * the hero band and hero corner block, which need the dark, "committed"
+ * team-color fills the mockup specifies — not the lighter text-safe hues.
+ *
+ * Why --court/--alert changed value (not just usage) in this pass: they are
+ * consumed as TEXT and BORDER colors by dashboard/landing components outside
+ * this file's boundary (border-alert, text-alert, text-court, border-l-court,
+ * etc). The old dark --court (1.52:1) and --alert (2.45:1) failed AA as text
+ * against the near-black paper. Every solid-FILL usage of --court/--alert in
+ * those same files (bg-court, bg-alert) pairs the fill with dark text
+ * (text-paper) or is purely decorative (a dot, no text on top), so re-valuing
+ * them to their text-safe siblings fixes the text/border cases without
+ * breaking the fill cases. New code that wants the ORIGINAL dark team-color
+ * fill (e.g. a full-bleed red/blue block) should reach for --alert-fill /
+ * --court-fill instead.
  */
 :root {
-  --paper: #e7e2d2; /* ledger paper */
-  --ink: #1c1a14; /* scoreboard ink */
-  --court: #1f6f4a; /* hardwood green — primary accent, live states */
-  --amber: #9c5f14; /* bench amber — coming-soon accent */
-  --rule: #b7ae96; /* chalk-line hairlines */
-  --alert: #a3311c; /* foul red — error states */
-}
+  color-scheme: dark; /* near-black page: keep UA chrome (scrollbar, caret, autofill) dark too */
+  --paper: #17130e; /* near-black newsprint stock — mockup --paper */
+  --paper-2: #1e1912; /* alternating table-row / section backdrop — mockup --paper-2 */
+  --paper-3: #251e15; /* third backdrop level, one step lighter than paper-2 — mockup --paper-3 */
+  --panel: #1b1610; /* committed section backdrop (centerpiece/artifact) — mockup --panel */
+  --ink: #e8dfc6; /* light "print" color — text + rules — mockup --ink */
+  --ink-muted: #a99c7d; /* secondary/meta text — mockup --ink-muted */
+  --ink-fill: #0b0906; /* dark fill for chips/table-heads that used to reuse ink — mockup --ink-fill */
+  --red-ink: #e25b67; /* text-safe red accent (>=4.5:1 on paper) — mockup --red-ink */
+  --blue-txt: #85a9dc; /* text-safe blue accent (>=4.5:1 on paper) — mockup --blue-txt */
+  --court: var(--blue-txt); /* text/border-safe now — pinned to --blue-txt so the two can't drift; the mockup's dark --blue lives on as --court-fill */
+  --gold: #c99a38; /* mockup --gold — also the focus-ring color (court blue reads too dark on dark paper) */
+  --amber: var(--gold); /* bench gold accent — same value as --gold, kept as its own name since dashboard already reads --amber */
+  --rule: rgba(237, 228, 203, 0.24); /* translucent cream hairline — mockup's rgba(237,228,203,.24) */
+  --alert: var(--red-ink); /* text/border-safe now — pinned to --red-ink so the two can't drift; the mockup's dark --red lives on as --alert-fill */
+  --alert-fill: #a81225; /* dark foul-red solid fill, fill-only — mockup --red */
+  --court-fill: #1b3560; /* dark backboard-blue solid fill, fill-only — mockup --blue */
+  --maroon: #5c0814; /* darker, recessive backdrop-panel red, fill-only — mockup --red-dk */
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --paper: #17160f;
-    --ink: #ede7d6;
-    --court: #3fae79;
-    --amber: #e3a339;
-    --rule: #4b4736;
-    --alert: #e0604a;
-  }
+  /* fixed pair for the AuthErrorNotice card, which always floats on a
+     dark backdrop panel: no mockup token shares this name, so cream/espresso
+     borrow the mockup's on-dark/ink-fill tones to stay a genuinely
+     light-card-on-dark-panel pair. The old "non-flipping" framing is moot
+     now that the site is single-theme, but the fixed values are still
+     useful so this card doesn't depend on whatever panel it sits on. */
+  --cream: #ede4cb;
+  --espresso: #0b0906;
+  --foul: var(--alert); /* referenced, not duplicated, so the two reds can't drift (matches --amber -> --gold) */
 }
 
 @theme inline {
   --color-paper: var(--paper);
+  --color-paper-2: var(--paper-2);
+  --color-paper-3: var(--paper-3);
+  --color-panel: var(--panel);
   --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-fill: var(--ink-fill);
   --color-court: var(--court);
+  --color-court-fill: var(--court-fill);
   --color-amber: var(--amber);
+  --color-gold: var(--gold);
   --color-rule: var(--rule);
   --color-alert: var(--alert);
-  --font-display: var(--font-zilla-slab);
-  --font-body: var(--font-source-serif);
+  --color-alert-fill: var(--alert-fill);
+  --color-maroon: var(--maroon);
+  --color-red-ink: var(--red-ink);
+  --color-blue-txt: var(--blue-txt);
+  --color-cream: var(--cream);
+  --color-espresso: var(--espresso);
+  --color-foul: var(--foul);
+  --font-display: var(--font-anton);
+  --font-body: var(--font-barlow);
+  --font-condensed: var(--font-barlow-condensed);
   --font-mono: var(--font-space-mono);
 }
 
 body {
   background: var(--paper);
   color: var(--ink);
-  font-family: var(--font-body), ui-serif, Georgia, serif;
+  font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
 }
 
-/* visible keyboard focus everywhere, independent of any accent-color choice */
+/* exponential ease-out for the deliberate hover/press/reveal motion this
+   redesign adds — no bounce, matches a ball settling into the net, not a toy */
+:root {
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+/* visible keyboard focus everywhere. gold, not the court/blue fill — court is
+   too dark to read as a ring against the near-black paper (mirrors the
+   mockup's own focus-visible rule and its stated reasoning) */
 :focus-visible {
-  outline: 2px solid var(--court);
+  outline: 2px solid var(--gold);
   outline-offset: 2px;
 }
 
+/* red-on-cream selection reads clearly on the dark paper; the old
+   court(blue)-on-paper pairing broke once paper became near-black, since
+   court's fill blue and paper are both dark */
 ::selection {
-  background: var(--court);
-  color: var(--paper);
+  background: var(--alert);
+  color: var(--ink);
 }
 
-/* respect reduced-motion preference for the few hover transitions we use */
+/* court-line motifs: center-circle arc and three-point arc, drawn with
+   radial gradients so they need no image asset (zero CLS risk) and scale
+   losslessly. Always used inside a `relative overflow-hidden` wrapper sized
+   by the section itself — see hero/demo markup — so an arc can never push a
+   container wider than its box and reopen the mobile horizontal-scroll bug
+   this app already fixed once. --arc-line is a literal color (not a token
+   reference): callers pass one explicitly so the arcs stay legible on
+   non-paper backdrops like the hero's maroon panel, where the default
+   --rule hairline (tuned for paper) would be the wrong contrast. */
+.court-arcs {
+  background-image:
+    radial-gradient(
+      circle at 50% 100%,
+      transparent 0,
+      transparent calc(var(--arc-r, 34%) - 1.5px),
+      var(--arc-line, var(--rule)) calc(var(--arc-r, 34%) - 1.5px),
+      var(--arc-line, var(--rule)) var(--arc-r, 34%),
+      transparent calc(var(--arc-r, 34%) + 1.5px)
+    ),
+    radial-gradient(
+      circle at 50% 100%,
+      transparent 0,
+      transparent calc(var(--arc-r2, 62%) - 1.5px),
+      var(--arc-line, var(--rule)) calc(var(--arc-r2, 62%) - 1.5px),
+      var(--arc-line, var(--rule)) var(--arc-r2, 62%),
+      transparent calc(var(--arc-r2, 62%) + 1.5px)
+    );
+}
+
+/* respect reduced-motion preference for every hover/press/reveal transition
+   this redesign adds */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

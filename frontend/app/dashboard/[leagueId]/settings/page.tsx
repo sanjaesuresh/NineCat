@@ -39,10 +39,10 @@ export default function SettingsPage() {
 
   return (
     <main className="mx-auto min-w-0 w-full max-w-4xl px-6 py-10 sm:px-10 sm:py-14">
-      <h1 className="font-display text-3xl font-semibold text-ink">Settings</h1>
+      <h1 className="font-display text-3xl text-ink">Settings</h1>
 
       <section className="mt-8 border border-rule p-5" aria-labelledby="refresh-heading">
-        <h2 id="refresh-heading" className="font-display text-lg font-semibold text-ink">
+        <h2 id="refresh-heading" className="font-display text-lg text-ink">
           Refresh league data
         </h2>
         <p className="mt-1 max-w-prose text-ink/90">
@@ -69,7 +69,7 @@ export default function SettingsPage() {
       </section>
 
       <section className="mt-6 border border-rule p-5" aria-labelledby="disconnect-heading">
-        <h2 id="disconnect-heading" className="font-display text-lg font-semibold text-ink">
+        <h2 id="disconnect-heading" className="font-display text-lg text-ink">
           Disconnect Yahoo
         </h2>
         <p className="mt-1 max-w-prose text-ink/90">
@@ -89,7 +89,7 @@ export default function SettingsPage() {
       </section>
 
       <section className="mt-6 border border-alert p-5" aria-labelledby="delete-heading">
-        <h2 id="delete-heading" className="font-display text-lg font-semibold text-ink">
+        <h2 id="delete-heading" className="font-display text-lg text-ink">
           Delete account
         </h2>
         <p className="mt-1 max-w-prose text-ink/90">

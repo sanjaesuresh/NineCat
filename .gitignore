@@ -7,3 +7,6 @@ scratch/
 .history/
 docs/
 certs/
+
+# design mockups: kept locally as the landing-page design reference, not shipped
+frontend/public/mockups/

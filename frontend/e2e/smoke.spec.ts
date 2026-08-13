@@ -10,7 +10,9 @@ test.describe("landing page", () => {
   test("shows the h1, the Yahoo sign-in CTA, and the Yahoo attribution", async ({ page }) => {
     await page.goto("/");
 
-    await expect(page.getByRole("heading", { level: 1, name: "NineCat" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Every Category, Graded Like a Box Score." }),
+    ).toBeVisible();
 
     // the header repeats this same CTA text, so target the hero's by id rather
     // than name alone, which would match both and violate strict mode

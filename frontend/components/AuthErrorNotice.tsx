@@ -26,11 +26,18 @@ export default function AuthErrorNotice({
   }
 
   return (
+    // this notice only ever renders inside the hero's maroon panel (see
+    // page.tsx), which doesn't flip with the site theme — so it uses the
+    // fixed cream/espresso/foul trio instead of the theme-adaptive
+    // paper/ink/alert tokens, which would go dark-on-dark in dark mode
     <div
       role="alert"
-      className="flex items-start justify-between gap-4 border-l-4 border-alert bg-ink/[0.03] px-4 py-3"
+      className="flex items-start justify-between gap-4 border-2 border-foul bg-cream px-4 py-3"
     >
-      <p className="text-sm text-ink">
+      <p className="text-sm text-espresso">
+        {/* plain, unmistakable copy — no referee/whistle flavor here: a real
+            error is the wrong place for decorative voice, it read as part of
+            the message itself instead of a label */}
         <strong className="font-semibold">Sign-in with Yahoo didn&apos;t go through.</strong>{" "}
         Try signing in again.
       </p>
@@ -39,7 +46,7 @@ export default function AuthErrorNotice({
         type="button"
         onClick={handleDismiss}
         aria-label="Dismiss"
-        className="flex h-6 w-6 shrink-0 items-center justify-center font-mono text-sm text-ink/70 hover:text-ink"
+        className="flex h-6 w-6 shrink-0 items-center justify-center font-mono text-sm text-espresso/70 hover:text-espresso"
       >
         ×
       </button>

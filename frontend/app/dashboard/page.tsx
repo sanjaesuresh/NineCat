@@ -93,7 +93,7 @@ export default function DashboardHome() {
   return (
     <main className="mx-auto min-w-0 w-full max-w-4xl px-6 py-14 sm:px-10 sm:py-20">
       <div className="flex items-baseline justify-between gap-4">
-        <h1 className="font-display text-3xl font-semibold text-ink">Your leagues</h1>
+        <h1 className="font-display text-3xl text-ink">Your leagues</h1>
         <LogoutButton />
       </div>
 

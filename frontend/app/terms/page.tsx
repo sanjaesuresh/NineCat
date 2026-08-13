@@ -11,7 +11,7 @@ export default function TermsPage() {
       <p className="font-mono text-xs uppercase tracking-[0.2em] text-ink/70">
         Effective August 11, 2026
       </p>
-      <h1 className="mt-3 font-display text-4xl font-bold tracking-tight text-ink sm:text-5xl">
+      <h1 className="mt-3 font-display text-4xl tracking-tight text-ink sm:text-5xl">
         Terms of Service
       </h1>
       <p className="mt-6 max-w-prose text-ink/90">
@@ -20,7 +20,7 @@ export default function TermsPage() {
 
       <div className="mt-10 space-y-10">
         <section>
-          <h2 className="font-display text-xl font-semibold text-ink">
+          <h2 className="font-display text-xl text-ink">
             What NineCat is
           </h2>
           <p className="mt-3 max-w-prose text-ink/90">
@@ -31,7 +31,7 @@ export default function TermsPage() {
         </section>
 
         <section>
-          <h2 className="font-display text-xl font-semibold text-ink">
+          <h2 className="font-display text-xl text-ink">
             Advisory only — no guaranteed results
           </h2>
           <p className="mt-3 max-w-prose text-ink/90">
@@ -42,7 +42,7 @@ export default function TermsPage() {
         </section>
 
         <section>
-          <h2 className="font-display text-xl font-semibold text-ink">
+          <h2 className="font-display text-xl text-ink">
             Read-only access
           </h2>
           <p className="mt-3 max-w-prose text-ink/90">
@@ -53,7 +53,7 @@ export default function TermsPage() {
         </section>
 
         <section>
-          <h2 className="font-display text-xl font-semibold text-ink">
+          <h2 className="font-display text-xl text-ink">
             Not affiliated with Yahoo or the NBA
           </h2>
           <p className="mt-3 max-w-prose text-ink/90">
@@ -64,7 +64,7 @@ export default function TermsPage() {
         </section>
 
         <section>
-          <h2 className="font-display text-xl font-semibold text-ink">
+          <h2 className="font-display text-xl text-ink">
             Termination and deletion
           </h2>
           <p className="mt-3 max-w-prose text-ink/90">
@@ -82,7 +82,7 @@ export default function TermsPage() {
         </section>
 
         <section>
-          <h2 className="font-display text-xl font-semibold text-ink">
+          <h2 className="font-display text-xl text-ink">
             Changes to these terms
           </h2>
           <p className="mt-3 max-w-prose text-ink/90">
@@ -92,7 +92,7 @@ export default function TermsPage() {
         </section>
 
         <section>
-          <h2 className="font-display text-xl font-semibold text-ink">Contact</h2>
+          <h2 className="font-display text-xl text-ink">Contact</h2>
           <p className="mt-3 max-w-prose text-ink/90">
             Questions about these terms:{" "}
             <a

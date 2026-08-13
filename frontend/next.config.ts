@@ -12,6 +12,17 @@ const nextConfig: NextConfig = {
       { source: "/auth/:path*", destination: `${backendUrl}/auth/:path*` },
     ];
   },
+  images: {
+    // waiver pickup headshots (see components/landing/PickupCard.tsx) load
+    // straight from the NBA's own CDN, no bucket/proxy of our own
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "cdn.nba.com",
+        pathname: "/headshots/nba/latest/**",
+      },
+    ],
+  },
 };
 
 export default nextConfig;

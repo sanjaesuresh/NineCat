@@ -11,7 +11,7 @@ export default function PrivacyPage() {
       <p className="font-mono text-xs uppercase tracking-[0.2em] text-ink/70">
         Effective August 11, 2026
       </p>
-      <h1 className="mt-3 font-display text-4xl font-bold tracking-tight text-ink sm:text-5xl">
+      <h1 className="mt-3 font-display text-4xl tracking-tight text-ink sm:text-5xl">
         Privacy Policy
       </h1>
       <p className="mt-6 max-w-prose text-ink/90">
@@ -22,8 +22,8 @@ export default function PrivacyPage() {
 
       <div className="mt-10 space-y-10">
         <section>
-          <h2 className="font-display text-xl font-semibold text-ink">What we store</h2>
-          <ul className="mt-3 space-y-2 border-l-2 border-rule pl-4 text-ink/90">
+          <h2 className="font-display text-xl text-ink">What we store</h2>
+          <ul className="mt-3 list-disc space-y-2 pl-5 text-ink/90 marker:text-court">
             <li>Your Yahoo account ID, so we know which account is signed in.</li>
             <li>
               League, team, and roster data synced from Yahoo Fantasy — the same
@@ -37,10 +37,10 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="font-display text-xl font-semibold text-ink">
+          <h2 className="font-display text-xl text-ink">
             What we never do
           </h2>
-          <ul className="mt-3 space-y-2 border-l-2 border-rule pl-4 text-ink/90">
+          <ul className="mt-3 list-disc space-y-2 pl-5 text-ink/90 marker:text-court">
             <li>
               We never write anything back to Yahoo. NineCat cannot submit a draft
               pick, add, drop, or trade on your behalf — it only reads.
@@ -51,7 +51,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="font-display text-xl font-semibold text-ink">Cookies</h2>
+          <h2 className="font-display text-xl text-ink">Cookies</h2>
           <p className="mt-3 max-w-prose text-ink/90">
             NineCat sets one session cookie to keep you signed in. There are no
             third-party analytics or advertising cookies.
@@ -59,7 +59,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="font-display text-xl font-semibold text-ink">
+          <h2 className="font-display text-xl text-ink">
             Deleting your data
           </h2>
           <p className="mt-3 max-w-prose text-ink/90">
@@ -77,7 +77,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="font-display text-xl font-semibold text-ink">
+          <h2 className="font-display text-xl text-ink">
             Changes to this policy
           </h2>
           <p className="mt-3 max-w-prose text-ink/90">
@@ -87,7 +87,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="font-display text-xl font-semibold text-ink">Contact</h2>
+          <h2 className="font-display text-xl text-ink">Contact</h2>
           <p className="mt-3 max-w-prose text-ink/90">
             Questions about this policy or your data:{" "}
             <a

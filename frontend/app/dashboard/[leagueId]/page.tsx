@@ -80,7 +80,7 @@ export default function MyTeamPage() {
 
   return (
     <main className="mx-auto min-w-0 w-full max-w-4xl px-6 py-10 sm:px-10 sm:py-14">
-      <h1 className="font-display text-3xl font-semibold text-ink">My Team</h1>
+      <h1 className="font-display text-3xl text-ink">My Team</h1>
 
       {status === "loading" && (
         <div className="mt-8 space-y-8" aria-busy="true">
@@ -104,7 +104,7 @@ export default function MyTeamPage() {
           {stale && syncedAt && <StaleBanner syncedAt={syncedAt} onRefresh={handleRefresh} />}
 
           <section aria-labelledby="roster-heading">
-            <h2 id="roster-heading" className="font-display text-xl font-semibold text-ink">
+            <h2 id="roster-heading" className="font-display text-xl text-ink">
               Roster
             </h2>
             <div className="mt-3">
@@ -113,7 +113,7 @@ export default function MyTeamPage() {
           </section>
 
           <section aria-labelledby="build-heading">
-            <h2 id="build-heading" className="font-display text-xl font-semibold text-ink">
+            <h2 id="build-heading" className="font-display text-xl text-ink">
               Category build
             </h2>
             <div className="mt-3">
@@ -122,7 +122,7 @@ export default function MyTeamPage() {
           </section>
 
           <section aria-labelledby="standings-heading">
-            <h2 id="standings-heading" className="font-display text-xl font-semibold text-ink">
+            <h2 id="standings-heading" className="font-display text-xl text-ink">
               Standings
             </h2>
             <div className="mt-3">
@@ -131,7 +131,7 @@ export default function MyTeamPage() {
           </section>
 
           <section aria-labelledby="matchup-heading">
-            <h2 id="matchup-heading" className="font-display text-xl font-semibold text-ink">
+            <h2 id="matchup-heading" className="font-display text-xl text-ink">
               This week
             </h2>
             <div className="mt-3">

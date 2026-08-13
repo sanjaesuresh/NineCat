@@ -10,7 +10,11 @@ export default function YahooAttribution() {
       href="https://sports.yahoo.com/fantasy"
       target="_blank"
       rel="noopener noreferrer"
-      className="font-mono text-xs text-ink/70 underline decoration-rule underline-offset-4 hover:text-ink hover:decoration-ink"
+      // matches the footer's Privacy/Terms link ramp (condensed, bold,
+      // uppercase, same size, same border-bottom hover) so this legally
+      // required link reads as part of the same row instead of a mismatched
+      // third element — inline-flex + py-1.5 keeps its hit area >=24px
+      className="inline-flex items-center border-b-2 border-transparent py-1.5 font-condensed text-sm font-bold uppercase tracking-[0.05em] no-underline transition-colors hover:border-red-ink hover:text-gold focus-visible:border-red-ink focus-visible:text-gold"
     >
       Fantasy data provided by Yahoo Fantasy
     </a>
