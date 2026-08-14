@@ -1381,14 +1381,14 @@ class _StubAdvisorClient:
             {
                 "summary": "Take the first one.",
                 "ranked": [
-                    {"player_key": k, "reasoning": f"Reasoning for {k}."} for k in keys
+                    {"item_key": k, "reasoning": f"Reasoning for {k}."} for k in keys
                 ],
             }
         )
 
 
-def _advisor_client(db_session, user: User, advisor) -> TestClient:
-    app = _app(db_session, _StubYahooClient())
+def _advisor_client(db_session, user: User, advisor, yahoo=None) -> TestClient:
+    app = _app(db_session, yahoo if yahoo is not None else _StubYahooClient())
     app.dependency_overrides[get_advisor_client] = lambda: advisor
     tc = _test_client(app)
     tc.cookies.set(SESSION_COOKIE_NAME, create_session_cookie(user.id))
@@ -1416,7 +1416,7 @@ def test_draft_recommend_returns_attributed_explanations(db_session):
     # visible model attribution is not optional (plan A6)
     assert body["explanations"]["model"] == "stub-model"
     assert body["explanations"]["summary"]
-    explained = {e["player_key"] for e in body["explanations"]["ranked"]}
+    explained = {e["item_key"] for e in body["explanations"]["ranked"]}
     assert explained <= {r["player_key"] for r in body["recommendations"]}
     assert all(e["reasoning"] for e in body["explanations"]["ranked"])
 
@@ -1508,7 +1508,7 @@ def test_draft_recommend_prompt_carries_no_secrets_or_user_identifiers(db_sessio
                 text=json.dumps(
                     {
                         "summary": "s",
-                        "ranked": [{"player_key": "999999", "reasoning": "Not on the list."}],
+                        "ranked": [{"item_key": "999999", "reasoning": "Not on the list."}],
                     }
                 )
             ),
@@ -1904,8 +1904,14 @@ def test_matchup_projects_both_sides_and_compares(db_session):
     body = response.json()
     assert set(body.keys()) == {
         "week", "week_range", "as_of", "mine", "opponent", "opponent_reason",
-        "comparison", "schedule_coverage", "streaming", "stale", "synced_at",
+        "comparison", "explanations", "explanations_available", "explanations_reason",
+        "schedule_coverage", "streaming", "stale", "synced_at",
     }  # fmt: skip
+    # this fixture's streaming plan has no slots, so there is nothing to rank
+    # and the empty-shortlist check short-circuits BEFORE the no-key one --
+    # the reason names what actually stopped it, not the first plausible cause
+    assert body["explanations_available"] is False
+    assert body["explanations_reason"] == "empty_shortlist"
     assert body["week"] == MATCHUP_WEEK
     assert body["week_range"] == {
         "start_date": MATCHUP_WEEK_START.isoformat(),
@@ -1938,14 +1944,13 @@ def test_matchup_projects_both_sides_and_compares(db_session):
     }  # fmt: skip
 
 
-def test_matchup_streaming_full_week_when_as_of_after_week_end(db_session):
-    """The demo-blocking case: as_of (defaults to the real wall clock) can
-    land AFTER a fixed/seeded week's end, not just before its start. The
-    window must clamp INTO the week (plan the whole thing) rather than
-    produce an empty invalid_window -- and a real free agent in a genuinely
-    close category must still produce a non-empty plan end to end (the
-    concrete non-empty case, distinct from the no-candidates empty path
-    covered elsewhere)."""
+def _seed_streaming_plan_fixture(db_session):
+    """League + a genuinely close matchup + one viable free agent, seeded so
+    the streaming optimizer actually produces a non-empty plan.
+
+    Extracted so more than one test can assert against a REAL plan: an
+    assertion about slot contents that runs against an empty plan passes
+    vacuously and pins nothing."""
     user = _seed_user(db_session)
     league, team, rival = _seed_league_with_team(db_session, user)
     league.settings_json = {"max_weekly_adds": 3}
@@ -1998,6 +2003,18 @@ def test_matchup_streaming_full_week_when_as_of_after_week_end(db_session):
             ]
         }
     )
+    return user, league, fa, stub
+
+
+def test_matchup_streaming_full_week_when_as_of_after_week_end(db_session):
+    """The demo-blocking case: as_of (defaults to the real wall clock) can
+    land AFTER a fixed/seeded week's end, not just before its start. The
+    window must clamp INTO the week (plan the whole thing) rather than
+    produce an empty invalid_window -- and a real free agent in a genuinely
+    close category must still produce a non-empty plan end to end (the
+    concrete non-empty case, distinct from the no-candidates empty path
+    covered elsewhere)."""
+    user, league, fa, stub = _seed_streaming_plan_fixture(db_session)
     client = _authed_client(db_session, user, stub)
 
     # as_of is well after MATCHUP_WEEK_END (2025-11-23) -- the week is
@@ -2228,7 +2245,8 @@ def test_adds_shape_no_free_agents(db_session):
     body = response.json()
     assert set(body.keys()) == {
         "week", "week_range", "as_of", "window_basis", "close_categories",
-        "opponent_reason", "candidates", "schedule_coverage", "stale", "synced_at",
+        "opponent_reason", "candidates", "explanations", "explanations_available",
+        "explanations_reason", "schedule_coverage", "stale", "synced_at",
     }  # fmt: skip
     assert body["week"] == MATCHUP_WEEK
     assert body["week_range"] == {
@@ -2734,6 +2752,130 @@ def test_trades_team_from_another_league_rejected(db_session):
     assert response.status_code == 404
 
 
+
+# --- advisor on the other three features (plan task 7) ---
+
+
+def test_adds_carries_attributed_explanations(db_session):
+    user = _seed_user(db_session)
+    league, _team, _fa1, _fa2, stub = _seed_adds_stream_fixture(db_session, user)
+    advisor = _StubAdvisorClient()
+
+    response = _advisor_client(db_session, user, advisor, yahoo=stub).get(
+        f"/api/leagues/{league.id}/adds"
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["candidates"]
+    assert body["explanations_available"] is True
+    assert body["explanations"]["model"] == "stub-model"
+    explained = {e["item_key"] for e in body["explanations"]["ranked"]}
+    assert explained <= {c["player_key"] for c in body["candidates"]}
+    assert len(advisor.calls) == 1
+
+
+def test_trades_explanations_key_proposals_not_players(db_session):
+    """The case that forced the shortlist to be items rather than players.
+
+    A proposal is a give/get pair, so there is no player key to echo back --
+    the advisor keys it by the engine's own ranking position instead, and the
+    integrity guard still holds on those keys.
+    """
+    user = _seed_user(db_session)
+    league, _my_team, other_team, _guard_ids, _big_ids = _seed_trade_depth_rosters(
+        db_session, user
+    )
+    advisor = _StubAdvisorClient()
+
+    response = _advisor_client(db_session, user, advisor).get(
+        f"/api/leagues/{league.id}/trades", params={"team_id": other_team.id}
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["explanations_available"] is True
+    keys = [e["item_key"] for e in body["explanations"]["ranked"]]
+    assert keys
+    # keyed by proposal position, never by a player key
+    assert all(k.startswith("proposal-") for k in keys)
+    assert len(keys) == len(set(keys))
+    assert len(keys) <= len(body["verdicts"])
+
+
+def test_trades_prompt_names_players_but_never_the_other_team(db_session):
+    """SECURITY (plan A4). The other side of a trade is another real person.
+
+    Player names are public stat-sheet data and the whole point of the
+    shortlist; the opposing TEAM name is that person's chosen handle and has no
+    business in an outbound payload.
+    """
+    user = _seed_user(db_session)
+    league, _my_team, other_team, _guard_ids, _big_ids = _seed_trade_depth_rosters(
+        db_session, user
+    )
+    advisor = _StubAdvisorClient()
+
+    _advisor_client(db_session, user, advisor).get(
+        f"/api/leagues/{league.id}/trades", params={"team_id": other_team.id}
+    )
+
+    system, prompt = advisor.calls[0]
+    sent = f"{system}\n{prompt}"
+    for forbidden in (other_team.name, league.name, league.yahoo_league_key, user.display_name):
+        assert forbidden not in sent
+    # and it did carry the thing it is supposed to reason over
+    assert "give " in sent and "get " in sent
+
+
+def test_every_wired_feature_survives_an_advisor_failure(db_session):
+    """One shared seam means one failure mode. Each feature must still answer."""
+    user = _seed_user(db_session)
+    league, _my_team, other_team, _guard_ids, _big_ids = _seed_trade_depth_rosters(
+        db_session, user
+    )
+    advisor = _StubAdvisorClient(error=AdvisorUnavailable(REASON_RATE_LIMITED))
+    client = _advisor_client(db_session, user, advisor)
+
+    response = client.get(f"/api/leagues/{league.id}/trades", params={"team_id": other_team.id})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["explanations"] is None
+    assert body["explanations_reason"] == "rate_limited"
+    # the deterministic half is untouched
+    assert body["verdicts"]
+    assert body["value_basis"] == "category_impact_only"
+
+
+def test_matchup_explanation_keys_are_day_qualified(db_session):
+    """The matchup item key is "<day>:<player_key>", and the frontend rebuilds
+    that exact string from the same two response fields to look reasoning up.
+
+    Pinned because the coupling is silent if it breaks: a changed key format
+    wouldn't error, it would just render every slot with no reasoning, which
+    looks identical to "the advisor is off".
+    """
+    user, league, _fa, stub = _seed_streaming_plan_fixture(db_session)
+    advisor = _StubAdvisorClient()
+
+    # same as_of the fixture's own test uses -- the window that is known to
+    # produce a non-empty plan, which this assertion depends on
+    response = _advisor_client(db_session, user, advisor, yahoo=stub).get(
+        f"/api/leagues/{league.id}/matchup", params={"as_of": "2026-01-01"}
+    )
+
+    body = response.json()
+    slots = body["streaming"]["slots"] if body["streaming"] else []
+    # this fixture must actually produce a plan, or the assertions below would
+    # pass vacuously and pin nothing
+    assert slots
+
+    expected = {f"{s['day']}:{s['player_key']}" for s in slots}
+    returned = {e["item_key"] for e in body["explanations"]["ranked"]}
+    assert returned
+    assert returned <= expected
+
 def test_trades_shape_evaluated_truncated_and_downside(db_session):
     user = _seed_user(db_session)
     league, my_team, other_team, _guard_ids, _big_ids = _seed_trade_depth_rosters(db_session, user)
@@ -2744,7 +2886,8 @@ def test_trades_shape_evaluated_truncated_and_downside(db_session):
     assert response.status_code == 200
     body = response.json()
     assert set(body.keys()) == {
-        "mine", "theirs", "players", "verdicts", "evaluated", "truncated", "value_basis", "stale", "synced_at",
+        "mine", "theirs", "players", "verdicts", "explanations", "explanations_available",
+        "explanations_reason", "evaluated", "truncated", "value_basis", "stale", "synced_at",
     }  # fmt: skip
     assert body["value_basis"] == "category_impact_only"
     assert set(body["mine"].keys()) == {"team_id", "categories", "surplus", "deficit"}

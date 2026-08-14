@@ -23,8 +23,8 @@ from ninecat.advisor.types import (
     AdvisorOutcome,
     AdvisorRequest,
     AdvisorResult,
-    PlayerExplanation,
-    ShortlistPlayer,
+    ItemExplanation,
+    ShortlistItem,
 )
 from ninecat.advisor.validation import AdvisorRejected, validate_response
 
@@ -43,8 +43,8 @@ __all__ = [
     "FEATURE_TRADES",
     "PROMPT_VERSION",
     "REASON_NOT_CONFIGURED",
-    "PlayerExplanation",
-    "ShortlistPlayer",
+    "ItemExplanation",
+    "ShortlistItem",
     "build_advisor_client",
     "build_prompt",
     "explain",

@@ -17,6 +17,7 @@ import ProjectedScoreboard from "@/components/dashboard/matchup/ProjectedScorebo
 import FocusCategories from "@/components/dashboard/matchup/FocusCategories";
 import ScheduleCoverageNotice from "@/components/dashboard/matchup/ScheduleCoverageNotice";
 import OpponentEmptyState from "@/components/dashboard/matchup/OpponentEmptyState";
+import ExplanationsNotice from "@/components/dashboard/advisor/ExplanationsNotice";
 import AddScheduleTable from "@/components/dashboard/matchup/AddScheduleTable";
 import { formatWeekRange, formatSlotDay } from "@/components/dashboard/matchup/format";
 
@@ -211,11 +212,20 @@ function MatchupContent({
               the schedule next syncs.
             </p>
           ) : (
-            <AddScheduleTable
-              streaming={matchup.streaming}
-              asOf={matchup.as_of}
-              weekRange={matchup.week_range}
-            />
+            <>
+              <div className="mb-3">
+                <ExplanationsNotice
+                  explanations={matchup.explanations}
+                  reason={matchup.explanations_reason}
+                />
+              </div>
+              <AddScheduleTable
+                streaming={matchup.streaming}
+                asOf={matchup.as_of}
+                weekRange={matchup.week_range}
+                explanations={matchup.explanations}
+              />
+            </>
           )}
         </div>
       </section>

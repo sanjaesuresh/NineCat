@@ -7,8 +7,8 @@ import { SkeletonCard } from "@/components/dashboard/Skeletons";
 import ExplanationsNotice from "@/components/dashboard/advisor/ExplanationsNotice";
 import ModelReasoning from "@/components/dashboard/advisor/ModelReasoning";
 import {
-  modelRankByPlayerKey,
-  reasoningByPlayerKey,
+  modelRankByItemKey,
+  reasoningByItemKey,
 } from "@/components/dashboard/advisor/tokens";
 import { formatSignedNumber } from "@/components/dashboard/format";
 import { MAY_NOT_LAST_REASON, MOCK_DRAFT_TEAMS, pickRound } from "./draftSession";
@@ -61,8 +61,8 @@ export default function DraftSessionPanel({
   const statBasisByKey = new Map(adpPlayers.map((p) => [p.player_key, p.stat_basis]));
   // keyed, not zipped: the model may rank the shortlist differently from the
   // engine, so pairing by index would attach the wrong prose to the wrong player
-  const reasoningByKey = reasoningByPlayerKey(explanations);
-  const modelRankByKey = modelRankByPlayerKey(explanations);
+  const reasoningByKey = reasoningByItemKey(explanations);
+  const modelRankByKey = modelRankByItemKey(explanations);
 
   if (rounds < 1) {
     return (

@@ -67,28 +67,28 @@ export function describeExplanationsReason(token: string | null): string | null 
 }
 
 /**
- * player_key -> reasoning, for rendering each explanation next to the player it
+ * item_key -> reasoning, for rendering each explanation next to the row it
  * is about.
  *
  * Deliberately keyed rather than zipped by position: the model's order and the
  * engine's order are allowed to differ (reordering is the one thing it may do),
- * so pairing by index would attach the wrong prose to the wrong player.
+ * so pairing by index would attach the wrong prose to the wrong row.
  */
-export function reasoningByPlayerKey(
+export function reasoningByItemKey(
   explanations: ModelExplanations | null,
 ): Map<string, string> {
   if (!explanations) return new Map();
-  return new Map(explanations.ranked.map((e) => [e.player_key, e.reasoning]));
+  return new Map(explanations.ranked.map((e) => [e.item_key, e.reasoning]));
 }
 
 /**
- * The model's rank (1-based) for each player_key, or an empty map when there
+ * The model's rank (1-based) for each item_key, or an empty map when there
  * are no explanations. Lets a list show where the model disagreed with the
  * engine's ordering instead of silently re-sorting the page underneath the user.
  */
-export function modelRankByPlayerKey(
+export function modelRankByItemKey(
   explanations: ModelExplanations | null,
 ): Map<string, number> {
   if (!explanations) return new Map();
-  return new Map(explanations.ranked.map((e, i) => [e.player_key, i + 1]));
+  return new Map(explanations.ranked.map((e, i) => [e.item_key, i + 1]));
 }

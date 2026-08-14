@@ -19,8 +19,8 @@ from ninecat.advisor.types import (
     FEATURE_DRAFT,
     AdvisorRequest,
     AdvisorResult,
-    PlayerExplanation,
-    ShortlistPlayer,
+    ItemExplanation,
+    ShortlistItem,
 )
 from ninecat.models.advisor import AdvisorCache
 
@@ -33,14 +33,14 @@ def _request(**overrides) -> AdvisorRequest:
         situation="pick 12 overall in a 12-team 9-cat league",
         context={"punting": "ft_pct", "roster so far": "Rudy Gobert"},
         shortlist=(
-            ShortlistPlayer(
-                player_key="1",
-                name="Alpha",
-                position="PG",
+            ShortlistItem(
+                item_key="1",
+                label="Alpha",
+                detail="PG",
                 metrics={"value": 3.4, "rank_score": 3.9},
                 tags=("best available",),
             ),
-            ShortlistPlayer(player_key="2", name="Beta", position="C", metrics={"value": 3.1}),
+            ShortlistItem(item_key="2", label="Beta", detail="C", metrics={"value": 3.1}),
         ),
     )
     defaults.update(overrides)
@@ -52,8 +52,8 @@ def _result() -> AdvisorResult:
         model=MODEL,
         summary="Take Alpha.",
         ranked=(
-            PlayerExplanation(player_key="1", reasoning="Best all-round value."),
-            PlayerExplanation(player_key="2", reasoning="Close second."),
+            ItemExplanation(item_key="1", reasoning="Best all-round value."),
+            ItemExplanation(item_key="2", reasoning="Close second."),
         ),
     )
 
@@ -77,7 +77,7 @@ def test_mapping_insertion_order_does_not_change_the_key():
 
 def test_a_changed_shortlist_misses():
     changed = _request(
-        shortlist=(ShortlistPlayer(player_key="1", name="Alpha", position="PG"),)
+        shortlist=(ShortlistItem(item_key="1", label="Alpha", detail="PG"),)
     )
     assert cache_key(changed, MODEL) != cache_key(_request(), MODEL)
 
@@ -123,19 +123,19 @@ def test_key_is_stable_across_separate_processes():
     script = textwrap.dedent(
         """
         from ninecat.advisor.cache import cache_key
-        from ninecat.advisor.types import AdvisorRequest, ShortlistPlayer, FEATURE_DRAFT
+        from ninecat.advisor.types import AdvisorRequest, ShortlistItem, FEATURE_DRAFT
 
         request = AdvisorRequest(
             feature=FEATURE_DRAFT,
             situation="pick 12 overall in a 12-team 9-cat league",
             context={"punting": "ft_pct", "roster so far": "Rudy Gobert"},
             shortlist=(
-                ShortlistPlayer(
-                    player_key="1", name="Alpha", position="PG",
+                ShortlistItem(
+                    item_key="1", label="Alpha", detail="PG",
                     metrics={"value": 3.4, "rank_score": 3.9}, tags=("best available",),
                 ),
-                ShortlistPlayer(
-                    player_key="2", name="Beta", position="C", metrics={"value": 3.1}
+                ShortlistItem(
+                    item_key="2", label="Beta", detail="C", metrics={"value": 3.1}
                 ),
             ),
         )
@@ -203,8 +203,8 @@ def test_write_is_an_upsert_not_a_duplicate_insert(db_session):
         model=MODEL,
         summary="Actually take Beta.",
         ranked=(
-            PlayerExplanation(player_key="2", reasoning="Reconsidered."),
-            PlayerExplanation(player_key="1", reasoning="Still good."),
+            ItemExplanation(item_key="2", reasoning="Reconsidered."),
+            ItemExplanation(item_key="1", reasoning="Still good."),
         ),
     )
     write_cached(db_session, key, _request(), revised, _completion())

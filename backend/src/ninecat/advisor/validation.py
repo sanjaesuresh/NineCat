@@ -8,7 +8,7 @@ explain but can never invent or drop a player, and a promise made only in the
 prompt is not enforcement -- a plausible-sounding explanation for a player the
 engine never shortlisted would launder a recommendation the engine never made.
 Request-level output schemas cannot express this: they can require a list of
-{player_key, reasoning}, but not WHICH keys are legal. So it lives here.
+{item_key, reasoning}, but not WHICH keys are legal. So it lives here.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from ninecat.advisor.types import (
     REASON_SHORTLIST_MISMATCH,
     AdvisorRequest,
     AdvisorResult,
-    PlayerExplanation,
+    ItemExplanation,
 )
 
 
@@ -47,13 +47,13 @@ def validate_response(raw_text: str, request: AdvisorRequest, model: str) -> Adv
     if not isinstance(summary, str) or not isinstance(ranked_raw, list):
         raise AdvisorRejected(REASON_MALFORMED)
 
-    explanations: list[PlayerExplanation] = []
+    explanations: list[ItemExplanation] = []
     for item in ranked_raw:
         if not isinstance(item, dict):
             raise AdvisorRejected(REASON_MALFORMED)
-        player_key = item.get("player_key")
+        item_key = item.get("item_key")
         reasoning = item.get("reasoning")
-        if not isinstance(player_key, str) or not isinstance(reasoning, str):
+        if not isinstance(item_key, str) or not isinstance(reasoning, str):
             raise AdvisorRejected(REASON_MALFORMED)
         # an entry with no prose is worse than no entry: the UI would render a
         # blank attributed explanation, which reads as a bug rather than as
@@ -61,7 +61,7 @@ def validate_response(raw_text: str, request: AdvisorRequest, model: str) -> Adv
         if not reasoning.strip():
             raise AdvisorRejected(REASON_MALFORMED)
         explanations.append(
-            PlayerExplanation(player_key=player_key, reasoning=reasoning.strip())
+            ItemExplanation(item_key=item_key, reasoning=reasoning.strip())
         )
 
     _assert_shortlist_intact(explanations, request)
@@ -74,7 +74,7 @@ def validate_response(raw_text: str, request: AdvisorRequest, model: str) -> Adv
 
 
 def _assert_shortlist_intact(
-    explanations: list[PlayerExplanation], request: AdvisorRequest
+    explanations: list[ItemExplanation], request: AdvisorRequest
 ) -> None:
     """Membership must match the shortlist exactly -- same keys, same count,
     each exactly once. Order is free; that is the whole permitted freedom.
@@ -83,7 +83,7 @@ def _assert_shortlist_intact(
     two entries for one player and none for another has matching set membership
     but is still a dropped player.
     """
-    returned = sorted(e.player_key for e in explanations)
-    expected = sorted(request.player_keys())
+    returned = sorted(e.item_key for e in explanations)
+    expected = sorted(request.item_keys())
     if returned != expected:
         raise AdvisorRejected(REASON_SHORTLIST_MISMATCH)

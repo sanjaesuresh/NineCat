@@ -19,6 +19,7 @@ from ninecat.advisor.types import (
     FEATURE_MATCHUP,
     FEATURE_TRADES,
     AdvisorRequest,
+    ShortlistItem,
 )
 
 # the rules the model must not break. A1 is enforced in code as well (see
@@ -30,11 +31,11 @@ decided is plausible, plus the context behind it.
 
 Your job:
 - Rank the shortlist, best option first.
-- Write one short explanation per player: why it sits where it does, in terms of \
+- Write one short explanation per entry: why it sits where it does, in terms of \
 this specific context.
 
 Hard rules:
-- Use only the players in the shortlist. Never introduce a player who is not on it, \
+- Use only the entries in the shortlist. Never introduce an option that is not on it, \
 and never drop one. Ranking within the shortlist is the only reordering allowed.
 - Never argue against a punt the user has chosen. Take it as settled and reason inside it.
 - The numbers you are given are the only numbers. Do not invent stats, injuries, \
@@ -42,17 +43,32 @@ news, or transactions.
 - If two options are genuinely close, say so plainly rather than manufacturing a \
 difference.
 
-Style: direct and concrete. Two sentences per player at most. No preamble, no \
+Style: direct and concrete. Two sentences per entry at most. No preamble, no \
 restating the question, no hedging filler. Write for someone who already knows the \
 category abbreviations."""
 
-# one line of feature-specific framing, so the same shape produces advice that
-# sounds like it is about the decision actually in front of the user
+# one line of feature-specific framing plus what that feature's shortlist
+# entries actually ARE, so the same generic shape produces advice that sounds
+# like it is about the decision in front of the user
 _FEATURE_FRAMING = {
-    FEATURE_DRAFT: "This is a draft pick decision. Weigh long-run roster fit and positional scarcity, not one week of production.",
-    FEATURE_MATCHUP: "This is a weekly matchup decision. Weigh what moves categories in this specific week.",
-    FEATURE_ADDS: "This is a waiver/free-agent decision. Weigh what the roster is short of and how long the player is likely to hold value.",
-    FEATURE_TRADES: "This is a trade decision. Weigh what each side gives up in category terms, not just aggregate value.",
+    FEATURE_DRAFT: (
+        "This is a draft pick decision. Each entry is a player you could take with this "
+        "pick. Weigh long-run roster fit and positional scarcity, not one week of production."
+    ),
+    FEATURE_MATCHUP: (
+        "This is a weekly streaming decision inside a head-to-head matchup. Each entry is "
+        "one add on one day. Weigh what actually moves categories in this specific week, "
+        "and be honest when an add is marginal."
+    ),
+    FEATURE_ADDS: (
+        "This is a waiver/free-agent decision. Each entry is a player who could be added. "
+        "Weigh what the roster is short of and how long the player is likely to hold value."
+    ),
+    FEATURE_TRADES: (
+        "This is a trade decision. Each entry is one proposed trade -- what you give and "
+        "what you get. Weigh what each side gives up in category terms, not just aggregate "
+        "value, and say plainly when a proposal is not worth making."
+    ),
 }
 
 
@@ -69,26 +85,27 @@ def build_prompt(request: AdvisorRequest) -> tuple[str, str]:
 
     lines.append("")
     lines.append("Shortlist (engine order):")
-    for player in request.shortlist:
-        lines.append(f"- {_render_player(player)}")
+    for item in request.shortlist:
+        lines.append(f"- {_render_item(item)}")
 
     lines.append("")
     lines.append(
-        "Return every shortlist player exactly once, best first, each with its "
-        "player_key copied verbatim, plus a one-line summary of the call."
+        "Return every shortlist entry exactly once, best first, each with its "
+        "item_key copied verbatim, plus a one-line summary of the call."
     )
     return _SYSTEM, "\n".join(lines)
 
 
-def _render_player(player) -> str:
-    position = player.position or "unknown position"
-    parts = [f"[{player.player_key}] {player.name} ({position})"]
-    if player.metrics:
+def _render_item(item: ShortlistItem) -> str:
+    parts = [f"[{item.item_key}] {item.label}"]
+    if item.detail:
+        parts.append(item.detail)
+    if item.metrics:
         # sorted so the same metrics dict always renders the same way
-        metrics = ", ".join(f"{k} {player.metrics[k]}" for k in sorted(player.metrics))
+        metrics = ", ".join(f"{k} {item.metrics[k]}" for k in sorted(item.metrics))
         parts.append(metrics)
-    if player.tags:
+    if item.tags:
         # tags arrive as an ordered tuple from the engine and stay in that
         # order -- it is the engine's own ranking of what matters most
-        parts.append("; ".join(player.tags))
+        parts.append("; ".join(item.tags))
     return " | ".join(parts)

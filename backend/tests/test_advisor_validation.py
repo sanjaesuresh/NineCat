@@ -14,27 +14,27 @@ from ninecat.advisor.types import (
     REASON_SHORTLIST_MISMATCH,
     FEATURE_DRAFT,
     AdvisorRequest,
-    ShortlistPlayer,
+    ShortlistItem,
 )
 from ninecat.advisor.validation import AdvisorRejected, validate_response
 
 MODEL = "claude-opus-5"
 
 
-def _request(*player_keys: str) -> AdvisorRequest:
+def _request(*item_keys: str) -> AdvisorRequest:
     return AdvisorRequest(
         feature=FEATURE_DRAFT,
         situation="pick 1 overall",
         shortlist=tuple(
-            ShortlistPlayer(player_key=key, name=f"Player {key}", position="C")
-            for key in player_keys
+            ShortlistItem(item_key=key, label=f"Player {key}", detail="C")
+            for key in item_keys
         ),
     )
 
 
 def _body(*pairs: tuple[str, str], summary: str = "Take the guard.") -> str:
     return json.dumps(
-        {"summary": summary, "ranked": [{"player_key": k, "reasoning": r} for k, r in pairs]}
+        {"summary": summary, "ranked": [{"item_key": k, "reasoning": r} for k, r in pairs]}
     )
 
 
@@ -46,7 +46,7 @@ def test_accepts_a_wellformed_response():
 
     assert result.model == MODEL
     assert result.summary == "Take the guard."
-    assert [e.player_key for e in result.ranked] == ["1", "2"]
+    assert [e.item_key for e in result.ranked] == ["1", "2"]
     assert result.ranked[0].reasoning == "Best all-round value."
 
 
@@ -57,7 +57,7 @@ def test_accepts_a_response_that_reorders_within_the_shortlist():
 
     result = validate_response(body, request, MODEL)
 
-    assert [e.player_key for e in result.ranked] == ["3", "1", "2"]
+    assert [e.item_key for e in result.ranked] == ["3", "1", "2"]
 
 
 def test_rejects_a_player_that_was_not_on_the_shortlist():
@@ -116,8 +116,8 @@ def test_rejects_a_duplicated_player():
         json.dumps({"summary": 7, "ranked": []}),
         json.dumps({"summary": "x", "ranked": "not a list"}),
         json.dumps({"summary": "x", "ranked": ["not an object"]}),
-        json.dumps({"summary": "x", "ranked": [{"player_key": 1, "reasoning": "y"}]}),
-        json.dumps({"summary": "x", "ranked": [{"player_key": "1"}]}),
+        json.dumps({"summary": "x", "ranked": [{"item_key": 1, "reasoning": "y"}]}),
+        json.dumps({"summary": "x", "ranked": [{"item_key": "1"}]}),
     ],
     ids=[
         "not-json", "empty", "top-level-list", "missing-ranked", "missing-summary",

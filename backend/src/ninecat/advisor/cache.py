@@ -22,7 +22,7 @@ from ninecat.advisor.types import (
     PROMPT_VERSION,
     AdvisorRequest,
     AdvisorResult,
-    PlayerExplanation,
+    ItemExplanation,
 )
 from ninecat.models.advisor import AdvisorCache
 
@@ -53,13 +53,13 @@ def cache_key(request: AdvisorRequest, model: str) -> str:
         "context": dict(request.context),
         "shortlist": [
             {
-                "player_key": p.player_key,
-                "name": p.name,
-                "position": p.position,
-                "metrics": dict(p.metrics),
-                "tags": list(p.tags),
+                "item_key": item.item_key,
+                "label": item.label,
+                "detail": item.detail,
+                "metrics": dict(item.metrics),
+                "tags": list(item.tags),
             }
-            for p in request.shortlist
+            for item in request.shortlist
         ],
     }
     encoded = json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()
@@ -92,7 +92,7 @@ def write_cached(
         "model": result.model,
         "summary": result.summary,
         "ranked": [
-            {"player_key": e.player_key, "reasoning": e.reasoning} for e in result.ranked
+            {"item_key": e.item_key, "reasoning": e.reasoning} for e in result.ranked
         ],
     }
     # atomic upsert: a select-then-insert would let two concurrent cold-cache
@@ -124,7 +124,7 @@ def _result_from_payload(payload: dict) -> AdvisorResult:
         model=payload["model"],
         summary=payload["summary"],
         ranked=tuple(
-            PlayerExplanation(player_key=e["player_key"], reasoning=e["reasoning"])
+            ItemExplanation(item_key=e["item_key"], reasoning=e["reasoning"])
             for e in payload["ranked"]
         ),
     )

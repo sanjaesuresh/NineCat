@@ -7,6 +7,11 @@ one frontend component instead of four of each. `feature` travels as a field so
 the prompt can differ where it must and cache keys never collide across
 features.
 
+The shortlist is a list of ITEMS, not players. Three of the four features do
+rank players, but a trade proposal is a give/get pair with no single player to
+name -- so the shape is generic and each feature says what its items are. This
+is the adjustment the build plan stopped after Draft to make.
+
 Nothing here touches the network, the clock, or the database.
 """
 
@@ -17,7 +22,9 @@ from dataclasses import dataclass, field
 # bumped whenever the prompt text or the response contract changes in a way
 # that makes previously cached answers wrong. It is part of the cache key, so a
 # bump invalidates every stored entry without needing a data migration.
-PROMPT_VERSION = 1
+# v2: shortlist entries became generic items (item_key/label) rather than
+# players, so every v1 prompt and every v1 cached answer is a different shape.
+PROMPT_VERSION = 2
 
 # feature identifiers -- structured tokens, never prose. They key the cache and
 # select prompt wording, so they are a contract, not a display string.
@@ -44,7 +51,7 @@ REASON_EMPTY_SHORTLIST = "empty_shortlist"
 
 
 @dataclass(frozen=True)
-class ShortlistPlayer:
+class ShortlistItem:
     """One candidate the engine already decided is plausible.
 
     `metrics` and `tags` are whatever that feature's engine computed and would
@@ -53,12 +60,17 @@ class ShortlistPlayer:
     user-scoped; see the no-secrets test.
     """
 
-    player_key: str
-    name: str
-    position: str | None
+    # opaque and stable within one request; the model echoes it back and the
+    # integrity guard matches on it. Whatever the feature uses to identify a
+    # row it already renders -- a player key, or a synthetic key for a proposal.
+    item_key: str
+    # what to call this item, e.g. a player's name or "give A, get B"
+    label: str
+    # optional second line, e.g. a position or a proposal's category effects
+    detail: str | None = None
     # label -> already-rounded number, e.g. {"value": 3.41, "pts": 1.08}
     metrics: dict[str, float] = field(default_factory=dict)
-    # engine-emitted structured facts (reason tokens, need categories)
+    # engine-emitted structured facts, already rendered for display
     tags: tuple[str, ...] = ()
 
 
@@ -70,27 +82,27 @@ class AdvisorRequest:
     # one line framing the decision, e.g. "the 12th overall pick"
     situation: str
     # label -> value, rendered into the prompt verbatim. Same rule as
-    # ShortlistPlayer: display data only, never identifiers or credentials.
+    # ShortlistItem: display data only, never identifiers or credentials.
     context: dict[str, str] = field(default_factory=dict)
-    shortlist: tuple[ShortlistPlayer, ...] = ()
+    shortlist: tuple[ShortlistItem, ...] = ()
 
     def __post_init__(self) -> None:
         if self.feature not in FEATURES:
             raise ValueError(f"unknown advisor feature: {self.feature!r}")
 
-    def player_keys(self) -> tuple[str, ...]:
-        return tuple(p.player_key for p in self.shortlist)
+    def item_keys(self) -> tuple[str, ...]:
+        return tuple(item.item_key for item in self.shortlist)
 
 
 @dataclass(frozen=True)
-class PlayerExplanation:
-    player_key: str
+class ItemExplanation:
+    item_key: str
     reasoning: str
 
 
 @dataclass(frozen=True)
 class AdvisorResult:
-    """A validated response: the shortlist reordered, plus per-player prose.
+    """A validated response: the shortlist reordered, plus per-item prose.
 
     `model` is carried so the UI can attribute the text (A6) -- the user must
     always be able to tell which parts are arithmetic and which are judgement.
@@ -100,7 +112,7 @@ class AdvisorResult:
     summary: str
     # shortlist order as the model ranked it; membership is guaranteed
     # identical to the request's shortlist (the A1 integrity guard)
-    ranked: tuple[PlayerExplanation, ...]
+    ranked: tuple[ItemExplanation, ...]
 
 
 @dataclass(frozen=True)
@@ -117,7 +129,7 @@ class AdvisorOutcome:
 
 # constrains the API response at the request level (structured outputs). This
 # does NOT replace validation.py's checks: a schema can say "a list of
-# {player_key, reasoning}", but it cannot say WHICH player_keys are legal, and
+# {item_key, reasoning}", but it cannot say WHICH item_keys are legal, and
 # that is the guarantee A1 actually depends on.
 RESPONSE_SCHEMA: dict = {
     "type": "object",
@@ -128,10 +140,10 @@ RESPONSE_SCHEMA: dict = {
             "items": {
                 "type": "object",
                 "properties": {
-                    "player_key": {"type": "string"},
+                    "item_key": {"type": "string"},
                     "reasoning": {"type": "string"},
                 },
-                "required": ["player_key", "reasoning"],
+                "required": ["item_key", "reasoning"],
                 "additionalProperties": False,
             },
         },

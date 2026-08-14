@@ -151,7 +151,7 @@ export interface StreamingPlan {
   window_basis: "remaining" | "full_week";
 }
 
-export interface LeagueMatchupResponse {
+export interface LeagueMatchupResponse extends Explained {
   week: number;
   week_range: WeekRange;
   // the date streaming.slots were computed relative to
@@ -213,8 +213,10 @@ export interface DraftBoardResponse {
 // --- Claude advisor (shared by every feature that carries reasoning) ---
 
 export interface ModelExplanation {
-  // matches a player_key in the same response's engine output
-  player_key: string;
+  // identifies one entry in the same response's engine output. Usually a
+  // player_key, but not always: a trade proposal has no single player, so the
+  // trades endpoint keys by the proposal's rank instead ("proposal-0")
+  item_key: string;
   reasoning: string;
 }
 
@@ -226,7 +228,7 @@ export interface ModelExplanations {
   summary: string;
   // the engine's shortlist, reordered by the model. Membership is guaranteed
   // identical to the engine's -- the backend rejects any response that adds or
-  // drops a player, so this never contains a player the engine didn't put up
+  // drops an entry, so this never contains something the engine didn't put up
   ranked: ModelExplanation[];
 }
 
@@ -288,7 +290,7 @@ export interface AddsCandidate {
   reasons: string[];
 }
 
-export interface LeagueAddsResponse {
+export interface LeagueAddsResponse extends Explained {
   week: number;
   week_range: WeekRange;
   as_of: string;
@@ -368,7 +370,7 @@ export interface TradeVerdict {
   reasons: string[];
 }
 
-export interface LeagueTradesResponse {
+export interface LeagueTradesResponse extends Explained {
   mine: TradeSide;
   theirs: TradeSide;
   // display info for every player_key referenced anywhere in mine/theirs or

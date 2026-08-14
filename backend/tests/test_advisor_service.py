@@ -24,7 +24,7 @@ from ninecat.advisor.types import (
     REASON_TIMEOUT,
     FEATURE_DRAFT,
     AdvisorRequest,
-    ShortlistPlayer,
+    ShortlistItem,
 )
 from ninecat.config import Settings, get_settings
 from ninecat.models.advisor import AdvisorCache
@@ -64,7 +64,7 @@ def _request(*keys: str) -> AdvisorRequest:
         situation="pick 12 overall in a 12-team 9-cat league",
         context={"punting": "ft_pct"},
         shortlist=tuple(
-            ShortlistPlayer(player_key=k, name=f"Player {k}", position="C") for k in keys
+            ShortlistItem(item_key=k, label=f"Player {k}", detail="C") for k in keys
         ),
     )
 
@@ -73,7 +73,7 @@ def _good_body(*keys: str) -> str:
     return json.dumps(
         {
             "summary": "Take the first one.",
-            "ranked": [{"player_key": k, "reasoning": f"Reason for {k}."} for k in keys],
+            "ranked": [{"item_key": k, "reasoning": f"Reason for {k}."} for k in keys],
         }
     )
 
@@ -92,7 +92,7 @@ def test_returns_a_validated_result_and_caches_it(db_session):
 
     assert outcome.reason is None
     assert outcome.cached is False
-    assert [e.player_key for e in outcome.result.ranked] == ["2", "1"]
+    assert [e.item_key for e in outcome.result.ranked] == ["2", "1"]
     assert _cached_row_count(db_session) == 1
 
 

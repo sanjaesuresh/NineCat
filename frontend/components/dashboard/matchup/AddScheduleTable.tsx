@@ -1,6 +1,9 @@
-import type { StreamingPlan, WeekRange } from "@/lib/api";
-import { LABEL_BY_CONTRACT_KEY } from "@/components/dashboard/categoryKeys";
+import type { ModelExplanations, StreamingPlan, WeekRange } from "@/lib/api";
+import ModelReasoning from "@/components/dashboard/advisor/ModelReasoning";
+import { modelRankByItemKey, reasoningByItemKey } from "@/components/dashboard/advisor/tokens";
+import { categoryLabelOrGap } from "@/components/dashboard/categoryKeys";
 import { formatGamesCount } from "@/components/dashboard/format";
+import PlayerAvatar from "@/components/dashboard/PlayerAvatar";
 import { formatSlotDay, describeWindowDirection } from "./format";
 import { describeReason, describeNote } from "./tokens";
 
@@ -16,24 +19,32 @@ const FULL_WEEK_COPY: Record<"before" | "after" | "unknown", string> = {
 /**
  * The add-schedule optimizer's recommended streaming slots by day.
  *
- * The contract has no player name for a streaming candidate — these are
- * free agents, not roster players, so there's no roster row to join a name
- * from (see lib/api.ts StreamSlot; player_key is the only identifier the
- * backend has). Rendering the raw key as a labeled "Player #<key>" is honest
- * about that gap rather than inventing a name.
+ * Slots carry the same display fields the draft board and adds list use
+ * (name, position, headshot), resolved server-side from the draftable rows —
+ * so a recommendation names the player rather than showing a bare id.
  */
 export default function AddScheduleTable({
   streaming,
   asOf,
   weekRange,
+  explanations = null,
 }: {
   streaming: StreamingPlan | null;
+  // optional: the table renders identically without explanations, which is
+  // the default mode
+  explanations?: ModelExplanations | null;
   // asOf + weekRange let the full_week banner say WHICH direction (week not
   // started vs. week already over) rather than a direction-agnostic "not
   // live" — the backend already knows which, so the UI shouldn't drop it
   asOf: string;
   weekRange: WeekRange;
 }) {
+  // the advisor keys a streaming slot by day AND player: the same player on
+  // two different days is two separate decisions, so a player-only key would
+  // collide and put one day's reasoning on the other
+  const reasoningByKey = reasoningByItemKey(explanations);
+  const modelRankByKey = modelRankByItemKey(explanations);
+
   if (!streaming) {
     return (
       <p className="border border-dashed border-rule px-4 py-6 text-center text-ink/80">
@@ -125,19 +136,34 @@ export default function AddScheduleTable({
                     <td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-ink/80">
                       {formatSlotDay(slot.day)}
                     </td>
-                    <td className="px-3 py-2 font-mono text-xs text-ink/80">
-                      Player #{slot.player_key}
+                    <td className="px-3 py-2 text-sm text-ink">
+                      <span className="flex items-center gap-2">
+                        <PlayerAvatar src={slot.headshot_url} />
+                        <span className="min-w-0">
+                          {slot.name}
+                          {slot.position ? (
+                            <span className="ml-1.5 font-mono text-[0.65rem] uppercase tracking-wide text-ink/70">
+                              {slot.position}
+                            </span>
+                          ) : null}
+                        </span>
+                      </span>
                     </td>
                     <td className="whitespace-nowrap border-l border-rule px-2 py-2 text-center font-mono text-sm text-ink">
                       {formatGamesCount(slot.games_added)}
                     </td>
                     <td className="border-l border-rule px-3 py-2 text-sm text-ink">
                       {slot.categories_helped.length > 0
-                        ? slot.categories_helped.map((k) => LABEL_BY_CONTRACT_KEY[k] ?? k).join(", ")
+                        ? slot.categories_helped.map(categoryLabelOrGap).join(", ")
                         : "—"}
                     </td>
                     <td className="border-l border-rule px-3 py-2 text-sm text-ink">
                       {slot.reason.length > 0 ? slot.reason.map(describeReason).join("; ") : "—"}
+                      <ModelReasoning
+                        reasoning={reasoningByKey.get(`${slot.day}:${slot.player_key}`)}
+                        modelRank={modelRankByKey.get(`${slot.day}:${slot.player_key}`)}
+                        engineRank={i + 1}
+                      />
                     </td>
                   </tr>
                 ))}

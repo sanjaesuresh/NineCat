@@ -6,8 +6,8 @@ import type { ModelExplanations } from "@/lib/api";
 import {
   EXPLANATIONS_REASON_TOKENS,
   describeExplanationsReason,
-  modelRankByPlayerKey,
-  reasoningByPlayerKey,
+  modelRankByItemKey,
+  reasoningByItemKey,
 } from "./tokens";
 
 function backendSource(relative: string): string {
@@ -62,35 +62,35 @@ const EXPLANATIONS: ModelExplanations = {
   model: "claude-opus-5",
   summary: "Take the big.",
   ranked: [
-    { player_key: "2", reasoning: "Fills the rebounding gap." },
-    { player_key: "1", reasoning: "Still the safer floor." },
+    { item_key: "2", reasoning: "Fills the rebounding gap." },
+    { item_key: "1", reasoning: "Still the safer floor." },
   ],
 };
 
-describe("reasoningByPlayerKey", () => {
-  it("keys reasoning by player rather than by position", () => {
+describe("reasoningByItemKey", () => {
+  it("keys reasoning by item rather than by position", () => {
     // the model reordered: pairing by index would put "Fills the rebounding
     // gap" on player 1, who the engine had first
-    const byKey = reasoningByPlayerKey(EXPLANATIONS);
+    const byKey = reasoningByItemKey(EXPLANATIONS);
 
     expect(byKey.get("2")).toBe("Fills the rebounding gap.");
     expect(byKey.get("1")).toBe("Still the safer floor.");
   });
 
   it("is empty when there are no explanations", () => {
-    expect(reasoningByPlayerKey(null).size).toBe(0);
+    expect(reasoningByItemKey(null).size).toBe(0);
   });
 });
 
-describe("modelRankByPlayerKey", () => {
+describe("modelRankByItemKey", () => {
   it("reports the model's 1-based order", () => {
-    const ranks = modelRankByPlayerKey(EXPLANATIONS);
+    const ranks = modelRankByItemKey(EXPLANATIONS);
 
     expect(ranks.get("2")).toBe(1);
     expect(ranks.get("1")).toBe(2);
   });
 
   it("is empty when there are no explanations", () => {
-    expect(modelRankByPlayerKey(null).size).toBe(0);
+    expect(modelRankByItemKey(null).size).toBe(0);
   });
 });

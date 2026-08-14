@@ -17,11 +17,14 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from ninecat.advisor import (
+    FEATURE_ADDS,
     FEATURE_DRAFT,
+    FEATURE_MATCHUP,
+    FEATURE_TRADES,
     AdvisorClient,
     AdvisorOutcome,
     AdvisorRequest,
-    ShortlistPlayer,
+    ShortlistItem,
     build_advisor_client,
     explain,
 )
@@ -122,7 +125,7 @@ def _explanations_out(outcome: AdvisorOutcome) -> dict:
             "model": outcome.result.model,
             "summary": outcome.result.summary,
             "ranked": [
-                {"player_key": e.player_key, "reasoning": e.reasoning}
+                {"item_key": e.item_key, "reasoning": e.reasoning}
                 for e in outcome.result.ranked
             ],
         },
@@ -904,10 +907,16 @@ def draft_board(
 # --- POST /api/leagues/{league_id}/draft/recommend ---
 
 
-# how many of the engine's recommendations are handed to the advisor. The
-# endpoint's own `limit` goes to 50, but the decision the user is actually
-# making is between the top few, and prompt size (and cost) scales with this.
+# How many of each engine's ranked rows are handed to the advisor. Each
+# endpoint's own `limit` goes much higher, but the decision the user is
+# actually making is between the top few, and prompt size (and therefore cost)
+# scales with this. Per-feature rather than one shared number because the lists
+# differ in kind: a streaming plan is already short, trade proposals are long
+# to describe, and a draft board is neither.
 DRAFT_ADVISOR_SHORTLIST_MAX = 5
+ADDS_ADVISOR_SHORTLIST_MAX = 6
+MATCHUP_ADVISOR_SHORTLIST_MAX = 5
+TRADES_ADVISOR_SHORTLIST_MAX = 4
 
 
 class DraftRecommendRequest(BaseModel):
@@ -1021,10 +1030,10 @@ def _draft_advisor_request(
     or team name (plan A4, pinned by the no-secrets test).
     """
     shortlist = tuple(
-        ShortlistPlayer(
-            player_key=r["player_key"],
-            name=r["name"],
-            position=r["position"],
+        ShortlistItem(
+            item_key=r["player_key"],
+            label=r["name"],
+            detail=r["position"],
             metrics={"value": r["value"], "rank_score": r["rank_score"]},
             tags=tuple(r["reasons"])
             + ((f"helps {', '.join(r['need_cats'])}",) if r["need_cats"] else ()),
@@ -1480,6 +1489,7 @@ def league_matchup(
     user: User = Depends(current_user),
     db: Session = Depends(get_session),
     client: YahooClient = Depends(get_yahoo_client),
+    advisor: AdvisorClient | None = Depends(get_advisor_client),
 ) -> dict:
     league = _get_owned_league(db, user, league_id)
 
@@ -1621,6 +1631,13 @@ def league_matchup(
             "window_basis": window_basis,
         }
 
+    outcome = explain(
+        db,
+        _matchup_advisor_request(streaming_out, comparison_out, target_week),
+        client=advisor,
+        model=get_settings().anthropic_model,
+    )
+
     stale, synced_at = _league_stale_and_synced_at(league)
     return {
         "week": target_week,
@@ -1634,6 +1651,7 @@ def league_matchup(
         "opponent": _side_out(opponent_side) if opponent_side is not None else None,
         "opponent_reason": opponent_reason,
         "comparison": comparison_out,
+        **_explanations_out(outcome),
         "schedule_coverage": {
             "mine_games": _round2(mine_games),
             "opponent_games": _round2(opponent_games) if opponent_games is not None else None,
@@ -1643,6 +1661,69 @@ def league_matchup(
         "stale": stale,
         "synced_at": synced_at,
     }
+
+
+def _matchup_advisor_request(
+    streaming_out: dict | None, comparison_out: dict | None, week: int
+) -> AdvisorRequest:
+    """Shape the week's streaming plan for the advisor.
+
+    The shortlist is one entry per PLANNED ADD (a player on a day), not per
+    player: the same player can legitimately appear on two days, and each is a
+    separate decision, so the item key carries the day too.
+
+    A4 note specific to this feature: the opponent is another real person.
+    Their team name never goes in the prompt -- only the category margins,
+    which are arithmetic. The engine's own comparison is the context; who they
+    are is not.
+    """
+    if streaming_out is None:
+        # no opponent means no close categories means no plan; there is nothing
+        # to rank, and the page already explains why
+        return AdvisorRequest(feature=FEATURE_MATCHUP, situation=f"week {week}")
+
+    shortlist = tuple(
+        ShortlistItem(
+            # day-qualified: two slots for the same player on different days
+            # are two different decisions and must not collide
+            item_key=f"{slot['day']}:{slot['player_key']}",
+            label=slot["name"],
+            detail=f"add on {slot['day']}",
+            metrics={"games_added": slot["games_added"]},
+            tags=_matchup_slot_tags(slot),
+        )
+        for slot in streaming_out["slots"][:MATCHUP_ADVISOR_SHORTLIST_MAX]
+    )
+
+    context: dict[str, str] = {
+        "adds used by this plan": str(streaming_out["adds_used"]),
+        "adds held back": str(streaming_out["adds_reserved"]),
+    }
+    if comparison_out is not None:
+        mine, theirs = comparison_out["projected_score"]
+        context["projected category score"] = f"{mine}-{theirs}"
+        context["close categories"] = (
+            ", ".join(comparison_out["close_categories"]) or "none this week"
+        )
+        context["most flippable first"] = ", ".join(comparison_out["focus"]) or "none"
+
+    return AdvisorRequest(
+        feature=FEATURE_MATCHUP,
+        situation=f"streaming adds for week {week}",
+        context=context,
+        shortlist=shortlist,
+    )
+
+
+def _matchup_slot_tags(slot: dict) -> tuple[str, ...]:
+    # same reason as _adds_tags: the engine's reason field is contract keys,
+    # which mean nothing to a model reading them cold
+    tags: list[str] = []
+    if slot["categories_helped"]:
+        tags.append(f"helps {', '.join(slot['categories_helped'])}")
+    if "back_to_back" in slot["reason"]:
+        tags.append("back-to-back, so two games from one add")
+    return tuple(tags)
 
 
 # --- GET /api/leagues/{league_id}/adds ---
@@ -1658,6 +1739,7 @@ def league_adds(
     user: User = Depends(current_user),
     db: Session = Depends(get_session),
     client: YahooClient = Depends(get_yahoo_client),
+    advisor: AdvisorClient | None = Depends(get_advisor_client),
 ) -> dict:
     league = _get_owned_league(db, user, league_id)
 
@@ -1747,6 +1829,15 @@ def league_adds(
             }
         )
 
+    outcome = explain(
+        db,
+        _adds_advisor_request(
+            candidates_out, target_week, window_basis, close_categories, opponent_reason, punt
+        ),
+        client=advisor,
+        model=get_settings().anthropic_model,
+    )
+
     stale, synced_at = _league_stale_and_synced_at(league)
     return {
         "week": target_week,
@@ -1760,6 +1851,7 @@ def league_adds(
         "close_categories": list(close_categories),
         "opponent_reason": opponent_reason,
         "candidates": candidates_out,
+        **_explanations_out(outcome),
         "schedule_coverage": {
             "mine_games": _round2(mine_games),
             "opponent_games": _round2(opponent_games) if opponent_games is not None else None,
@@ -1768,6 +1860,76 @@ def league_adds(
         "stale": stale,
         "synced_at": synced_at,
     }
+
+
+def _adds_advisor_request(
+    candidates: list[dict],
+    week: int,
+    window_basis: str,
+    close_categories: list[str],
+    opponent_reason: str | None,
+    punt: list[str],
+) -> AdvisorRequest:
+    """Shape the waiver shortlist for the advisor.
+
+    Same A4 rule as the draft builder: player names, stat-derived numbers and
+    the engine's own reasons only. Nothing user-scoped, and in particular no
+    team or league name -- a league is other people, and their team names are
+    theirs.
+    """
+    shortlist = tuple(
+        ShortlistItem(
+            item_key=c["player_key"],
+            label=c["name"],
+            detail=c["position"],
+            metrics={"score": c["score"], "games_remaining": c["games_remaining"]},
+            tags=_adds_tags(c),
+        )
+        for c in candidates[:ADDS_ADVISOR_SHORTLIST_MAX]
+    )
+    window = (
+        "the rest of this week" if window_basis == STREAM_WINDOW_REMAINING else "the full week"
+    )
+    return AdvisorRequest(
+        feature=FEATURE_ADDS,
+        situation=f"free-agent adds for week {week}, covering {window}",
+        context={
+            "ranking targets": (
+                ", ".join(close_categories)
+                if close_categories
+                else "roster need alone (no close categories this week)"
+            ),
+            # the honesty surface the Adds page already shows: say when the
+            # ranking degraded to need-only so the model doesn't reason as if
+            # it were matchup-weighted
+            "matchup basis": (
+                "no opponent identified, so this is roster need only"
+                if opponent_reason
+                else "weighted toward this week's matchup"
+            ),
+            "punting": ", ".join(c for c in CATEGORIES if c in set(punt)) or "nothing",
+        },
+        shortlist=shortlist,
+    )
+
+
+def _adds_tags(candidate: dict) -> tuple[str, ...]:
+    """Render an AddsCandidate's structured tokens into prompt-readable text.
+
+    The engine emits contract keys ("schedule_driven"), which are meaningless
+    to a model reading them cold. This is the only place the backend turns them
+    into words, and it stays deliberately terse -- the frontend's own
+    translation (components/dashboard/adds/tokens.ts) is the user-facing copy
+    and the two are allowed to differ.
+    """
+    tags: list[str] = []
+    if candidate["categories_helped"]:
+        tags.append(f"helps {', '.join(candidate['categories_helped'])}")
+    if "schedule_driven" in candidate["reasons"]:
+        tags.append("plays more games than most of this pool")
+    if candidate["stat_basis"] == "season_average":
+        tags.append("valued off last season's averages, not a projection")
+    return tuple(tags)
 
 
 # --- GET /api/leagues/{league_id}/trades ---
@@ -1824,6 +1986,7 @@ def league_trades(
     limit: int = 10,
     user: User = Depends(current_user),
     db: Session = Depends(get_session),
+    advisor: AdvisorClient | None = Depends(get_advisor_client),
 ) -> dict:
     league = _get_owned_league(db, user, league_id)
 
@@ -1894,6 +2057,13 @@ def league_trades(
         for v in verdicts
     ]
 
+    outcome = explain(
+        db,
+        _trades_advisor_request(verdicts_out, players_out, comparison),
+        client=advisor,
+        model=get_settings().anthropic_model,
+    )
+
     stale, synced_at = _league_stale_and_synced_at(league)
     return {
         "mine": {
@@ -1910,9 +2080,77 @@ def league_trades(
         },
         "players": players_out,
         "verdicts": verdicts_out,
+        **_explanations_out(outcome),
         "evaluated": candidate_set.evaluated,
         "truncated": candidate_set.truncated,
         "value_basis": TRADE_VALUE_BASIS_CATEGORY_IMPACT_ONLY,
         "stale": stale,
         "synced_at": synced_at,
     }
+
+
+def _trades_advisor_request(
+    verdicts: list[dict], players: dict[str, dict], comparison
+) -> AdvisorRequest:
+    """Shape trade proposals for the advisor.
+
+    This is the feature that forced the shortlist to be items rather than
+    players: a proposal is a give/get PAIR, so there is no single player to
+    name and no player key to echo back.
+
+    The item key is the proposal's position in the engine's own ranking, not a
+    player key. That keeps it short, stable for the cache, and free of ids --
+    the label carries the names, which is what the model actually reasons over.
+
+    A4 note: the other team belongs to another real person. Their team name is
+    never sent; the proposals and the category strengths are, because those are
+    arithmetic over public player stats.
+    """
+    shortlist = tuple(
+        ShortlistItem(
+            item_key=f"proposal-{i}",
+            label=(
+                f"give {_trade_names(v['give'], players)}"
+                f" / get {_trade_names(v['get'], players)}"
+            ),
+            detail=f"engine verdict: {v['verdict']}",
+            metrics={"net_value": v["net_value"]},
+            tags=_trade_tags(v),
+        )
+        for i, v in enumerate(verdicts[:TRADES_ADVISOR_SHORTLIST_MAX])
+    )
+    return AdvisorRequest(
+        feature=FEATURE_TRADES,
+        situation="trade proposals with one other team in a 9-cat league",
+        context={
+            "my surplus": ", ".join(comparison.my_surplus) or "none",
+            "my deficit": ", ".join(comparison.my_deficit) or "none",
+            "their surplus": ", ".join(comparison.their_surplus) or "none",
+            "their deficit": ", ".join(comparison.their_deficit) or "none",
+            # the same caveat the page shows: net_value weighs category impact
+            # only, so the model must not present it as an all-in valuation
+            "how net_value was computed": (
+                "category impact only -- it ignores positional scarcity entirely"
+            ),
+        },
+        shortlist=shortlist,
+    )
+
+
+def _trade_names(player_keys: list[str], players: dict[str, dict]) -> str:
+    # players is the display map the response already carries, so a proposal
+    # never renders to the model as a list of raw keys
+    return ", ".join(players[k]["name"] for k in player_keys if k in players) or "nobody"
+
+
+def _trade_tags(verdict: dict) -> tuple[str, ...]:
+    tags: list[str] = []
+    if verdict["mine"]["gained"]:
+        tags.append(f"I gain {', '.join(verdict['mine']['gained'])}")
+    if verdict["mine"]["lost"]:
+        tags.append(f"I lose {', '.join(verdict['mine']['lost'])}")
+    # a collapsed category is the one that should stop a trade outright: it
+    # means the category doesn't just weaken, it stops existing
+    if verdict["mine"]["collapsed"]:
+        tags.append(f"I collapse {', '.join(verdict['mine']['collapsed'])} entirely")
+    return tuple(tags)

@@ -16,7 +16,7 @@ from ninecat.advisor.types import (
     FEATURE_MATCHUP,
     FEATURE_TRADES,
     AdvisorRequest,
-    ShortlistPlayer,
+    ShortlistItem,
 )
 
 
@@ -26,17 +26,17 @@ def _request(**overrides) -> AdvisorRequest:
         situation="pick 12 overall in a 12-team 9-cat league",
         context={"punting": "ft_pct", "roster so far": "Rudy Gobert"},
         shortlist=(
-            ShortlistPlayer(
-                player_key="201939",
-                name="Alpha Guard",
-                position="PG",
+            ShortlistItem(
+                item_key="201939",
+                label="Alpha Guard",
+                detail="PG",
                 metrics={"value": 3.4, "rank_score": 3.9},
                 tags=("best available", "helps ast, stl"),
             ),
-            ShortlistPlayer(
-                player_key="203999",
-                name="Beta Big",
-                position="C",
+            ShortlistItem(
+                item_key="203999",
+                label="Beta Big",
+                detail="C",
                 metrics={"value": 3.1, "rank_score": 3.2},
                 tags=("may not last to your next pick",),
             ),
@@ -64,18 +64,30 @@ def test_prompt_states_the_integrity_rule_the_validator_enforces():
     # the guard is enforced in code (validation.py); the prompt says it too so
     # the model has a chance of producing a usable answer in the first place
     system, _user = build_prompt(_request())
-    assert "never introduce a player" in system.lower()
+    assert "never introduce an option that is not on it" in system.lower()
     assert "never drop one" in system.lower()
 
 
 @pytest.mark.parametrize(
     "feature", [FEATURE_DRAFT, FEATURE_MATCHUP, FEATURE_ADDS, FEATURE_TRADES]
 )
-def test_every_feature_has_its_own_framing_line(feature):
-    # one shared shape, but each feature must sound like it is about the
-    # decision actually in front of the user (plan B3)
+def test_every_feature_says_what_its_shortlist_entries_are(feature):
+    """One generic shape, four decisions. The framing line is what stops a
+    trade proposal being described to the model as if it were a draft pick --
+    the shortlist is items, and only this line says what kind."""
     _system, user = build_prompt(_request(feature=feature))
-    assert user.splitlines()[0].strip()
+    framing = user.splitlines()[0]
+
+    assert framing.strip()
+    assert "Each entry is" in framing
+
+
+def test_feature_framings_are_all_distinct():
+    framings = {
+        build_prompt(_request(feature=f))[1].splitlines()[0]
+        for f in (FEATURE_DRAFT, FEATURE_MATCHUP, FEATURE_ADDS, FEATURE_TRADES)
+    }
+    assert len(framings) == 4
 
 
 def test_prompt_is_byte_stable_for_the_same_request():
