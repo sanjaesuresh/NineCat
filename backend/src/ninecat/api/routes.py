@@ -16,6 +16,15 @@ from pydantic import BaseModel
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
+from ninecat.advisor import (
+    FEATURE_DRAFT,
+    AdvisorClient,
+    AdvisorOutcome,
+    AdvisorRequest,
+    ShortlistPlayer,
+    build_advisor_client,
+    explain,
+)
 from ninecat.auth.sessions import SESSION_COOKIE_NAME, current_user
 from ninecat.config import get_settings
 from ninecat.db import get_session
@@ -80,6 +89,46 @@ def get_yahoo_client(
     handler ever needs to know whether it's talking to a real gateway or not.
     """
     return YahooClient(YahooGateway(db, user.id))
+
+
+def get_advisor_client() -> AdvisorClient | None:
+    """FastAPI dependency yielding the Claude advisor client, or None when no
+    key is configured.
+
+    None is a first-class mode, not an error (plan A2) -- it is what every test
+    and every key-less deployment runs on. Overridden in tests with a fake, the
+    same seam get_yahoo_client uses, so no test can reach the network.
+    """
+    return build_advisor_client(get_settings())
+
+
+def _explanations_out(outcome: AdvisorOutcome) -> dict:
+    """The advisor half of a feature response. Shared by all four features so
+    the frontend has one shape to render (plan B3).
+
+    `explanations_reason` is a structured token, never prose -- the frontend
+    owns the wording (see components/dashboard/advisor/tokens.ts).
+    """
+    if outcome.result is None:
+        return {
+            "explanations": None,
+            "explanations_available": False,
+            "explanations_reason": outcome.reason,
+        }
+    return {
+        "explanations": {
+            # visible model attribution is not optional: the user must be able
+            # to tell which parts are arithmetic and which are judgement (A6)
+            "model": outcome.result.model,
+            "summary": outcome.result.summary,
+            "ranked": [
+                {"player_key": e.player_key, "reasoning": e.reasoning}
+                for e in outcome.result.ranked
+            ],
+        },
+        "explanations_available": True,
+        "explanations_reason": None,
+    }
 
 
 @dataclass(frozen=True)
@@ -855,6 +904,12 @@ def draft_board(
 # --- POST /api/leagues/{league_id}/draft/recommend ---
 
 
+# how many of the engine's recommendations are handed to the advisor. The
+# endpoint's own `limit` goes to 50, but the decision the user is actually
+# making is between the top few, and prompt size (and cost) scales with this.
+DRAFT_ADVISOR_SHORTLIST_MAX = 5
+
+
 class DraftRecommendRequest(BaseModel):
     my_player_keys: list[str] = []
     taken_player_keys: list[str] = []
@@ -870,6 +925,7 @@ def draft_recommend(
     body: DraftRecommendRequest,
     user: User = Depends(current_user),
     db: Session = Depends(get_session),
+    advisor: AdvisorClient | None = Depends(get_advisor_client),
 ) -> dict:
     league = _get_owned_league(db, user, league_id)
 
@@ -882,7 +938,8 @@ def draft_recommend(
             status_code=status.HTTP_400_BAD_REQUEST, detail="limit must be between 1 and 50"
         )
 
-    season = get_settings().current_season
+    settings = get_settings()
+    season = settings.current_season
     resolved_source = _resolve_projection_source(db, season, body.source)
     rows = _draftable_rows(db, season, resolved_source)
 
@@ -929,8 +986,68 @@ def draft_recommend(
         for r in recs
     ]
 
+    # exactly one advisor call per request, whatever `limit` is -- the mock
+    # draft hits this endpoint once per user turn, so per-request fan-out here
+    # would multiply straight into per-draft cost
+    outcome = explain(
+        db,
+        _draft_advisor_request(body, config, recommendations, my_players, rows, resolved_source),
+        client=advisor,
+        model=settings.anthropic_model,
+    )
+
     stale, synced_at = _league_stale_and_synced_at(league)
-    return {"recommendations": recommendations, "stale": stale, "synced_at": synced_at}
+    return {
+        "recommendations": recommendations,
+        **_explanations_out(outcome),
+        "stale": stale,
+        "synced_at": synced_at,
+    }
+
+
+def _draft_advisor_request(
+    body: DraftRecommendRequest,
+    config: LeagueConfig,
+    recommendations: list[dict],
+    my_players: list[DraftPoolPlayer],
+    rows: dict[int, _DraftableRow],
+    resolved_source: str | None,
+) -> AdvisorRequest:
+    """Shape the draft shortlist for the advisor.
+
+    Everything here is data the page already shows the user -- player names,
+    stat-derived numbers, the engine's own reasons, the punts they picked.
+    Nothing user-scoped goes in: no user id, no email, no Yahoo token, no league
+    or team name (plan A4, pinned by the no-secrets test).
+    """
+    shortlist = tuple(
+        ShortlistPlayer(
+            player_key=r["player_key"],
+            name=r["name"],
+            position=r["position"],
+            metrics={"value": r["value"], "rank_score": r["rank_score"]},
+            tags=tuple(r["reasons"])
+            + ((f"helps {', '.join(r['need_cats'])}",) if r["need_cats"] else ()),
+        )
+        for r in recommendations[:DRAFT_ADVISOR_SHORTLIST_MAX]
+    )
+    # both of these are sorted into a canonical order rather than left in
+    # request order: neither ordering carries meaning, and leaving it to the
+    # caller would make the same question hash two different ways and miss the
+    # cache (punt uses CATEGORIES order, the same canonical order the rest of
+    # the codebase serializes punts in)
+    punting = [c for c in CATEGORIES if c in set(body.punt)]
+    roster = sorted(rows[int(p.player_key)].nba_player.full_name for p in my_players)
+    return AdvisorRequest(
+        feature=FEATURE_DRAFT,
+        situation=f"pick {body.overall_pick} overall in a {config.num_teams}-team 9-cat league",
+        context={
+            "punting": ", ".join(punting) if punting else "nothing",
+            "roster so far": ", ".join(roster) if roster else "empty",
+            "stat basis": resolved_source or "last season's averages",
+        },
+        shortlist=shortlist,
+    )
 
 
 # --- GET /api/leagues/{league_id}/matchup ---

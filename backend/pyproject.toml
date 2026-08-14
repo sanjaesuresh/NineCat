@@ -16,6 +16,7 @@ dependencies = [
     "apscheduler>=3.10",
     "nba_api>=1.4",
     "yahoo_fantasy_api>=2.10",
+    "anthropic>=0.95",
 ]
 
 [dependency-groups]

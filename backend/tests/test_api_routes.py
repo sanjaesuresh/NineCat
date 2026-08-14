@@ -1,4 +1,6 @@
+import json
 import math
+import re
 from collections import Counter
 from datetime import date, datetime, timedelta, timezone
 from http.cookies import SimpleCookie
@@ -8,13 +10,23 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from ninecat.api.routes import get_yahoo_client, router
+from ninecat.advisor.client import AdvisorCompletion, AdvisorUnavailable
+from ninecat.advisor.types import REASON_RATE_LIMITED
+from ninecat.api.routes import (
+    DRAFT_ADVISOR_SHORTLIST_MAX,
+    get_advisor_client,
+    get_yahoo_client,
+    router,
+)
 from ninecat.auth.routes import (
     _DEV_POOL_PLAYERS,
+    DEV_LEAGUE_KEY,
+    DEV_OTHER_TEAM_KEY,
     _get_or_create_nba_player,
     _get_or_create_projection,
     _get_or_create_season_average,
 )
+from ninecat.auth.routes import router as auth_router
 from ninecat.auth.sessions import SESSION_COOKIE_NAME, create_session_cookie
 from ninecat.config import get_settings
 from ninecat.db import get_session
@@ -1312,7 +1324,19 @@ def test_draft_recommend_round_trip(db_session):
 
     assert response.status_code == 200
     body = response.json()
-    assert set(body.keys()) == {"recommendations", "stale", "synced_at"}
+    assert set(body.keys()) == {
+        "recommendations",
+        "explanations",
+        "explanations_available",
+        "explanations_reason",
+        "stale",
+        "synced_at",
+    }
+    # the suite runs with no ANTHROPIC_API_KEY, which is the default mode: the
+    # engine's own ordering plus an honest reason (plan A2)
+    assert body["explanations"] is None
+    assert body["explanations_available"] is False
+    assert body["explanations_reason"] == "not_configured"
     datetime.fromisoformat(body["synced_at"])
     recs = body["recommendations"]
     assert len(recs) == 2
@@ -1320,6 +1344,208 @@ def test_draft_recommend_round_trip(db_session):
         "player_key", "name", "position", "value", "rank_score", "reasons", "need_cats",
     }
     assert recs[0]["player_key"] in {str(p.id) for p in players}
+
+
+# --- Claude advisor on the draft endpoint (docs/claude-advisor-plan.md) ---
+
+
+class _StubAdvisorClient:
+    """The AdvisorClient seam, implemented directly -- no network, ever.
+
+    Echoes the shortlist back in the order it was given unless `text` overrides
+    the body, so the integrity guard passes by default and tests that care about
+    it can break it deliberately.
+    """
+
+    def __init__(self, *, text: str | None = None, error: Exception | None = None):
+        self._text = text
+        self._error = error
+        self.calls: list[tuple[str, str]] = []
+
+    def complete(self, *, system: str, user: str, schema: dict) -> AdvisorCompletion:
+        self.calls.append((system, user))
+        if self._error is not None:
+            raise self._error
+        return AdvisorCompletion(
+            text=self._text if self._text is not None else self._echo(user),
+            model="stub-model",
+            input_tokens=1200,
+            output_tokens=340,
+        )
+
+    @staticmethod
+    def _echo(user: str) -> str:
+        # the prompt renders each shortlist entry as "- [key] Name (...)"
+        keys = re.findall(r"^- \[([^\]]+)\]", user, flags=re.MULTILINE)
+        return json.dumps(
+            {
+                "summary": "Take the first one.",
+                "ranked": [
+                    {"player_key": k, "reasoning": f"Reasoning for {k}."} for k in keys
+                ],
+            }
+        )
+
+
+def _advisor_client(db_session, user: User, advisor) -> TestClient:
+    app = _app(db_session, _StubYahooClient())
+    app.dependency_overrides[get_advisor_client] = lambda: advisor
+    tc = _test_client(app)
+    tc.cookies.set(SESSION_COOKIE_NAME, create_session_cookie(user.id))
+    return tc
+
+
+def _recommend(client, league, **body):
+    payload = {"my_player_keys": [], "taken_player_keys": [], "overall_pick": 1, "limit": 4}
+    payload.update(body)
+    return client.post(f"/api/leagues/{league.id}/draft/recommend", json=payload)
+
+
+def test_draft_recommend_returns_attributed_explanations(db_session):
+    user = _seed_user(db_session)
+    league, _team, _rival = _seed_league_with_team(db_session, user)
+    _seed_recommend_pool(db_session)
+    advisor = _StubAdvisorClient()
+
+    response = _recommend(_advisor_client(db_session, user, advisor), league)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["explanations_available"] is True
+    assert body["explanations_reason"] is None
+    # visible model attribution is not optional (plan A6)
+    assert body["explanations"]["model"] == "stub-model"
+    assert body["explanations"]["summary"]
+    explained = {e["player_key"] for e in body["explanations"]["ranked"]}
+    assert explained <= {r["player_key"] for r in body["recommendations"]}
+    assert all(e["reasoning"] for e in body["explanations"]["ranked"])
+
+
+def test_draft_recommend_makes_exactly_one_advisor_call_per_request(db_session):
+    # the mock draft hits this endpoint once per user turn, so per-request
+    # fan-out here would multiply straight into per-draft cost
+    user = _seed_user(db_session)
+    league, _team, _rival = _seed_league_with_team(db_session, user)
+    _seed_recommend_pool(db_session)
+    advisor = _StubAdvisorClient()
+
+    _recommend(_advisor_client(db_session, user, advisor), league)
+
+    assert len(advisor.calls) == 1
+
+
+def test_draft_recommend_caps_the_shortlist_it_sends(db_session):
+    user = _seed_user(db_session)
+    league, _team, _rival = _seed_league_with_team(db_session, user)
+    _seed_recommend_pool(db_session)
+    advisor = _StubAdvisorClient()
+
+    response = _recommend(_advisor_client(db_session, user, advisor), league, limit=50)
+
+    body = response.json()
+    _system, prompt = advisor.calls[0]
+    sent = re.findall(r"^- \[([^\]]+)\]", prompt, flags=re.MULTILINE)
+    assert len(sent) <= DRAFT_ADVISOR_SHORTLIST_MAX
+    assert len(body["explanations"]["ranked"]) == len(sent)
+
+
+def test_draft_recommend_repeats_hit_the_cache_instead_of_the_api(db_session):
+    user = _seed_user(db_session)
+    league, _team, _rival = _seed_league_with_team(db_session, user)
+    _seed_recommend_pool(db_session)
+    advisor = _StubAdvisorClient()
+    client = _advisor_client(db_session, user, advisor)
+
+    first = _recommend(client, league)
+    second = _recommend(client, league)
+
+    assert len(advisor.calls) == 1
+    assert second.json()["explanations"] == first.json()["explanations"]
+
+
+def test_draft_recommend_prompt_carries_no_secrets_or_user_identifiers(db_session):
+    """SECURITY, pinned (plan A4). The unit test in test_advisor_prompt.py pins
+    the prompt builder; this pins what the ROUTE actually hands it -- the place
+    a future change is most likely to slip a token or an identifier in."""
+    user = _seed_user(db_session)
+    league, _team, _rival = _seed_league_with_team(db_session, user)
+    _seed_recommend_pool(db_session)
+    # stored verbatim rather than encrypted on purpose: if this value ever
+    # reached a prompt the assertion below would see it in the clear
+    db_session.add(
+        YahooToken(
+            user_id=user.id,
+            encrypted_refresh_token="refresh-token-value",
+            access_token_expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+        )
+    )
+    db_session.flush()
+    advisor = _StubAdvisorClient()
+
+    _recommend(_advisor_client(db_session, user, advisor), league)
+
+    system, prompt = advisor.calls[0]
+    sent = f"{system}\n{prompt}"
+    for forbidden in (
+        "refresh-token-value",
+        str(user.id),
+        user.yahoo_guid,
+        user.display_name,
+        league.yahoo_league_key,
+        league.name,
+        SESSION_COOKIE_NAME,
+    ):
+        assert forbidden not in sent
+
+
+@pytest.mark.parametrize(
+    ("advisor", "reason"),
+    [
+        (_StubAdvisorClient(error=AdvisorUnavailable(REASON_RATE_LIMITED)), REASON_RATE_LIMITED),
+        (_StubAdvisorClient(text="not json at all"), "malformed_response"),
+        (
+            _StubAdvisorClient(
+                text=json.dumps(
+                    {
+                        "summary": "s",
+                        "ranked": [{"player_key": "999999", "reasoning": "Not on the list."}],
+                    }
+                )
+            ),
+            "shortlist_mismatch",
+        ),
+    ],
+    ids=["api-failure", "malformed", "smuggled-player"],
+)
+def test_draft_recommend_survives_every_advisor_failure(db_session, advisor, reason):
+    # a recommendation page must never fail because an explanation service did
+    user = _seed_user(db_session)
+    league, _team, _rival = _seed_league_with_team(db_session, user)
+    _seed_recommend_pool(db_session)
+
+    response = _recommend(_advisor_client(db_session, user, advisor), league)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["explanations"] is None
+    assert body["explanations_available"] is False
+    assert body["explanations_reason"] == reason
+    # the deterministic half is untouched
+    assert len(body["recommendations"]) == 4
+
+
+def test_draft_recommendations_are_identical_with_explanations_on_and_off(db_session):
+    # the engine leads; the advisor only explains (plan A1)
+    user = _seed_user(db_session)
+    league, _team, _rival = _seed_league_with_team(db_session, user)
+    _seed_recommend_pool(db_session)
+
+    off = _recommend(_advisor_client(db_session, user, None), league)
+    on = _recommend(_advisor_client(db_session, user, _StubAdvisorClient()), league)
+
+    assert off.json()["recommendations"] == on.json()["recommendations"]
+    assert off.json()["explanations_reason"] == "not_configured"
+    assert on.json()["explanations_available"] is True
 
 
 def test_draft_recommend_excludes_taken_and_mine(db_session):
@@ -2581,3 +2807,65 @@ def test_trades_never_proposes_a_center_deep_team_giving_up_a_guard(db_session):
     for verdict in body["verdicts"]:
         assert set(verdict["give"]) <= big_keys, "a center-deep team must never be offered up giving a guard"
         assert set(verdict["get"]) <= guard_keys
+
+
+def test_trades_over_the_real_dev_seed_proposes_guards_for_bigs(
+    db_session, monkeypatch: pytest.MonkeyPatch
+):
+    """The demo itself must produce trades, not just hand-built fixtures.
+
+    This is the guard for a real regression: the seeded user roster used to
+    carry two quality bigs alongside its guards, which left all nine of its
+    categories labelled "average" -- no surplus, no deficit -- so candidate
+    generation returned nothing and the Trades page rendered empty forever.
+    Measured against the running stack before the seed was rebalanced:
+    evaluated=0, verdicts=0, from either side's perspective.
+
+    Direction is asserted too, not just non-emptiness: the seeded roster is
+    guard-deep and thin at center, so every proposal must give a guard and
+    get a big. That is the plan's mandatory fan-plausibility check, and it
+    fails if the seed drifts back toward balance (no verdicts at all) or if
+    the surplus/deficit pairing ever inverts.
+    """
+    monkeypatch.setenv("DEV_AUTH_ENABLED", "true")
+    get_settings.cache_clear()
+
+    app = FastAPI()
+    app.include_router(auth_router)
+    app.include_router(router)
+    app.dependency_overrides[get_session] = lambda: db_session
+    client = _test_client(app)
+
+    assert client.post("/api/auth/dev-login").status_code == 204
+
+    league = db_session.execute(
+        select(League).where(League.yahoo_league_key == DEV_LEAGUE_KEY)
+    ).scalar_one()
+    rival = db_session.execute(
+        select(Team).where(Team.yahoo_team_key == DEV_OTHER_TEAM_KEY)
+    ).scalar_one()
+
+    response = client.get(f"/api/leagues/{league.id}/trades", params={"team_id": rival.id})
+
+    assert response.status_code == 200
+    body = response.json()
+
+    # the two facts that were false before the rebalance
+    assert body["mine"]["surplus"], "seeded roster has nothing to trade from"
+    assert body["mine"]["deficit"], "seeded roster has no weakness to trade for"
+    assert body["verdicts"], "the seeded demo league must produce at least one proposal"
+
+    players = body["players"]
+    for verdict in body["verdicts"]:
+        assert verdict["verdict"] in {"favors_me", "favors_them", "balanced", "rejected"}
+        # every key a verdict references must resolve, or the page renders "Player #<id>"
+        for key in list(verdict["give"]) + list(verdict["get"]):
+            assert key in players
+        given = [players[key]["position"] or "" for key in verdict["give"]]
+        received = [players[key]["position"] or "" for key in verdict["get"]]
+        assert all("C" not in pos and "PF" not in pos for pos in given), (
+            f"a guard-deep, big-thin roster must never be told to give up a big: {given}"
+        )
+        assert all("C" in pos or "PF" in pos for pos in received), (
+            f"the fix for a big-thin roster must be a big: {received}"
+        )

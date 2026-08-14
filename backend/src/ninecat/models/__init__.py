@@ -1,3 +1,4 @@
+from ninecat.models.advisor import AdvisorCache
 from ninecat.models.cache import YahooApiCache
 from ninecat.models.core import (
     FantasyWeek,
@@ -20,6 +21,7 @@ from ninecat.models.warehouse import (
 )
 
 __all__ = [
+    "AdvisorCache",
     "FantasyWeek",
     "JobRun",
     "League",

@@ -8,6 +8,7 @@ import {
   ApiError,
   type DraftBoardPlayer,
   type DraftRecommendation,
+  type ModelExplanations,
 } from "@/lib/api";
 import {
   MOCK_DRAFT_TEAMS,
@@ -52,6 +53,11 @@ export function useDraftSession({
   const [recStatus, setRecStatus] = useState<RecStatus>("loading");
   const [recommendations, setRecommendations] = useState<DraftRecommendation[]>([]);
   const [recError, setRecError] = useState<string | null>(null);
+  // model-written reasoning for the current pick, and why it is missing when
+  // it is. Both are cleared alongside recommendations so a stale explanation
+  // can never outlive the shortlist it was written about.
+  const [explanations, setExplanations] = useState<ModelExplanations | null>(null);
+  const [explanationsReason, setExplanationsReason] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState<string | null>(null);
 
   // re-seeded on every startSession() call (a fresh Date.now()-derived seed)
@@ -76,6 +82,8 @@ export function useDraftSession({
           limit: 5,
         });
         setRecommendations(res.recommendations);
+        setExplanations(res.explanations);
+        setExplanationsReason(res.explanations_reason);
         setRecStatus("ready");
       } catch (err) {
         if (isUnauthorized(err)) {
@@ -127,6 +135,8 @@ export function useDraftSession({
     } else {
       setRecStatus("ready");
       setRecommendations([]);
+      setExplanations(null);
+      setExplanationsReason(null);
     }
   }, [advanceOpponents, fetchRecommendations, rounds, totalPicks]);
 
@@ -163,6 +173,8 @@ export function useDraftSession({
     } else {
       setRecStatus("ready");
       setRecommendations([]);
+      setExplanations(null);
+      setExplanationsReason(null);
     }
   }
 
@@ -180,6 +192,8 @@ export function useDraftSession({
     draftComplete,
     recStatus,
     recommendations,
+    explanations,
+    explanationsReason,
     recError,
     announcement,
     startSession,

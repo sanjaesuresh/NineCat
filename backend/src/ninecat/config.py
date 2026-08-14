@@ -54,6 +54,19 @@ class Settings(BaseSettings):
     # containing this date, monday-to-sunday from there. 2025-10-20 is the
     # monday of 2025-26 NBA opening week; bump alongside current_season.
     fantasy_season_start: date = date(2025, 10, 20)
+    # Claude advisor (docs/claude-advisor-plan.md A2/A7). Declared -- not just
+    # read from the environment -- because model_config sets extra="ignore",
+    # which silently drops any undeclared key. Absent key is a first-class mode:
+    # every feature degrades to its deterministic engine output and says so.
+    anthropic_api_key: str | None = None
+    anthropic_model: str = "claude-opus-5"
+
+    @property
+    def explanations_available(self) -> bool:
+        """The single predicate for "can this deployment produce model-written
+        explanations". Every caller asks this rather than testing the key
+        directly, so the no-key path has exactly one definition."""
+        return bool(self.anthropic_api_key)
 
 
 @lru_cache

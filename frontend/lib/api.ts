@@ -210,6 +210,40 @@ export interface DraftBoardResponse {
   synced_at: string;
 }
 
+// --- Claude advisor (shared by every feature that carries reasoning) ---
+
+export interface ModelExplanation {
+  // matches a player_key in the same response's engine output
+  player_key: string;
+  reasoning: string;
+}
+
+export interface ModelExplanations {
+  // the model that wrote this text. Rendered, not decorative: the user has to
+  // be able to tell which parts of the page are arithmetic and which are
+  // judgement (docs/claude-advisor-plan.md A6)
+  model: string;
+  summary: string;
+  // the engine's shortlist, reordered by the model. Membership is guaranteed
+  // identical to the engine's -- the backend rejects any response that adds or
+  // drops a player, so this never contains a player the engine didn't put up
+  ranked: ModelExplanation[];
+}
+
+/**
+ * The advisor half of a feature response. One shape for all four features so
+ * there is one component to render it.
+ *
+ * `explanations_reason` is a structured token, never prose -- see
+ * components/dashboard/advisor/tokens.ts for the translation, which is pinned
+ * against the backend's own vocabulary.
+ */
+export interface Explained {
+  explanations: ModelExplanations | null;
+  explanations_available: boolean;
+  explanations_reason: string | null;
+}
+
 export interface DraftRecommendation {
   player_key: string;
   name: string;
@@ -220,7 +254,7 @@ export interface DraftRecommendation {
   need_cats: string[];
 }
 
-export interface DraftRecommendResponse {
+export interface DraftRecommendResponse extends Explained {
   recommendations: DraftRecommendation[];
   stale: boolean;
   synced_at: string;

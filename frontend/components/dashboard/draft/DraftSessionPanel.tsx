@@ -4,6 +4,12 @@ import { useEffect, useRef } from "react";
 import type { DraftBoardPlayer, DraftRecommendation } from "@/lib/api";
 import ErrorState from "@/components/dashboard/ErrorState";
 import { SkeletonCard } from "@/components/dashboard/Skeletons";
+import ExplanationsNotice from "@/components/dashboard/advisor/ExplanationsNotice";
+import ModelReasoning from "@/components/dashboard/advisor/ModelReasoning";
+import {
+  modelRankByPlayerKey,
+  reasoningByPlayerKey,
+} from "@/components/dashboard/advisor/tokens";
 import { formatSignedNumber } from "@/components/dashboard/format";
 import { MAY_NOT_LAST_REASON, MOCK_DRAFT_TEAMS, pickRound } from "./draftSession";
 import type { DraftSession } from "./useDraftSession";
@@ -34,6 +40,8 @@ export default function DraftSessionPanel({
     draftComplete,
     recStatus,
     recommendations,
+    explanations,
+    explanationsReason,
     recError,
     announcement,
     startSession,
@@ -51,6 +59,10 @@ export default function DraftSessionPanel({
   }, [announcement]);
 
   const statBasisByKey = new Map(adpPlayers.map((p) => [p.player_key, p.stat_basis]));
+  // keyed, not zipped: the model may rank the shortlist differently from the
+  // engine, so pairing by index would attach the wrong prose to the wrong player
+  const reasoningByKey = reasoningByPlayerKey(explanations);
+  const modelRankByKey = modelRankByPlayerKey(explanations);
 
   if (rounds < 1) {
     return (
@@ -162,6 +174,9 @@ export default function DraftSessionPanel({
 
           {recStatus === "ready" && recommendations.length > 0 && (
             <>
+              <div className="mt-3">
+                <ExplanationsNotice explanations={explanations} reason={explanationsReason} />
+              </div>
               <ul aria-label="Top recommendations" className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {recommendations.map((rec, i) => {
                   const isPrimary = i === 0;
@@ -191,6 +206,11 @@ export default function DraftSessionPanel({
                           ))}
                         </ul>
                       )}
+                      <ModelReasoning
+                        reasoning={reasoningByKey.get(rec.player_key)}
+                        modelRank={modelRankByKey.get(rec.player_key)}
+                        engineRank={i + 1}
+                      />
                       <button
                         type="button"
                         onClick={() =>
