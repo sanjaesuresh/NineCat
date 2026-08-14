@@ -14,6 +14,7 @@ from bisect import bisect_left
 from dataclasses import dataclass
 
 from ninecat.engine.draft import DraftPoolPlayer, LeagueConfig, compute_draft_values
+from ninecat.engine.needs import need_weights
 from ninecat.engine.zscores import CATEGORIES
 
 # display labels for the recommender's "Fills your X need" reason strings, in
@@ -87,32 +88,6 @@ class PickRecommendation:
     need_cats: tuple[str, ...]
 
 
-def _need_weights(
-    my_players: list[DraftPoolPlayer], punt: frozenset[str]
-) -> dict[str, float]:
-    """Per-category need weight from the roster's mean z: 0.5 for a clear
-    weakness, 0.25 for a mild one, 0.0 otherwise. An empty roster has no
-    basis for need, so every weight is 0 (falls through to pure value
-    ranking). Punted categories are always 0 regardless of roster mean —
-    fixing a punted weakness is not a real need."""
-    if not my_players:
-        return {cat: 0.0 for cat in CATEGORIES}
-    roster_mean = {
-        cat: sum(p.zscores[cat] for p in my_players) / len(my_players) for cat in CATEGORIES
-    }
-    weights: dict[str, float] = {}
-    for cat in CATEGORIES:
-        if cat in punt:
-            weights[cat] = 0.0
-        elif roster_mean[cat] <= -0.35:
-            weights[cat] = 0.5
-        elif roster_mean[cat] < 0:
-            weights[cat] = 0.25
-        else:
-            weights[cat] = 0.0
-    return weights
-
-
 def _need_cats(player: DraftPoolPlayer, weights: dict[str, float]) -> tuple[str, ...]:
     """Up to 2 needed categories (weight > 0) this player's own z clears the
     0.5 fill threshold for, in canonical CATEGORIES order."""
@@ -180,7 +155,9 @@ def recommend_picks(
     player at a position of strength.
     """
     values = compute_draft_values(available, config, punt)
-    weights = _need_weights(my_players, punt)
+    # extracted to engine/needs.py so the waiver scorer shares this exact
+    # logic rather than a re-derived copy (see docs/waiver-valuation-plan.md)
+    weights = need_weights([p.zscores for p in my_players], punt)
 
     # per-class values, sorted ascending once, so each player's own
     # comparable-or-better count is a bisect instead of an O(n) scan
