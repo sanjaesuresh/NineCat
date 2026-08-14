@@ -4,10 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import LogoutButton from "./LogoutButton";
 
-// tools not built yet, in the same season order as the landing page's roadmap
-const COMING_SOON = ["Adds", "Trades"];
-
-/** Dashboard chrome for a single league: section nav, coming-soon tools, settings, logout. */
+/** Dashboard chrome for a single league: section nav, settings, logout. */
 export default function DashboardNav({
   leagueId,
   leagueName,
@@ -19,10 +16,14 @@ export default function DashboardNav({
   const teamHref = `/dashboard/${leagueId}`;
   const draftHref = `/dashboard/${leagueId}/draft`;
   const matchupHref = `/dashboard/${leagueId}/matchup`;
+  const addsHref = `/dashboard/${leagueId}/adds`;
+  const tradesHref = `/dashboard/${leagueId}/trades`;
   const settingsHref = `/dashboard/${leagueId}/settings`;
   const onTeam = pathname === teamHref;
   const onDraft = pathname === draftHref;
   const onMatchup = pathname === matchupHref;
+  const onAdds = pathname === addsHref;
+  const onTrades = pathname === tradesHref;
   const onSettings = pathname === settingsHref;
 
   // inline-flex + py-1.5 pads the link's hit area to a ~24px target (WCAG 2.2
@@ -57,18 +58,12 @@ export default function DashboardNav({
           <Link href={matchupHref} aria-current={onMatchup ? "page" : undefined} className={linkClass(onMatchup)}>
             Matchup
           </Link>
-          {COMING_SOON.map((tool) => (
-            <span
-              key={tool}
-              aria-disabled="true"
-              className="inline-flex items-center gap-1.5 font-mono text-xs uppercase tracking-wide text-ink/70"
-            >
-              {tool}
-              <span className="border border-amber px-1 py-0.5 text-[0.6rem] leading-none text-ink/70">
-                Soon
-              </span>
-            </span>
-          ))}
+          <Link href={addsHref} aria-current={onAdds ? "page" : undefined} className={linkClass(onAdds)}>
+            Adds
+          </Link>
+          <Link href={tradesHref} aria-current={onTrades ? "page" : undefined} className={linkClass(onTrades)}>
+            Trades
+          </Link>
           <Link
             href={settingsHref}
             aria-current={onSettings ? "page" : undefined}

@@ -15,7 +15,7 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -728,17 +728,28 @@ def _dev_schedule_fetcher(season: str) -> list[dict]:
 # (REB, BLK, FG%) -- a real "punt AST" build -- so the matchup comparison has
 # actual contrast instead of two similar-looking teams. Disjoint by construction
 # (checked in tests) so both are valid, non-overlapping league rosters.
+#
+# The dev roster's lean has to be EXTREME, not merely present. The trade
+# analyzer only offers a player who clears MEANINGFUL_Z in one of my surplus
+# categories, and then rejects any swap that drops a "strong" category below
+# the strong threshold on either side. An almost-strong surplus (mean z just
+# over 0.35) therefore collapses the moment it is used, and the whole page
+# renders empty: measured live, the earlier mixed roster -- which carried two
+# quality bigs -- labelled all nine categories "average" and produced zero
+# proposals from either perspective. Twelve guards plus the fixed dev centre
+# puts AST/ST/3PM/FT%/PTS clear of the threshold with headroom to trade from,
+# and leaves FG%/REB/BLK as real deficits the rival's bigs can fill.
 _DEV_USER_EXTRA_ROSTER_IDS: list[int] = [
+    900106,  # Haliburton
+    900110,  # Mitchell
     900111,  # Brunson
+    900112,  # Trae Young
     900113,  # Fox
-    900140,  # White
-    900161,  # Maxey
-    900162,  # Garland
+    900114,  # Lillard
     900136,  # McConnell
     900137,  # Pritchard
-    900157,  # Bridges
-    900108,  # Sabonis
-    900126,  # Claxton
+    900154,  # LaMelo Ball
+    900161,  # Maxey
 ]
 _DEV_RIVAL_ROSTER_IDS: list[int] = [
     900123,  # Gobert
@@ -861,6 +872,32 @@ def _get_or_create_roster_slot(
         index_elements=[RosterSlot.team_id, RosterSlot.yahoo_player_key]
     )
     db.execute(stmt)
+    db.flush()
+
+
+def _prune_stale_dev_roster_slots(db: Session, *, dev_team: Team, other_team: Team) -> None:
+    """Drop roster slots the seed no longer assigns to the two demo teams.
+
+    Every other seed helper self-heals drifted COLUMNS, but roster membership
+    drifts by row: the get-or-create above only ever adds, so an existing dev
+    database keeps a player forever after the seed stops assigning them, and
+    the roster silently grows past 13. That is not cosmetic -- the build
+    profile, the weekly projection and the trade analyzer all read the roster
+    as a whole, so a stale big left on a guard roster changes what every one
+    of those pages says. Scoped to the two demo teams' own ids, never a
+    table-wide delete, so a real synced league in the same database is
+    untouched."""
+    expected_by_team = {
+        dev_team.id: {spec["person_id"] for spec in _DEV_PLAYERS} | set(_DEV_USER_EXTRA_ROSTER_IDS),
+        other_team.id: set(_DEV_RIVAL_ROSTER_IDS),
+    }
+    for team_id, person_ids in expected_by_team.items():
+        keys = {f"{DEV_LEAGUE_KEY}.p.{person_id}" for person_id in person_ids}
+        db.execute(
+            delete(RosterSlot).where(
+                RosterSlot.team_id == team_id, RosterSlot.yahoo_player_key.notin_(keys)
+            )
+        )
     db.flush()
 
 
@@ -1174,6 +1211,8 @@ def dev_login(db: Session = Depends(get_session)) -> Response:
                 position=spec["position"],
                 injury_status=None,
             )
+
+    _prune_stale_dev_roster_slots(db, dev_team=dev_team, other_team=other_team)
 
     _warm_scoreboard_cache(db, user_id=user.id, league_key=DEV_LEAGUE_KEY)
 

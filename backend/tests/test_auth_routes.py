@@ -1276,3 +1276,80 @@ def test_concurrent_dev_logins_on_separate_connections_do_not_race(
             cleanup.commit()
         finally:
             cleanup.close()
+
+
+def test_dev_login_prunes_roster_slots_the_seed_no_longer_assigns(
+    db_session, monkeypatch: pytest.MonkeyPatch
+):
+    """Roster membership drifts by ROW, not by column, so the get-or-create
+    helpers' self-healing does not cover it: they only ever add. Without a
+    prune, a player the seed stops assigning stays on the demo roster forever
+    in any existing dev database, and every roster-wide read (build profile,
+    weekly projection, trade surplus/deficit) is computed over the wrong team.
+    Scoping is asserted too -- a real synced league sharing the database must
+    not lose rows to a dev-login."""
+    monkeypatch.setenv("DEV_AUTH_ENABLED", "true")
+    get_settings.cache_clear()
+    client = _client(_app(db_session))
+
+    client.post("/api/auth/dev-login")
+
+    dev_team = db_session.execute(select(Team).where(Team.yahoo_team_key == DEV_TEAM_KEY)).scalar_one()
+    expected_keys = {
+        slot.yahoo_player_key
+        for slot in db_session.execute(
+            select(RosterSlot).where(RosterSlot.team_id == dev_team.id)
+        ).scalars()
+    }
+
+    # a player the seed used to assign and no longer does
+    db_session.add(
+        RosterSlot(
+            team_id=dev_team.id,
+            yahoo_player_key=f"{DEV_LEAGUE_KEY}.p.900999",
+            player_name="Dropped From Seed",
+            position="C",
+            injury_status=None,
+        )
+    )
+    # an unrelated league's roster slot, which must survive untouched
+    other_league = League(
+        yahoo_league_key="nba.l.424242",
+        name="Real League",
+        season=2025,
+        num_teams=12,
+        scoring_type="head",
+        settings_json={},
+    )
+    db_session.add(other_league)
+    db_session.flush()
+    other_team = Team(
+        league_id=other_league.id, yahoo_team_key="nba.l.424242.t.1", name="Real Team"
+    )
+    db_session.add(other_team)
+    db_session.flush()
+    db_session.add(
+        RosterSlot(
+            team_id=other_team.id,
+            yahoo_player_key="nba.l.424242.p.1",
+            player_name="Real Player",
+            position="PG",
+            injury_status=None,
+        )
+    )
+    db_session.flush()
+
+    client.post("/api/auth/dev-login")
+
+    after = {
+        slot.yahoo_player_key
+        for slot in db_session.execute(
+            select(RosterSlot).where(RosterSlot.team_id == dev_team.id)
+        ).scalars()
+    }
+    assert after == expected_keys
+    assert f"{DEV_LEAGUE_KEY}.p.900999" not in after
+    survivors = db_session.execute(
+        select(RosterSlot).where(RosterSlot.team_id == other_team.id)
+    ).scalars().all()
+    assert [slot.yahoo_player_key for slot in survivors] == ["nba.l.424242.p.1"]

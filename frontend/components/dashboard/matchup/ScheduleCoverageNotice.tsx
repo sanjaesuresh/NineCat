@@ -8,13 +8,24 @@ import { formatGamesCount } from "@/components/dashboard/format";
  * flagged — so rendering that as a confident scoreboard would be actively
  * misleading. This replaces the numbers with an explanation rather than
  * caveating them, per the plan's honesty requirement.
+ *
+ * `withheld` names what this notice is standing in for. The Adds page reuses
+ * this component for its ranked candidate list, and telling that user we're
+ * withholding a "scoreboard" describes a screen they never asked for while
+ * never saying which thing is actually missing.
  */
-export default function ScheduleCoverageNotice({ coverage }: { coverage: ScheduleCoverage }) {
+export default function ScheduleCoverageNotice({
+  coverage,
+  withheld = "a real scoreboard",
+}: {
+  coverage: ScheduleCoverage;
+  withheld?: string;
+}) {
   return (
     <div role="status" className="border-l-4 border-amber bg-ink/[0.03] px-4 py-4">
       <p className="text-ink">
         Schedule data is missing for this week, so a projection would show every category as
-        zero. We&apos;re not showing that as a real scoreboard.
+        zero. We&apos;re not showing that as {withheld}.
       </p>
       <p className="mt-2 text-sm text-ink/80">
         This should fill in once the league&apos;s schedule data next syncs.

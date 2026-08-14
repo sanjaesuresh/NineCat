@@ -52,7 +52,19 @@ function BuildMeter({ tone }: { tone: BuildTone | null }) {
   );
 }
 
-export default function BuildProfile({ profile }: { profile: BuildProfileData }) {
+/**
+ * `showLegend` exists for callers that render several of these together (the
+ * trade card stacks four: both rosters, before and after). Repeating the same
+ * four-item key under every table is noise that makes the group harder to
+ * read, not easier -- one legend per group is enough.
+ */
+export default function BuildProfile({
+  profile,
+  showLegend = true,
+}: {
+  profile: BuildProfileData;
+  showLegend?: boolean;
+}) {
   const hasLabels = profile.labels && Object.keys(profile.labels).length > 0;
 
   if (!hasLabels) {
@@ -108,7 +120,10 @@ export default function BuildProfile({ profile }: { profile: BuildProfileData })
           </tbody>
         </table>
       </div>
-      <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5" aria-hidden="true">
+      <ul
+        className={`mt-3 flex flex-wrap gap-x-4 gap-y-1.5 ${showLegend ? "" : "hidden"}`}
+        aria-hidden="true"
+      >
         {(["strong", "average", "punt"] as const).map((tone) => (
           <li key={tone} className="flex items-center gap-1.5 font-mono text-[0.65rem] uppercase tracking-wide text-ink/70">
             <span className={`h-1.5 w-1.5 rounded-full ${TONE_FILL[tone]}`} />

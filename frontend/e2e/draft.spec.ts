@@ -23,13 +23,17 @@ async function devLoginAndOpenDraftTab(page: Page) {
   // the dev user's single linked league (same as smoke.spec.ts)
   await page.waitForURL(/\/dashboard\/\d+$/);
 
-  // prove the Draft tab is now a real link, not one of DashboardNav's
-  // COMING_SOON badges -- those render as a plain <span aria-disabled="true">
-  // with a "Soon" chip and are never a link, so getByRole("link") only finds
-  // Draft (and My Team/Settings), never Matchup/Adds/Trades
+  // prove the Draft tab is a real link. Every tool is unlocked now (Trades
+  // was the last coming-soon badge), so the original "a Soon chip still
+  // exists" companion assertion is replaced by the whole link set: that keeps
+  // the intent -- proving DashboardNav actually renders its tools as links --
+  // rather than proving one <a> happens to exist.
   const draftLink = page.getByRole("link", { name: "Draft", exact: true });
   await expect(draftLink).toBeVisible();
-  await expect(page.getByText("Soon").first()).toBeVisible();
+  for (const tool of ["My Team", "Matchup", "Adds", "Trades"]) {
+    await expect(page.getByRole("link", { name: tool, exact: true })).toBeVisible();
+  }
+  await expect(page.getByText("Soon")).toHaveCount(0);
 
   await draftLink.click();
   await page.waitForURL(/\/dashboard\/\d+\/draft$/);

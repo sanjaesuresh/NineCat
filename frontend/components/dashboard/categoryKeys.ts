@@ -45,3 +45,17 @@ export const STAT_ID_BY_LABEL: Record<(typeof CATEGORIES)[number], string> = Obj
 export const LABEL_BY_CONTRACT_KEY: Record<string, (typeof CATEGORIES)[number]> = Object.fromEntries(
   Object.entries(CONTRACT_KEY_BY_LABEL).map(([label, key]) => [key, label]),
 ) as Record<string, (typeof CATEGORIES)[number]>;
+
+/**
+ * Display label for a backend contract key, or a MARKED GAP for one this map
+ * doesn't know.
+ *
+ * Every caller used to spell this as `LABEL_BY_CONTRACT_KEY[key] ?? key`,
+ * which renders an untranslated key in the same chip or cell as a real
+ * category — visually indistinguishable from "REB", and exactly the raw-key
+ * bug this project has now shipped twice. A gap must look like a gap, and it
+ * must keep the key so whoever chases it knows what to add.
+ */
+export function categoryLabelOrGap(key: string): string {
+  return LABEL_BY_CONTRACT_KEY[key] ?? `Unrecognized (${key})`;
+}
