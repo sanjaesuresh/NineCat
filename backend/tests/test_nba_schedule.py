@@ -11,6 +11,15 @@ FIXTURE_PATH = Path(__file__).parent / "fixtures" / "nba" / "sample_schedule.jso
 
 BOS_NBA_TEAM_ID = 1610612738
 BKN_NBA_TEAM_ID = 1610612751
+NYK_NBA_TEAM_ID = 1610612752
+MIA_NBA_TEAM_ID = 1610612748
+
+# the exact 4 teams / 5 games sample_schedule.json produces -- scoping queries to
+# these natural keys (rather than a bare select(NbaTeam)/select(NbaGame)) lets these
+# tests prove "upserts, never duplicates" even when the shared dev database already
+# carries unrelated committed rows (e.g. from a real dev-login/e2e run)
+_FIXTURE_NBA_TEAM_IDS = [BOS_NBA_TEAM_ID, BKN_NBA_TEAM_ID, NYK_NBA_TEAM_ID, MIA_NBA_TEAM_ID]
+_FIXTURE_GAME_IDS = ["0022500001", "0022500010", "0022500011", "0022500012", "0022500013"]
 
 WEEK_START = date(2025, 11, 1)
 WEEK_END = date(2025, 11, 7)
@@ -25,8 +34,12 @@ def test_sync_schedule_upserts_teams_and_games(db_session):
     sync_schedule(db_session, season="2025-26", fetcher=_fixture_fetcher)
     db_session.flush()
 
-    teams = db_session.execute(select(NbaTeam)).scalars().all()
-    games = db_session.execute(select(NbaGame)).scalars().all()
+    teams = db_session.execute(
+        select(NbaTeam).where(NbaTeam.nba_team_id.in_(_FIXTURE_NBA_TEAM_IDS))
+    ).scalars().all()
+    games = db_session.execute(
+        select(NbaGame).where(NbaGame.nba_game_id.in_(_FIXTURE_GAME_IDS))
+    ).scalars().all()
 
     # 4 distinct teams appear across the fixture's home/away fields
     assert len(teams) == 4
@@ -78,8 +91,12 @@ def test_sync_schedule_is_idempotent_on_rerun(db_session):
     sync_schedule(db_session, season="2025-26", fetcher=_fixture_fetcher)
     db_session.flush()
 
-    teams = db_session.execute(select(NbaTeam)).scalars().all()
-    games = db_session.execute(select(NbaGame)).scalars().all()
+    teams = db_session.execute(
+        select(NbaTeam).where(NbaTeam.nba_team_id.in_(_FIXTURE_NBA_TEAM_IDS))
+    ).scalars().all()
+    games = db_session.execute(
+        select(NbaGame).where(NbaGame.nba_game_id.in_(_FIXTURE_GAME_IDS))
+    ).scalars().all()
 
     assert len(teams) == 4
     assert len(games) == 5
@@ -112,8 +129,12 @@ def test_sync_schedule_rerun_with_changed_row_updates_in_place(db_session):
     # session's identity map, so this actually proves the row was updated
     db_session.expire_all()
 
-    teams = db_session.execute(select(NbaTeam)).scalars().all()
-    games = db_session.execute(select(NbaGame)).scalars().all()
+    teams = db_session.execute(
+        select(NbaTeam).where(NbaTeam.nba_team_id.in_(_FIXTURE_NBA_TEAM_IDS))
+    ).scalars().all()
+    games = db_session.execute(
+        select(NbaGame).where(NbaGame.nba_game_id.in_(_FIXTURE_GAME_IDS))
+    ).scalars().all()
     assert len(teams) == 4
     assert len(games) == 5
 

@@ -18,6 +18,12 @@ CURRY_PERSON_ID = 201939
 DONCIC_PERSON_ID = 1629029
 JJJ_PERSON_ID = 1630163
 
+# the exact 3 players sample_player_averages.json produces -- scoping queries to
+# these natural keys (rather than a bare select(NbaPlayer)/select(PlayerSeasonAverage))
+# lets these tests prove "upserts, never duplicates" even when the shared dev database
+# already carries unrelated committed rows (e.g. from a real dev-login/e2e run)
+_FIXTURE_PERSON_IDS = [CURRY_PERSON_ID, DONCIC_PERSON_ID, JJJ_PERSON_ID]
+
 BOS_NBA_TEAM_ID = 1610612738
 
 
@@ -27,18 +33,32 @@ def _fixture_fetcher(season: str) -> list[dict]:
 
 
 def test_sync_player_averages_upserts_players_and_averages(db_session):
-    # a team must already exist for the fixture's team-linked player to resolve
-    db_session.add(
-        NbaTeam(nba_team_id=BOS_NBA_TEAM_ID, name="Boston Celtics", abbreviation="BOS")
-    )
-    db_session.flush()
+    # a team must already exist for the fixture's team-linked player to resolve --
+    # get-or-create rather than a bare insert: BOS_NBA_TEAM_ID is a real NBA.com
+    # natural key that can already be present in the shared dev database from an
+    # unrelated committed dev-login/e2e seed, and a raw insert would collide on
+    # the nba_team_id unique constraint
+    existing_team = db_session.execute(
+        select(NbaTeam).where(NbaTeam.nba_team_id == BOS_NBA_TEAM_ID)
+    ).scalar_one_or_none()
+    if existing_team is None:
+        db_session.add(
+            NbaTeam(nba_team_id=BOS_NBA_TEAM_ID, name="Boston Celtics", abbreviation="BOS")
+        )
+        db_session.flush()
 
     count = sync_player_averages(db_session, season="2025-26", fetcher=_fixture_fetcher)
     db_session.flush()
 
     assert count == 3
-    players = db_session.execute(select(NbaPlayer)).scalars().all()
-    averages = db_session.execute(select(PlayerSeasonAverage)).scalars().all()
+    players = db_session.execute(
+        select(NbaPlayer).where(NbaPlayer.nba_person_id.in_(_FIXTURE_PERSON_IDS))
+    ).scalars().all()
+    averages = db_session.execute(
+        select(PlayerSeasonAverage).where(
+            PlayerSeasonAverage.nba_player_id.in_([p.id for p in players])
+        )
+    ).scalars().all()
     assert len(players) == 3
     assert len(averages) == 3
 
@@ -93,8 +113,14 @@ def test_sync_player_averages_is_idempotent_on_rerun(db_session):
     db_session.flush()
 
     assert count == 3
-    players = db_session.execute(select(NbaPlayer)).scalars().all()
-    averages = db_session.execute(select(PlayerSeasonAverage)).scalars().all()
+    players = db_session.execute(
+        select(NbaPlayer).where(NbaPlayer.nba_person_id.in_(_FIXTURE_PERSON_IDS))
+    ).scalars().all()
+    averages = db_session.execute(
+        select(PlayerSeasonAverage).where(
+            PlayerSeasonAverage.nba_player_id.in_([p.id for p in players])
+        )
+    ).scalars().all()
     assert len(players) == 3
     assert len(averages) == 3
 
@@ -120,8 +146,14 @@ def test_sync_player_averages_rerun_with_changed_value_updates_in_place(db_sessi
     # session's identity map, so this actually proves the row was updated
     db_session.expire_all()
 
-    players = db_session.execute(select(NbaPlayer)).scalars().all()
-    averages = db_session.execute(select(PlayerSeasonAverage)).scalars().all()
+    players = db_session.execute(
+        select(NbaPlayer).where(NbaPlayer.nba_person_id.in_(_FIXTURE_PERSON_IDS))
+    ).scalars().all()
+    averages = db_session.execute(
+        select(PlayerSeasonAverage).where(
+            PlayerSeasonAverage.nba_player_id.in_([p.id for p in players])
+        )
+    ).scalars().all()
     assert len(players) == 3
     assert len(averages) == 3
 
@@ -217,8 +249,14 @@ def test_sync_player_averages_dedupes_duplicate_person_id_in_one_batch(db_sessio
     db_session.flush()
 
     assert count == 3
-    players = db_session.execute(select(NbaPlayer)).scalars().all()
-    averages = db_session.execute(select(PlayerSeasonAverage)).scalars().all()
+    players = db_session.execute(
+        select(NbaPlayer).where(NbaPlayer.nba_person_id.in_(_FIXTURE_PERSON_IDS))
+    ).scalars().all()
+    averages = db_session.execute(
+        select(PlayerSeasonAverage).where(
+            PlayerSeasonAverage.nba_player_id.in_([p.id for p in players])
+        )
+    ).scalars().all()
     assert len(players) == 3
     assert len(averages) == 3
 

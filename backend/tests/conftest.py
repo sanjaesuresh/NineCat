@@ -82,4 +82,13 @@ def _reset_engine_cache() -> Generator[None, None, None]:
     # get_engine() is lru_cached; drop it after each test so a later test that
     # monkeypatches DATABASE_URL doesn't reuse a stale engine/connection pool
     yield
+    # dispose before clearing: cache_clear only drops our reference, it does not
+    # close the pool's sockets, so without this every test leaks its connections
+    # and a full run exhausts postgres max_connections -- which surfaces as tests
+    # SKIPPING with "too many clients already" rather than failing, silently
+    # hollowing out the suite
+    try:
+        get_engine().dispose()
+    except Exception:  # engine unbuildable (e.g. a test pointed DATABASE_URL at nothing)
+        pass
     get_engine.cache_clear()

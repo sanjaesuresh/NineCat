@@ -12,6 +12,7 @@ second fresh session opened the same way to both verify and clean up.
 
 import logging
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from alembic import command
@@ -28,6 +29,7 @@ from ninecat.db import get_engine
 from ninecat.jobs.scheduler import nightly_warehouse_sync, register_jobs, run_job
 from ninecat.main import create_app
 from ninecat.models import JobRun, NbaTeam
+from ninecat.warehouse.player_positions import PositionSyncResult
 
 
 def _fresh_session() -> Session:
@@ -212,23 +214,85 @@ def test_run_job_swallows_database_outage_and_logs(monkeypatch, caplog):
 
 def test_nightly_warehouse_sync_runs_schedule_then_averages_then_positions(monkeypatch):
     calls: list[str] = []
+    # return realistic types (int / int / PositionSyncResult), matching the
+    # real sync functions -- nightly_warehouse_sync now logs these return
+    # values (row-count observability), so a stub returning None would make
+    # that logging call blow up on a real run
     monkeypatch.setattr(
         "ninecat.jobs.scheduler.sync_schedule",
-        lambda session, season: calls.append("schedule"),
+        lambda session, season: calls.append("schedule") or 0,
     )
     monkeypatch.setattr(
         "ninecat.jobs.scheduler.sync_player_averages",
-        lambda session, season: calls.append("averages"),
+        lambda session, season: calls.append("averages") or 0,
     )
     monkeypatch.setattr(
         "ninecat.jobs.scheduler.sync_player_positions",
-        lambda session, season: calls.append("positions"),
+        lambda session, season: calls.append("positions") or PositionSyncResult(),
     )
 
     # session is never touched by the stubs above, only passed through
     nightly_warehouse_sync(session=object())
 
     assert calls == ["schedule", "averages", "positions"]
+
+
+def test_nightly_warehouse_sync_uses_current_season_setting_not_hardcoded(monkeypatch):
+    """Proves the season each step syncs comes from Settings.current_season,
+    not a hardcoded/independently-derived string -- a season rollover must be
+    a config change, not a code edit."""
+    seasons_used: dict[str, str] = {}
+
+    def _stub_schedule(session, season):
+        seasons_used["schedule"] = season
+        return 0
+
+    def _stub_averages(session, season):
+        seasons_used["averages"] = season
+        return 0
+
+    def _stub_positions(session, season):
+        seasons_used["positions"] = season
+        return PositionSyncResult()
+
+    monkeypatch.setattr("ninecat.jobs.scheduler.sync_schedule", _stub_schedule)
+    monkeypatch.setattr("ninecat.jobs.scheduler.sync_player_averages", _stub_averages)
+    monkeypatch.setattr("ninecat.jobs.scheduler.sync_player_positions", _stub_positions)
+    # a season deliberately unlike the real default ("2025-26"), so this test
+    # can't accidentally pass just because it matches Settings' default
+    monkeypatch.setattr(
+        "ninecat.jobs.scheduler.get_settings",
+        lambda: SimpleNamespace(current_season="2099-00"),
+    )
+
+    nightly_warehouse_sync(session=object())
+
+    assert seasons_used == {
+        "schedule": "2099-00",
+        "averages": "2099-00",
+        "positions": "2099-00",
+    }
+
+
+def test_nightly_warehouse_sync_logs_row_counts_including_zero(monkeypatch, caplog):
+    """A schedule sync returning 0 games (expected in the off-season, before a
+    new season's schedule publishes) must be visible in the log, distinct
+    from a healthy nonzero sync -- not silently indistinguishable success."""
+    monkeypatch.setattr("ninecat.jobs.scheduler.sync_schedule", lambda session, season: 0)
+    monkeypatch.setattr(
+        "ninecat.jobs.scheduler.sync_player_averages", lambda session, season: 450
+    )
+    monkeypatch.setattr(
+        "ninecat.jobs.scheduler.sync_player_positions",
+        lambda session, season: PositionSyncResult(matched=450, skipped=2),
+    )
+
+    with caplog.at_level(logging.INFO, logger="ninecat.jobs.scheduler"):
+        nightly_warehouse_sync(session=object())
+
+    assert "sync_schedule upserted 0 game rows" in caplog.text
+    assert "sync_player_averages upserted 450 rows" in caplog.text
+    assert "sync_player_positions matched=450 skipped=2" in caplog.text
 
 
 def test_nightly_warehouse_sync_position_sync_failure_is_non_fatal(monkeypatch, caplog):
@@ -240,9 +304,10 @@ def test_nightly_warehouse_sync_position_sync_failure_is_non_fatal(monkeypatch, 
 
     def _stub_schedule(session, season):
         session.add(NbaTeam(nba_team_id=nba_team_id, name="Test Team", abbreviation="TST"))
+        return 1
 
     def _stub_averages(session, season):
-        pass
+        return 0
 
     def _stub_positions(session, season):
         raise RuntimeError("boom-position")

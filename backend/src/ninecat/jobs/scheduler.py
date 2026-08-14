@@ -96,12 +96,36 @@ def nightly_warehouse_sync(session: Session) -> None:
     A position-sync failure is caught here (not left to propagate to run_job)
     so it can't roll back the schedule/averages work that already succeeded --
     it's logged and the job still reports success.
+
+    Each step's row count is logged at INFO, always (not just on zero) --
+    JobRun itself only tracks running/success/failed, and `fn` here has no
+    access to the JobRun row to write into (run_job constructs it internally),
+    so counts live in the log rather than a new column. This is deliberate:
+    a schedule sync returning 0 games is EXPECTED before a new season's
+    schedule publishes, and must read differently in the logs than "synced
+    1200 games" -- not be indistinguishable success in either case.
     """
     season = get_settings().current_season
-    sync_schedule(session, season)
-    sync_player_averages(session, season)
+    schedule_count = sync_schedule(session, season)
+    logger.info(
+        "nightly_warehouse_sync: sync_schedule upserted %d game rows for season %s",
+        schedule_count,
+        season,
+    )
+    averages_count = sync_player_averages(session, season)
+    logger.info(
+        "nightly_warehouse_sync: sync_player_averages upserted %d rows for season %s",
+        averages_count,
+        season,
+    )
     try:
-        sync_player_positions(session, season)
+        position_result = sync_player_positions(session, season)
+        logger.info(
+            "nightly_warehouse_sync: sync_player_positions matched=%d skipped=%d for season %s",
+            position_result.matched,
+            position_result.skipped,
+            season,
+        )
     except Exception:
         logger.exception(
             "nightly_warehouse_sync: sync_player_positions failed, continuing"

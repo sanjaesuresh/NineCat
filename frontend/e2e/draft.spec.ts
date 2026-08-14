@@ -36,13 +36,6 @@ async function devLoginAndOpenDraftTab(page: Page) {
 }
 
 test.describe("draft assistant", () => {
-  // dev-login is a get-or-create keyed on a fixed yahoo_guid ("DEVUSER") with
-  // no upsert-level locking -- config.ts's fullyParallel default would run
-  // this file's tests concurrently and race two inserts against the same
-  // unique constraint (observed: IntegrityError on uq_users_yahoo_guid).
-  // Serial mode avoids the race without touching the backend route.
-  test.describe.configure({ mode: "serial" });
-
   test("dev-login reaches the draft page via a real nav link", async ({ page }) => {
     await devLoginAndOpenDraftTab(page);
 
