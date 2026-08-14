@@ -9,11 +9,11 @@ judgment, is the source of truth for what the frontend expects.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from ninecat.auth.sessions import SESSION_COOKIE_NAME, current_user
@@ -26,15 +26,29 @@ from ninecat.engine import (
     DraftPoolPlayer,
     LeagueConfig,
     PlayerAverages,
+    RosterPlayer,
+    StreamCandidate,
+    WaiverCandidate,
+    WeeklyPlayerRate,
+    WeeklyProjection,
+    compare_matchup,
+    compare_rosters,
     compute_draft_values,
     compute_player_zscores,
     compute_team_profile,
+    evaluate_trades,
+    generate_trade_candidates,
+    plan_streaming,
+    project_week,
     recommend_picks,
+    score_waiver_candidates,
     suggest_punt_builds,
 )
 from ninecat.models import (
+    FantasyWeek,
     League,
     NbaPlayer,
+    NbaTeam,
     PlayerIdMap,
     PlayerProjection,
     PlayerSeasonAverage,
@@ -45,7 +59,9 @@ from ninecat.models import (
     YahooToken,
 )
 from ninecat.sync.league_sync import sync_league_detail, sync_user_leagues
+from ninecat.warehouse.fantasy_weeks import resolve_week, week_date_range
 from ninecat.warehouse.id_mapping import map_yahoo_players
+from ninecat.warehouse.nba_schedule import games_in_range
 from ninecat.yahoo.client import YahooClient
 from ninecat.yahoo.gateway import YahooAuthError, YahooGateway, YahooUnavailableError
 from ninecat.yahoo.parsers import UserTeamInfo
@@ -915,3 +931,871 @@ def draft_recommend(
 
     stale, synced_at = _league_stale_and_synced_at(league)
     return {"recommendations": recommendations, "stale": stale, "synced_at": synced_at}
+
+
+# --- GET /api/leagues/{league_id}/matchup ---
+
+# opponent_reason tokens -- structured contract keys, never English prose (the
+# engine-emitting-prose finding hit two earlier tasks; this route inherits the
+# same discipline for its own reason field)
+OPPONENT_REASON_YAHOO_UNAVAILABLE = "yahoo_unavailable"
+OPPONENT_REASON_NO_MATCHUP = "no_matchup_this_week"
+OPPONENT_REASON_SINGLE_TEAM_MATCHUP = "no_opponent_in_matchup"
+OPPONENT_REASON_TEAM_NOT_SYNCED = "opponent_team_not_synced"
+
+# streaming.window_basis -- tells the UI whether the plan covers the
+# remaining days of a live week (as_of falls inside the week) or the whole
+# week of a past/future one (as_of clamped because it fell outside the
+# range), so a full-week plan is never presented as adds still actionable today
+STREAM_WINDOW_REMAINING = "remaining"
+STREAM_WINDOW_FULL_WEEK = "full_week"
+
+
+def _fallback_week(db: Session, league: League) -> int:
+    """The week to project when ?week= is omitted and the live scoreboard
+    couldn't identify a "current" week either (Yahoo unavailable, off-season,
+    or no matchup found for this team this call): the highest week already
+    resolved for this league, or week 1 if none ever has been. Deliberately
+    not date.today()-based -- FantasyWeek rows are the only record this
+    endpoint has of "what week were we last tracking."
+    """
+    latest = db.execute(
+        select(func.max(FantasyWeek.week)).where(FantasyWeek.league_id == league.id)
+    ).scalar_one()
+    return latest if latest is not None else 1
+
+
+def _league_max_weekly_adds(league: League) -> int:
+    """league.settings_json's max_weekly_adds, tolerant of a never-synced
+    league or a malformed value. Falls back to 0 (not a guessed default) so a
+    missing/bad budget surfaces honestly through plan_streaming's own
+    "no_adds_available" note rather than silently driving a fabricated plan.
+    """
+    raw = league.settings_json.get("max_weekly_adds") if league.settings_json else None
+    return raw if isinstance(raw, int) and raw > 0 else 0
+
+
+def _nba_team_id_maps(db: Session) -> tuple[dict[str, int], dict[int, int]]:
+    """abbreviation -> NBA.com team id, and internal NbaTeam PK -> NBA.com team
+    id. games_in_range keys off NBA.com's own id, not our internal NbaTeam.id,
+    so both the roster-slot-abbreviation path and the NbaPlayer.nba_team_id
+    fallback path need a translation step; built once per request since the
+    table is small (30ish rows) and every player lookup needs it.
+    """
+    teams = db.execute(select(NbaTeam)).scalars().all()
+    return (
+        {t.abbreviation: t.nba_team_id for t in teams},
+        {t.id: t.nba_team_id for t in teams},
+    )
+
+
+def _resolve_roster_nba_team_id(
+    slot: RosterSlot,
+    nba_player: NbaPlayer | None,
+    abbr_to_nba_id: dict[str, int],
+    internal_id_to_nba_id: dict[int, int],
+) -> int | None:
+    """RosterSlot.nba_team_abbr first (direct, Yahoo-sourced on every roster
+    entry), falling back to the PlayerIdMap -> NbaPlayer -> NbaTeam chain
+    (best-effort name matching) -- the abbreviation is a straight lookup while
+    the id map can be wrong, stale, or simply absent (plan M2).
+    """
+    if slot.nba_team_abbr and slot.nba_team_abbr in abbr_to_nba_id:
+        return abbr_to_nba_id[slot.nba_team_abbr]
+    if nba_player is not None and nba_player.nba_team_id is not None:
+        return internal_id_to_nba_id.get(nba_player.nba_team_id)
+    return None
+
+
+def _team_side(
+    db: Session,
+    team: Team,
+    rows: dict[int, _DraftableRow],
+    zscores: dict[str, dict[str, float]],
+    abbr_to_nba_id: dict[str, int],
+    internal_id_to_nba_id: dict[int, int],
+    week_start: date,
+    week_end: date,
+) -> dict:
+    """One roster's raw weekly projection + build profile (unrounded -- the
+    caller rounds only at JSON-serialization time via _side_out, since
+    compare_matchup must run on real totals, not display-rounded ones).
+
+    Per-player rates come from `rows` (projection-wins-over-season-average,
+    the same source the draft board uses -- reused rather than re-queried).
+    A rostered player absent from `rows` (no projection and no season average
+    at all) contributes nothing; there is no stat basis to project them on,
+    the same skip the draft board applies.
+    """
+    slots = db.execute(select(RosterSlot).where(RosterSlot.team_id == team.id)).scalars().all()
+    id_maps_by_key = (
+        {
+            m.yahoo_player_key: m
+            for m in db.execute(
+                select(PlayerIdMap).where(
+                    PlayerIdMap.yahoo_player_key.in_([s.yahoo_player_key for s in slots])
+                )
+            )
+            .scalars()
+            .all()
+        }
+        if slots
+        else {}
+    )
+
+    player_rates: list[WeeklyPlayerRate] = []
+    roster_zscores: list[dict[str, float]] = []
+    for slot in slots:
+        id_map = id_maps_by_key.get(slot.yahoo_player_key)
+        nba_player_id = id_map.nba_player_id if id_map is not None else None
+        row = rows.get(nba_player_id) if nba_player_id is not None else None
+        if row is None:
+            continue
+        nba_team_id = _resolve_roster_nba_team_id(
+            slot, row.nba_player, abbr_to_nba_id, internal_id_to_nba_id
+        )
+        games = (
+            float(games_in_range(db, nba_team_id, week_start, week_end).count)
+            if nba_team_id is not None
+            else 0.0
+        )
+        player_rates.append(
+            WeeklyPlayerRate(
+                player_key=slot.yahoo_player_key,
+                games=games,
+                fgm=row.fgm,
+                fga=row.fga,
+                ftm=row.ftm,
+                fta=row.fta,
+                tpm=row.tpm,
+                pts=row.pts,
+                reb=row.reb,
+                ast=row.ast,
+                stl=row.stl,
+                blk=row.blk,
+                tov=row.tov,
+            )
+        )
+        z = zscores.get(str(nba_player_id))
+        if z is not None:
+            roster_zscores.append(z)
+
+    return {
+        "team_id": team.id,
+        "team_key": team.yahoo_team_key,
+        "name": team.name,
+        "projection": project_week(player_rates),
+        "build_profile": compute_team_profile(roster_zscores),
+        "roster_size": len(roster_zscores),
+        # per-player z's, not just the aggregated build_profile -- the adds
+        # endpoint's need-weighting (score_waiver_candidates) needs a list of
+        # per-player dicts, not a summed profile; _side_out ignores this key
+        "roster_zscores": roster_zscores,
+    }
+
+
+def _side_out(side: dict) -> dict:
+    """Round a _team_side result for the JSON response -- the only place
+    display rounding happens, so every consumer of the raw dataclasses
+    (compare_matchup, plan_streaming) still sees real totals.
+    """
+    projection: WeeklyProjection = side["projection"]
+    profile = side["build_profile"]
+    roster_size = side["roster_size"]
+    means = {
+        cat: _round2((profile["totals"][cat] / roster_size) if roster_size else 0.0)
+        for cat in CATEGORIES
+    }
+    return {
+        "team_id": side["team_id"],
+        "team_key": side["team_key"],
+        "name": side["name"],
+        "projection": {
+            "totals": {cat: _round2(projection.totals[cat]) for cat in CATEGORIES},
+            "components": {k: _round2(v) for k, v in projection.components.items()},
+            "games": _round2(projection.games),
+            "player_games": {k: _round2(v) for k, v in projection.player_games.items()},
+        },
+        "build_profile": {
+            "totals": {cat: _round2(profile["totals"][cat]) for cat in CATEGORIES},
+            "labels": profile["labels"],
+            "means": means,
+        },
+    }
+
+
+@dataclass(frozen=True)
+class _CandidatePlayer:
+    """One free agent's resolved schedule + raw per-game rates within a date
+    window -- the shared basis for both the streaming optimizer
+    (StreamCandidate, needs the game DATES for day-by-day planning) and the
+    waiver ranker (WaiverCandidate, needs a games COUNT and stat_basis).
+    Generalized here rather than forked so both endpoints draw candidates
+    from the identical league-wide-unrostered universe with identical rates.
+    """
+
+    player_id: int
+    game_dates: tuple[date, ...]
+    category_rates: dict[str, float]
+    stat_basis: str
+
+
+def _candidate_players(
+    db: Session,
+    rows: dict[int, _DraftableRow],
+    league_rostered: set[int],
+    internal_id_to_nba_id: dict[int, int],
+    start_day: date,
+    end_day: date,
+) -> list[_CandidatePlayer]:
+    """Free-agent pool within [start_day, end_day]: every draftable player not
+    rostered anywhere in the league (mirrors the draft board's own
+    league-wide rostered exclusion), with RAW per-game rates -- callers
+    (plan_streaming, score_waiver_candidates) own turning a rate into a
+    signed value, per their own module docstrings on the tov convention. A
+    player whose NBA team can't be resolved, or who has no games left in the
+    window, is not a useful candidate and is dropped here rather than passed
+    through as a dead entry.
+    """
+    candidates: list[_CandidatePlayer] = []
+    for player_id, row in rows.items():
+        if player_id in league_rostered:
+            continue
+        nba_team_id = (
+            internal_id_to_nba_id.get(row.nba_player.nba_team_id)
+            if row.nba_player.nba_team_id is not None
+            else None
+        )
+        if nba_team_id is None:
+            continue
+        game_dates = tuple(games_in_range(db, nba_team_id, start_day, end_day).dates)
+        if not game_dates:
+            continue
+        candidates.append(
+            _CandidatePlayer(
+                player_id=player_id,
+                game_dates=game_dates,
+                category_rates={
+                    "fg_pct": row.fgm / row.fga if row.fga else 0.0,
+                    "ft_pct": row.ftm / row.fta if row.fta else 0.0,
+                    "tpm": row.tpm,
+                    "pts": row.pts,
+                    "reb": row.reb,
+                    "ast": row.ast,
+                    "stl": row.stl,
+                    "blk": row.blk,
+                    "tov": row.tov,
+                },
+                stat_basis=row.source_label,
+            )
+        )
+    return candidates
+
+
+def _streaming_candidates(
+    db: Session,
+    rows: dict[int, _DraftableRow],
+    league_rostered: set[int],
+    internal_id_to_nba_id: dict[int, int],
+    start_day: date,
+    end_day: date,
+) -> list[StreamCandidate]:
+    """The matchup endpoint's add-schedule optimizer input -- see
+    _candidate_players for the shared free-agent universe/rate computation."""
+    return [
+        StreamCandidate(
+            player_key=str(c.player_id), game_dates=c.game_dates, category_rates=c.category_rates
+        )
+        for c in _candidate_players(db, rows, league_rostered, internal_id_to_nba_id, start_day, end_day)
+    ]
+
+
+def _waiver_candidates(
+    db: Session,
+    rows: dict[int, _DraftableRow],
+    league_rostered: set[int],
+    internal_id_to_nba_id: dict[int, int],
+    start_day: date,
+    end_day: date,
+) -> list[WaiverCandidate]:
+    """The adds endpoint's waiver-ranker input -- see _candidate_players for
+    the shared free-agent universe/rate computation. games_remaining is the
+    count of games in the window (score_waiver_candidates only needs a
+    count, unlike plan_streaming's day-by-day StreamCandidate)."""
+    return [
+        WaiverCandidate(
+            player_key=str(c.player_id),
+            games_remaining=float(len(c.game_dates)),
+            rates=c.category_rates,
+            stat_basis=c.stat_basis,
+        )
+        for c in _candidate_players(db, rows, league_rostered, internal_id_to_nba_id, start_day, end_day)
+    ]
+
+
+def _roster_players(
+    db: Session, team: Team, rows: dict[int, _DraftableRow], zscores: dict[str, dict[str, float]]
+) -> tuple[list[RosterPlayer], dict[str, dict]]:
+    """A team's roster as RosterPlayer (the trade engines' input, keyed by
+    yahoo_player_key -- unique per roster slot) plus a parallel display-info
+    dict (name/position/headshot, keyed the same way) the trades response
+    uses to resolve a verdict's give/get player_keys without a second roster
+    walk -- mirrors the draft board's nba_person_id/headshot_url fields (D)
+    so the page can render avatars the same way. A slot with no id-map link
+    or no stat basis at all is skipped from both (same skip _team_side and
+    the draft board apply) -- there is no z-score to compare it on.
+    """
+    slots = db.execute(select(RosterSlot).where(RosterSlot.team_id == team.id)).scalars().all()
+    if not slots:
+        return [], {}
+    id_maps_by_key = {
+        m.yahoo_player_key: m
+        for m in db.execute(
+            select(PlayerIdMap).where(
+                PlayerIdMap.yahoo_player_key.in_([s.yahoo_player_key for s in slots])
+            )
+        )
+        .scalars()
+        .all()
+    }
+    players: list[RosterPlayer] = []
+    info: dict[str, dict] = {}
+    for slot in slots:
+        id_map = id_maps_by_key.get(slot.yahoo_player_key)
+        nba_player_id = id_map.nba_player_id if id_map is not None else None
+        row = rows.get(nba_player_id) if nba_player_id is not None else None
+        if row is None:
+            continue
+        z = zscores.get(str(nba_player_id))
+        if z is None:
+            continue
+        players.append(RosterPlayer(player_key=slot.yahoo_player_key, zscores=z))
+        info[slot.yahoo_player_key] = {
+            "name": row.nba_player.full_name,
+            "position": row.nba_player.position,
+            "nba_person_id": row.nba_player.nba_person_id,
+            "headshot_url": _HEADSHOT_URL_TEMPLATE.format(nba_person_id=row.nba_player.nba_person_id),
+        }
+    return players, info
+
+
+def _resolve_week_and_opponent(
+    db: Session, client: YahooClient, league: League, my_team: Team, week: int | None
+):
+    """Resolve the target fantasy week and this team's opponent from a single
+    scoreboard call -- shared by /matchup and /adds so week resolution, date
+    persistence, and opponent identification can never diverge between the
+    two pages. Returns (target_week, week_range, opponent_team, opponent_reason).
+    """
+    scoreboard_unavailable = False
+    try:
+        matchups = client.get_scoreboard(league.yahoo_league_key, week=week)
+    except YahooAuthError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="yahoo_reauth_required"
+        ) from exc
+    except YahooUnavailableError:
+        matchups = []
+        scoreboard_unavailable = True
+
+    my_matchup = next(
+        (m for m in matchups if my_team.yahoo_team_key in {t.team_key for t in m.teams}), None
+    )
+
+    if week is not None:
+        target_week = week
+    elif my_matchup is not None:
+        target_week = my_matchup.week
+    else:
+        target_week = _fallback_week(db, league)
+
+    resolve_week(
+        db,
+        league,
+        target_week,
+        yahoo_start=my_matchup.week_start if my_matchup is not None else None,
+        yahoo_end=my_matchup.week_end if my_matchup is not None else None,
+    )
+    week_range = week_date_range(db, league, target_week)
+    assert week_range is not None  # resolve_week always leaves start/end populated
+
+    opponent_team: Team | None = None
+    opponent_reason: str | None = None
+    if scoreboard_unavailable:
+        opponent_reason = OPPONENT_REASON_YAHOO_UNAVAILABLE
+    elif my_matchup is None:
+        opponent_reason = OPPONENT_REASON_NO_MATCHUP
+    else:
+        opponent_keys = [
+            t.team_key for t in my_matchup.teams if t.team_key != my_team.yahoo_team_key
+        ]
+        if not opponent_keys:
+            opponent_reason = OPPONENT_REASON_SINGLE_TEAM_MATCHUP
+        else:
+            opponent_team = db.execute(
+                select(Team).where(
+                    Team.league_id == league.id, Team.yahoo_team_key == opponent_keys[0]
+                )
+            ).scalar_one_or_none()
+            if opponent_team is None:
+                opponent_reason = OPPONENT_REASON_TEAM_NOT_SYNCED
+
+    return target_week, week_range, opponent_team, opponent_reason
+
+
+def _resolve_stream_window(week_range, resolved_as_of: date) -> tuple[date, date, str]:
+    """Clamp INTO the week both directions (mirrors matchup's window-basis
+    rule -- see league_matchup's own comment for the demo-blocking bug this
+    guards against): a live week clamps forward to today ("remaining"), a
+    week entirely in the past or future clamps to the WHOLE week rather than
+    an empty/invalid window ("full_week"). Shared by /matchup and /adds.
+    """
+    if week_range.start_date <= resolved_as_of <= week_range.end_date:
+        return resolved_as_of, week_range.end_date, STREAM_WINDOW_REMAINING
+    return week_range.start_date, week_range.end_date, STREAM_WINDOW_FULL_WEEK
+
+
+@router.get("/api/leagues/{league_id}/matchup")
+def league_matchup(
+    league_id: int,
+    week: int | None = None,
+    as_of: date | None = None,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_session),
+    client: YahooClient = Depends(get_yahoo_client),
+) -> dict:
+    league = _get_owned_league(db, user, league_id)
+
+    if week is not None and week < 1:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="week must be >= 1")
+
+    # _get_owned_league already proved a Team row with this user_id exists in
+    # this league; re-select it here for its id/roster/yahoo_team_key
+    my_team = db.execute(
+        select(Team).where(Team.league_id == league.id, Team.user_id == user.id)
+    ).scalar_one_or_none()
+    if my_team is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Team not found")
+
+    # one scoreboard call answers two questions: which week (week=None means
+    # "whatever week is current" to Yahoo, mirroring /overview) and who the
+    # opponent is (the other team_key in my_team's matchup for that week) --
+    # shared with /adds via _resolve_week_and_opponent
+    target_week, week_range, opponent_team, opponent_reason = _resolve_week_and_opponent(
+        db, client, league, my_team, week
+    )
+
+    season = get_settings().current_season
+    resolved_source = _resolve_projection_source(db, season, None)
+    rows = _draftable_rows(db, season, resolved_source)
+    zscores = _zscores_for(rows)
+    abbr_to_nba_id, internal_id_to_nba_id = _nba_team_id_maps(db)
+
+    mine_side = _team_side(
+        db,
+        my_team,
+        rows,
+        zscores,
+        abbr_to_nba_id,
+        internal_id_to_nba_id,
+        week_range.start_date,
+        week_range.end_date,
+    )
+    opponent_side = (
+        _team_side(
+            db,
+            opponent_team,
+            rows,
+            zscores,
+            abbr_to_nba_id,
+            internal_id_to_nba_id,
+            week_range.start_date,
+            week_range.end_date,
+        )
+        if opponent_team is not None
+        else None
+    )
+
+    mine_games: float = mine_side["projection"].games
+    opponent_games: float | None = opponent_side["projection"].games if opponent_side else None
+    # the missing-schedule guard: zero games for a roster means every
+    # projected total is 0.0, which reads as a real 0-0 tie unless flagged --
+    # exactly what an unsynced/stale schedule looks like (see matchup.py's own
+    # 0-0-excluded-from-close comment for the same failure mode)
+    schedule_ok = mine_games > 0 and (opponent_side is None or (opponent_games or 0) > 0)
+
+    # as_of defaults to the real wall clock -- the sensible default for "what
+    # days are left to stream" in live use. Callers viewing a specific week
+    # explicitly pass ?as_of= (documented in frontend/lib/api.ts).
+    resolved_as_of = as_of if as_of is not None else date.today()
+
+    comparison_out = None
+    streaming_out = None
+    if opponent_side is not None:
+        comparison = compare_matchup(mine_side["projection"], opponent_side["projection"])
+        comparison_out = {
+            "categories": [
+                {
+                    "category": cv.category,
+                    "mine": _round2(cv.mine),
+                    "theirs": _round2(cv.theirs),
+                    "margin": _round2(cv.margin),
+                    "verdict": cv.verdict,
+                }
+                for cv in comparison.categories
+            ],
+            "projected_score": list(comparison.projected_score),
+            "close_categories": list(comparison.close_categories),
+            "focus": list(comparison.focus),
+        }
+
+        # streaming window: the remaining days of a LIVE week (as_of falls
+        # inside [week_start, week_end]) clamps forward to today, same as
+        # before. But as_of falling OUTSIDE that range -- a week that's
+        # already over (the common demo-data shape: a fixed seeded week and a
+        # moving wall clock) or one that hasn't started -- clamps to the
+        # WHOLE week rather than producing an empty/invalid window. Returning
+        # nothing here would teach the user the optimizer is broken; the
+        # honest middle ground is "here's the full week's plan," flagged via
+        # window_basis so the UI never implies these are adds still
+        # actionable today. Shared with /adds via _resolve_stream_window.
+        stream_start, stream_end, window_basis = _resolve_stream_window(week_range, resolved_as_of)
+        league_rostered = _league_rostered_player_ids(db, league)
+        candidates = _streaming_candidates(
+            db, rows, league_rostered, internal_id_to_nba_id, stream_start, stream_end
+        )
+        plan = plan_streaming(
+            candidates,
+            frozenset(comparison.close_categories),
+            stream_start,
+            stream_end,
+            _league_max_weekly_adds(league),
+            # this endpoint's contract has no ?punt= today -- explicit empty
+            # set rather than relying on plan_streaming's default, so a
+            # future punt-aware caller can't silently inherit a stale
+            # assumption about what "no punt passed" meant here
+            punt=frozenset(),
+        )
+        streaming_out = {
+            "slots": [
+                {
+                    "day": slot.day.isoformat(),
+                    "player_key": slot.player_key,
+                    # slot.player_key is str(nba_player_id) (see
+                    # _streaming_candidates) -- rows is already loaded for
+                    # this request, so this is a dict lookup, not a new query;
+                    # same display fields the draft board/adds endpoint emit
+                    # so the page can render one avatar-plus-name treatment
+                    "name": rows[int(slot.player_key)].nba_player.full_name,
+                    "position": rows[int(slot.player_key)].nba_player.position,
+                    "nba_person_id": rows[int(slot.player_key)].nba_player.nba_person_id,
+                    "headshot_url": _HEADSHOT_URL_TEMPLATE.format(
+                        nba_person_id=rows[int(slot.player_key)].nba_player.nba_person_id
+                    ),
+                    "games_added": slot.games_added,
+                    "categories_helped": list(slot.categories_helped),
+                    "reason": list(slot.reason),
+                }
+                for slot in plan.slots
+            ],
+            "adds_used": plan.adds_used,
+            "adds_reserved": plan.adds_reserved,
+            "notes": list(plan.notes),
+            "window_basis": window_basis,
+        }
+
+    stale, synced_at = _league_stale_and_synced_at(league)
+    return {
+        "week": target_week,
+        "week_range": {
+            "start_date": week_range.start_date.isoformat(),
+            "end_date": week_range.end_date.isoformat(),
+            "is_derived": week_range.is_derived,
+        },
+        "as_of": resolved_as_of.isoformat(),
+        "mine": _side_out(mine_side),
+        "opponent": _side_out(opponent_side) if opponent_side is not None else None,
+        "opponent_reason": opponent_reason,
+        "comparison": comparison_out,
+        "schedule_coverage": {
+            "mine_games": _round2(mine_games),
+            "opponent_games": _round2(opponent_games) if opponent_games is not None else None,
+            "ok": schedule_ok,
+        },
+        "streaming": streaming_out,
+        "stale": stale,
+        "synced_at": synced_at,
+    }
+
+
+# --- GET /api/leagues/{league_id}/adds ---
+
+
+@router.get("/api/leagues/{league_id}/adds")
+def league_adds(
+    league_id: int,
+    week: int | None = None,
+    as_of: date | None = None,
+    punt: list[str] = Query(default=[]),
+    limit: int = 25,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_session),
+    client: YahooClient = Depends(get_yahoo_client),
+) -> dict:
+    league = _get_owned_league(db, user, league_id)
+
+    if week is not None and week < 1:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="week must be >= 1")
+    if not (1 <= limit <= 50):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="limit must be between 1 and 50"
+        )
+    _validate_punt_categories(punt)
+
+    my_team = db.execute(
+        select(Team).where(Team.league_id == league.id, Team.user_id == user.id)
+    ).scalar_one_or_none()
+    if my_team is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Team not found")
+
+    # same week/opponent resolution the matchup endpoint uses -- see
+    # _resolve_week_and_opponent's docstring
+    target_week, week_range, opponent_team, opponent_reason = _resolve_week_and_opponent(
+        db, client, league, my_team, week
+    )
+
+    season = get_settings().current_season
+    resolved_source = _resolve_projection_source(db, season, None)
+    rows = _draftable_rows(db, season, resolved_source)
+    zscores = _zscores_for(rows)
+    abbr_to_nba_id, internal_id_to_nba_id = _nba_team_id_maps(db)
+
+    mine_side = _team_side(
+        db, my_team, rows, zscores, abbr_to_nba_id, internal_id_to_nba_id,
+        week_range.start_date, week_range.end_date,
+    )  # fmt: skip
+    mine_games: float = mine_side["projection"].games
+    roster_zscores = mine_side["roster_zscores"]
+
+    # close_categories drives which categories score_waiver_candidates
+    # weights on top of roster need -- degrades to an empty set (need-only
+    # ranking) when no opponent can be identified, per the plan; the WHY is
+    # surfaced via opponent_reason (same token vocabulary as /matchup) so the
+    # page can say it's ranking on need alone rather than this week's matchup
+    close_categories: frozenset[str] = frozenset()
+    opponent_games: float | None = None
+    if opponent_team is not None:
+        opponent_side = _team_side(
+            db, opponent_team, rows, zscores, abbr_to_nba_id, internal_id_to_nba_id,
+            week_range.start_date, week_range.end_date,
+        )  # fmt: skip
+        opponent_games = opponent_side["projection"].games
+        comparison = compare_matchup(mine_side["projection"], opponent_side["projection"])
+        close_categories = frozenset(comparison.close_categories)
+
+    # same missing-schedule guard as /matchup -- see its comment
+    schedule_ok = mine_games > 0 and (opponent_team is None or (opponent_games or 0) > 0)
+
+    resolved_as_of = as_of if as_of is not None else date.today()
+    stream_start, stream_end, window_basis = _resolve_stream_window(week_range, resolved_as_of)
+
+    league_rostered = _league_rostered_player_ids(db, league)
+    candidates = _waiver_candidates(
+        db, rows, league_rostered, internal_id_to_nba_id, stream_start, stream_end
+    )
+    scores = score_waiver_candidates(
+        candidates, close_categories, roster_zscores, punt=frozenset(punt), limit=limit
+    )
+
+    candidates_out = []
+    for s in scores:
+        pid = int(s.player_key)
+        row = rows[pid]
+        candidates_out.append(
+            {
+                "player_key": s.player_key,
+                "name": row.nba_player.full_name,
+                "position": row.nba_player.position,
+                # matches the draft board's fields so the page renders
+                # avatars the same way for both lists
+                "nba_person_id": row.nba_player.nba_person_id,
+                "headshot_url": _HEADSHOT_URL_TEMPLATE.format(
+                    nba_person_id=row.nba_player.nba_person_id
+                ),
+                "score": _round2(s.score),
+                "games_remaining": _round2(s.games_remaining),
+                "categories_helped": list(s.categories_helped),
+                "stat_basis": s.stat_basis,
+                "reasons": list(s.reasons),
+            }
+        )
+
+    stale, synced_at = _league_stale_and_synced_at(league)
+    return {
+        "week": target_week,
+        "week_range": {
+            "start_date": week_range.start_date.isoformat(),
+            "end_date": week_range.end_date.isoformat(),
+            "is_derived": week_range.is_derived,
+        },
+        "as_of": resolved_as_of.isoformat(),
+        "window_basis": window_basis,
+        "close_categories": list(close_categories),
+        "opponent_reason": opponent_reason,
+        "candidates": candidates_out,
+        "schedule_coverage": {
+            "mine_games": _round2(mine_games),
+            "opponent_games": _round2(opponent_games) if opponent_games is not None else None,
+            "ok": schedule_ok,
+        },
+        "stale": stale,
+        "synced_at": synced_at,
+    }
+
+
+# --- GET /api/leagues/{league_id}/trades ---
+
+# value_basis token -- discloses the T3 plan amendment (docs/trade-analyzer-
+# plan.md): net_value/verdict weigh CATEGORY IMPACT only, never positional
+# scarcity, because evaluate_trades's inputs (two RosterPlayer lists) carry
+# no position data at all. Structured, not English, per the same discipline
+# every other reason field in this module follows.
+TRADE_VALUE_BASIS_CATEGORY_IMPACT_ONLY = "category_impact_only"
+
+
+def _strength_out(strength) -> dict:
+    return {
+        "category": strength.category,
+        "total": _round2(strength.total),
+        "mean": _round2(strength.mean),
+        "label": strength.label,
+        "depth": strength.depth,
+        "fragile": strength.fragile,
+        "top_contributor": strength.top_contributor,
+        "top_share": _round2(strength.top_share),
+    }
+
+
+def _side_outcome_out(outcome, roster_size: int) -> dict:
+    # roster_size is constant pre/post for a given side -- generate_trade_
+    # candidates only ever swaps equal-length give/get packages -- so one
+    # size safely derives both before and after means
+    def _profile_out(profile: dict) -> dict:
+        return {
+            "totals": {cat: _round2(profile["totals"][cat]) for cat in CATEGORIES},
+            "labels": profile["labels"],
+            "means": {
+                cat: _round2((profile["totals"][cat] / roster_size) if roster_size else 0.0)
+                for cat in CATEGORIES
+            },
+        }
+
+    return {
+        "before": _profile_out(outcome.before),
+        "after": _profile_out(outcome.after),
+        "gained": list(outcome.gained),
+        "lost": list(outcome.lost),
+        "collapsed": list(outcome.collapsed),
+    }
+
+
+@router.get("/api/leagues/{league_id}/trades")
+def league_trades(
+    league_id: int,
+    team_id: int,
+    max_package: int = 2,
+    limit: int = 10,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_session),
+) -> dict:
+    league = _get_owned_league(db, user, league_id)
+
+    my_team = db.execute(
+        select(Team).where(Team.league_id == league.id, Team.user_id == user.id)
+    ).scalar_one_or_none()
+    if my_team is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Team not found")
+
+    if team_id == my_team.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="team_id must be a different team than your own",
+        )
+    # scoped to Team.league_id == league.id -- a team_id that exists but
+    # belongs to a DIFFERENT league must 404, never be compared, or one
+    # user's trade query could leak another league's roster data
+    other_team = db.execute(
+        select(Team).where(Team.id == team_id, Team.league_id == league.id)
+    ).scalar_one_or_none()
+    if other_team is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="team_id not found in this league"
+        )
+
+    if not (1 <= max_package <= 2):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="max_package must be between 1 and 2"
+        )
+    if not (1 <= limit <= 25):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="limit must be between 1 and 25"
+        )
+
+    season = get_settings().current_season
+    resolved_source = _resolve_projection_source(db, season, None)
+    rows = _draftable_rows(db, season, resolved_source)
+    # one shared z population for BOTH rosters, per the task brief -- two
+    # independently-scaled rosters would not be comparable on the same axis
+    zscores = _zscores_for(rows)
+
+    mine_players, mine_info = _roster_players(db, my_team, rows, zscores)
+    theirs_players, theirs_info = _roster_players(db, other_team, rows, zscores)
+    players_out = {**mine_info, **theirs_info}
+
+    comparison = compare_rosters(mine_players, theirs_players)
+    candidate_set = generate_trade_candidates(
+        mine_players, theirs_players, comparison=comparison, max_package=max_package
+    )
+    verdicts = evaluate_trades(
+        list(candidate_set.candidates),
+        mine_players,
+        theirs_players,
+        config=_league_config(league),
+        limit=limit,
+    )
+
+    verdicts_out = [
+        {
+            "give": list(v.candidate.give),
+            "get": list(v.candidate.get),
+            "mine": _side_outcome_out(v.mine, len(mine_players)),
+            "theirs": _side_outcome_out(v.theirs, len(theirs_players)),
+            "net_value": _round2(v.net_value),
+            "verdict": v.verdict,
+            "reasons": list(v.reasons),
+        }
+        for v in verdicts
+    ]
+
+    stale, synced_at = _league_stale_and_synced_at(league)
+    return {
+        "mine": {
+            "team_id": my_team.id,
+            "categories": {cat: _strength_out(comparison.mine[cat]) for cat in CATEGORIES},
+            "surplus": list(comparison.my_surplus),
+            "deficit": list(comparison.my_deficit),
+        },
+        "theirs": {
+            "team_id": other_team.id,
+            "categories": {cat: _strength_out(comparison.theirs[cat]) for cat in CATEGORIES},
+            "surplus": list(comparison.their_surplus),
+            "deficit": list(comparison.their_deficit),
+        },
+        "players": players_out,
+        "verdicts": verdicts_out,
+        "evaluated": candidate_set.evaluated,
+        "truncated": candidate_set.truncated,
+        "value_basis": TRADE_VALUE_BASIS_CATEGORY_IMPACT_ONLY,
+        "stale": stale,
+        "synced_at": synced_at,
+    }

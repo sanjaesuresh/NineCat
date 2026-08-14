@@ -161,6 +161,10 @@ def sync_league_detail(
                     player_name=entry.name,
                     position=entry.selected_position,
                     injury_status=entry.injury_status,
+                    # normalize "" to None: RosterEntry.nba_team_abbr is typed as
+                    # a plain str, but a blank editorial_team_abbr shouldn't be
+                    # stored as a truthy-looking empty string
+                    nba_team_abbr=entry.nba_team_abbr or None,
                 )
             )
 

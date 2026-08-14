@@ -9,13 +9,13 @@ import logging
 import secrets
 from collections.abc import Generator
 from dataclasses import asdict
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -26,6 +26,7 @@ from ninecat.db import get_session
 from ninecat.models import (
     League,
     NbaPlayer,
+    NbaTeam,
     PlayerIdMap,
     PlayerProjection,
     PlayerSeasonAverage,
@@ -46,6 +47,10 @@ from ninecat.yahoo.gateway import _path_hash
 # produces from a live Yahoo response -- the draft engine can't tell the
 # difference between dev-seeded and real settings
 from ninecat.yahoo.parsers import CategoryInfo, LeagueSettings, RosterPosition
+# reuse the warehouse's own upsert (idempotent + self-healing NbaTeam/NbaGame
+# rows on rerun) instead of hand-rolling a second copy of that logic here --
+# one code path owns "how a schedule row becomes NbaTeam/NbaGame rows"
+from ninecat.warehouse.nba_schedule import sync_schedule
 
 router = APIRouter()
 
@@ -332,7 +337,18 @@ DEV_USER_GUID = "DEVUSER"
 DEV_LEAGUE_KEY = "nba.l.999999"
 DEV_TEAM_KEY = "nba.l.999999.t.1"
 DEV_OTHER_TEAM_KEY = "nba.l.999999.t.2"
-DEV_LEAGUE_SEASON = 2025
+# league.season used to be a hardcoded literal here, independent of the
+# current_season setting -- it would silently go stale the moment that setting
+# was bumped for a new NBA season. Derived instead, at call time (not at
+# import time, so a test's monkeypatch+cache_clear of current_season takes
+# effect): config.py documents this exact leading-4-digits conversion as the
+# sanctioned way to get League.season's plain start-year int from the
+# hyphenated "YYYY-YY" setting.
+
+
+def _dev_league_season() -> int:
+    return int(get_settings().current_season[:4])
+
 
 # real values from tests/fixtures/yahoo/league_settings.json (a live-shaped Yahoo
 # settings response) -- keeps the dev league's roster_positions/categories/stat_ids
@@ -525,38 +541,277 @@ def _pool_player(row: tuple) -> dict:
 _DEV_POOL_PLAYERS = [_pool_player(row) for row in _DEV_POOL_RAW]
 
 
+# --- NBA teams, schedule, and player-to-team links (Matchup Monitor demo data) ---
+#
+# Without these, warehouse/nba_schedule.py's games_in_range returns 0 for every
+# seeded player (no NbaTeam/NbaGame rows, NbaPlayer.nba_team_id always NULL), which
+# renders every weekly projection as zeros -- see docs/matchup-monitor-plan.md M2.
+
+# monday-to-sunday demo week. Fixed, never date.today(), so the seed (and any test
+# pinning it) is deterministic. Chosen to land on a real fantasy-week boundary under
+# Settings.fantasy_season_start (2025-10-20, week 1) + 6*7 days = week 7, so a later
+# week-derivation feature that anchors off that same constant agrees with this seed.
+DEMO_WEEK_START = date(2025, 12, 1)
+DEMO_WEEK_END = date(2025, 12, 7)
+DEMO_WEEK_NUMBER = 7
+
+# real NBA.com team ids (the stable, public constants nba_api and every stats.nba.com
+# consumer use) keyed by abbreviation -- games_in_range resolves by this NBA.com id,
+# not the internal NbaTeam PK, so these must be the real ones, not made up.
+_DEV_NBA_TEAM_INFO: dict[str, tuple[int, str]] = {
+    "ATL": (1610612737, "Atlanta Hawks"),
+    "BOS": (1610612738, "Boston Celtics"),
+    "BKN": (1610612751, "Brooklyn Nets"),
+    "CHA": (1610612766, "Charlotte Hornets"),
+    "CHI": (1610612741, "Chicago Bulls"),
+    "CLE": (1610612739, "Cleveland Cavaliers"),
+    "DAL": (1610612742, "Dallas Mavericks"),
+    "DEN": (1610612743, "Denver Nuggets"),
+    "DET": (1610612765, "Detroit Pistons"),
+    "GSW": (1610612744, "Golden State Warriors"),
+    "HOU": (1610612745, "Houston Rockets"),
+    "IND": (1610612754, "Indiana Pacers"),
+    "LAC": (1610612746, "LA Clippers"),
+    "LAL": (1610612747, "Los Angeles Lakers"),
+    "MEM": (1610612763, "Memphis Grizzlies"),
+    "MIA": (1610612748, "Miami Heat"),
+    "MIL": (1610612749, "Milwaukee Bucks"),
+    "MIN": (1610612750, "Minnesota Timberwolves"),
+    "NOP": (1610612740, "New Orleans Pelicans"),
+    "NYK": (1610612752, "New York Knicks"),
+    "OKC": (1610612760, "Oklahoma City Thunder"),
+    "ORL": (1610612753, "Orlando Magic"),
+    "PHI": (1610612755, "Philadelphia 76ers"),
+    "PHX": (1610612756, "Phoenix Suns"),
+    "POR": (1610612757, "Portland Trail Blazers"),
+    "SAC": (1610612758, "Sacramento Kings"),
+    "SAS": (1610612759, "San Antonio Spurs"),
+    "TOR": (1610612761, "Toronto Raptors"),
+    "UTA": (1610612762, "Utah Jazz"),
+    "WAS": (1610612764, "Washington Wizards"),
+}
+
+# each real pool player's actual current NBA team (post-2025-offseason rosters, to
+# the best of available knowledge -- a handful of role-player free-agency landing
+# spots are less certain than the stars' and are called out below). The 3 fictional
+# roster players (900001-900003) all land on Washington, the one team with no pool
+# player, so every one of the 30 real NBA teams is represented in the demo schedule.
+_DEV_PLAYER_TEAM_ABBR: dict[int, str] = {
+    900001: "WAS", 900002: "WAS", 900003: "WAS",
+    900101: "DEN",  # Jokic
+    900102: "LAL",  # Doncic (Feb 2025 trade to LAL)
+    900103: "OKC",  # Gilgeous-Alexander
+    900104: "MIL",  # Antetokounmpo
+    900105: "BOS",  # Tatum
+    900106: "IND",  # Haliburton
+    900107: "MIN",  # Edwards
+    900108: "SAC",  # Sabonis
+    900109: "PHX",  # Booker
+    900110: "CLE",  # Mitchell
+    900111: "NYK",  # Brunson
+    900112: "ATL",  # Young
+    900113: "SAS",  # Fox (Feb 2025 trade to SAS)
+    900114: "POR",  # Lillard (Bucks stretch-waived him 2025 offseason; re-signed POR)
+    900115: "LAC",  # Leonard
+    900116: "PHI",  # Embiid
+    900117: "MEM",  # Morant
+    900118: "NOP",  # Williamson
+    900119: "DEN",  # Murray
+    900120: "ATL",  # Porzingis (traded BOS->ATL, 2025 offseason)
+    900121: "PHI",  # George
+    900122: "LAC",  # Beal (bought out by PHX, signed LAC, 2025 offseason)
+    900123: "MIN",  # Gobert
+    900124: "LAC",  # Zubac
+    900125: "HOU",  # Capela
+    900126: "BKN",  # Claxton
+    900127: "NYK",  # Robinson
+    900128: "CLE",  # Allen
+    900129: "GSW",  # Hield
+    900130: "DAL",  # Thompson
+    900131: "MIA",  # D. Robinson
+    900132: "CLE",  # Merrill
+    900133: "CLE",  # Strus
+    900134: "DET",  # Beasley (less certain -- 2025 offseason free agency)
+    900135: "DEN",  # Jones (less certain -- 2024-25 in-season trade destination)
+    900136: "IND",  # McConnell
+    900137: "BOS",  # Pritchard
+    900138: "NOP",  # Alvarado
+    900139: "POR",  # Holiday (Feb 2025 trade BOS->POR for Simons)
+    900140: "BOS",  # White
+    900141: "LAL",  # Smart (less certain -- 2024-25 in-season trade chain)
+    900142: "HOU",  # Sengun
+    900143: "DAL",  # Davis (Feb 2025 trade for Doncic)
+    900144: "MIA",  # Adebayo
+    900145: "NYK",  # Towns (2024 offseason trade to NYK)
+    900146: "CLE",  # Mobley
+    900147: "SAS",  # Wembanyama
+    900148: "OKC",  # Holmgren
+    900149: "ORL",  # Banchero
+    900150: "ORL",  # Wagner
+    900151: "OKC",  # Williams
+    900152: "TOR",  # Barnes
+    900153: "DET",  # Cunningham
+    900154: "CHA",  # Ball
+    900155: "CHI",  # White
+    900156: "BOS",  # Brown
+    900157: "NYK",  # Bridges (2024 offseason trade to NYK)
+    900158: "NYK",  # Anunoby
+    900159: "NOP",  # Jones
+    900160: "POR",  # Avdija
+    900161: "PHI",  # Maxey
+    900162: "CLE",  # Garland
+    900163: "PHX",  # Green (2025 offseason Durant trade, HOU->PHX)
+    900164: "BOS",  # Simons (Feb 2025 trade POR->BOS for Holiday)
+    900165: "MIA",  # Powell
+    900166: "UTA",  # Kessler
+    900167: "DAL",  # Gafford
+    900168: "HOU",  # Hartenstein
+    900169: "DET",  # Duren
+    900170: "BKN",  # Porter Jr. (2025 offseason trade DEN->BKN)
+    900171: "TOR",  # Ingram
+    900172: "TOR",  # Barrett
+}
+
+# a demo week's worth of games (48 total, mirrors a real week's ~45-55 league-wide
+# count): most of the 30 teams play 3-4 games, 5 play only 2, and several (BOS, HOU,
+# CLE, NYK among them) have a genuine back-to-back -- without this spread the
+# streaming/add-schedule optimizer has nothing to optimize (every team would look
+# identical). (day offset from DEMO_WEEK_START, home abbr, away abbr).
+_DEV_GAMES: list[tuple[int, str, str]] = [
+    (0, "BKN", "SAS"), (0, "BOS", "MIA"), (0, "DEN", "CLE"), (0, "HOU", "IND"),
+    (0, "LAC", "ORL"), (0, "MIL", "TOR"), (0, "SAC", "CHI"),
+    (1, "BOS", "DEN"), (1, "CHA", "ATL"), (1, "DAL", "PHX"), (1, "MEM", "HOU"),
+    (1, "MIN", "ORL"), (1, "PHI", "MIA"), (1, "POR", "OKC"),
+    (2, "BKN", "POR"), (2, "GSW", "LAL"), (2, "IND", "NYK"), (2, "LAC", "PHX"),
+    (2, "NOP", "CLE"), (2, "TOR", "OKC"),
+    (3, "ATL", "DEN"), (3, "CHI", "MIL"), (3, "CLE", "BOS"), (3, "DAL", "PHI"),
+    (3, "DET", "MEM"), (3, "GSW", "SAS"), (3, "LAC", "NYK"), (3, "SAC", "MIN"),
+    (4, "DEN", "SAS"), (4, "DET", "MIA"), (4, "HOU", "WAS"), (4, "NOP", "UTA"),
+    (4, "PHI", "MIN"), (4, "POR", "TOR"),
+    (5, "ATL", "LAL"), (5, "CHA", "ORL"), (5, "DAL", "HOU"), (5, "LAC", "NYK"),
+    (5, "MEM", "BOS"), (5, "MIA", "MIL"),
+    (6, "DET", "OKC"), (6, "MIN", "PHX"), (6, "NOP", "IND"), (6, "NYK", "UTA"),
+    (6, "ORL", "CLE"), (6, "PHI", "GSW"), (6, "SAC", "BKN"), (6, "WAS", "DAL"),
+]  # fmt: skip
+
+
+def _dev_schedule_fetcher(season: str) -> list[dict]:
+    """sync_schedule Fetcher for _DEV_GAMES -- shapes the fixed demo week as the
+    same ScheduleRow dicts a live nba_api response would produce, so sync_schedule's
+    own (idempotent, self-healing) upsert is the only place that logic lives."""
+    rows = []
+    for day_offset, home_abbr, away_abbr in _DEV_GAMES:
+        game_date = DEMO_WEEK_START + timedelta(days=day_offset)
+        home_id, home_name = _DEV_NBA_TEAM_INFO[home_abbr]
+        away_id, away_name = _DEV_NBA_TEAM_INFO[away_abbr]
+        rows.append(
+            {
+                # deterministic, collision-free with real nba_game_ids (nba.com's
+                # are all-numeric) and stable across reruns for idempotency
+                "game_id": f"dev-{game_date.isoformat()}-{home_abbr}-{away_abbr}",
+                "game_date": game_date.isoformat(),
+                "home_team_id": home_id,
+                "home_team_name": home_name,
+                "home_team_abbreviation": home_abbr,
+                "away_team_id": away_id,
+                "away_team_name": away_name,
+                "away_team_abbreviation": away_abbr,
+            }
+        )
+    return rows
+
+
+# pool players who fill out the two demo rosters beyond the 3 fixed dev-team
+# players (see task item 6) and the rival team (which otherwise has a standings
+# row but no roster at all). Deliberately different category shapes: the dev
+# team leans guard/playmaking (AST, 3PM, ST), the rival leans bigs/rim protection
+# (REB, BLK, FG%) -- a real "punt AST" build -- so the matchup comparison has
+# actual contrast instead of two similar-looking teams. Disjoint by construction
+# (checked in tests) so both are valid, non-overlapping league rosters.
+_DEV_USER_EXTRA_ROSTER_IDS: list[int] = [
+    900111,  # Brunson
+    900113,  # Fox
+    900140,  # White
+    900161,  # Maxey
+    900162,  # Garland
+    900136,  # McConnell
+    900137,  # Pritchard
+    900157,  # Bridges
+    900108,  # Sabonis
+    900126,  # Claxton
+]
+_DEV_RIVAL_ROSTER_IDS: list[int] = [
+    900123,  # Gobert
+    900124,  # Zubac
+    900125,  # Capela
+    900166,  # Kessler
+    900168,  # Hartenstein
+    900142,  # Sengun
+    900143,  # Davis
+    900144,  # Adebayo
+    900146,  # Mobley
+    900127,  # Robinson
+    900128,  # Allen
+    900167,  # Gafford
+    900169,  # Duren
+]
+_DEV_ROSTER_ASSIGNMENTS: dict[int, str] = {
+    **{pid: "user" for pid in _DEV_USER_EXTRA_ROSTER_IDS},
+    **{pid: "rival" for pid in _DEV_RIVAL_ROSTER_IDS},
+}
+
+
+# every helper below used to be a plain SELECT-then-INSERT-if-missing: two
+# concurrent dev-logins (two real Yahoo test users hitting /api/auth/dev-login
+# at once, or a test suite racing against a live e2e run) can both pass the
+# SELECT before either INSERT lands, and the loser's INSERT then dies on the
+# row's unique constraint (live-observed: frontend/e2e/draft.spec.ts had to
+# serialize itself around exactly this, and a backend-suite run overlapping a
+# second process produced a real IntegrityError in test_dev_login_is_idempotent).
+# Every one of these now does a single atomic ON CONFLICT statement instead --
+# the same pattern the warehouse sync modules already use (nba_schedule.py,
+# player_stats.py, fantasy_weeks.py) -- so two racing sessions each get a
+# consistent row back with no unhandled-constraint window between them. Rows
+# that need to self-heal drifted seed data use DO UPDATE (unconditional
+# overwrite, matching nba_schedule.sync_schedule's convention); rows that are
+# genuinely create-once use DO NOTHING. Every helper re-selects afterward
+# rather than trusting RETURNING, since DO NOTHING returns no row when another
+# session already won the race (same rationale as fantasy_weeks.resolve_week).
+
+
 def _get_or_create_user(db: Session) -> User:
-    user = db.execute(select(User).where(User.yahoo_guid == DEV_USER_GUID)).scalar_one_or_none()
-    if user is None:
-        user = User(yahoo_guid=DEV_USER_GUID, display_name="Dev User")
-        db.add(user)
-        db.flush()
-    return user
+    stmt = pg_insert(User).values(yahoo_guid=DEV_USER_GUID, display_name="Dev User")
+    stmt = stmt.on_conflict_do_nothing(index_elements=[User.yahoo_guid])
+    db.execute(stmt)
+    db.flush()
+    return db.execute(select(User).where(User.yahoo_guid == DEV_USER_GUID)).scalar_one()
 
 
 def _get_or_create_league(db: Session) -> League:
-    league = db.execute(
+    insert_stmt = pg_insert(League).values(
+        yahoo_league_key=DEV_LEAGUE_KEY,
+        name="Dev League",
+        season=_dev_league_season(),
+        num_teams=2,
+        scoring_type="head",
+        settings_json=DEV_LEAGUE_SETTINGS_JSON,
+    )
+    stmt = insert_stmt.on_conflict_do_update(
+        index_elements=[League.yahoo_league_key],
+        set_={
+            # self-heal: a league seeded before this constant existed (or
+            # before current_season was bumped) would otherwise carry
+            # stale/empty settings_json or a stale season forever -- re-login
+            # is the natural point to bring it current
+            "season": insert_stmt.excluded.season,
+            "settings_json": insert_stmt.excluded.settings_json,
+        },
+    )
+    db.execute(stmt)
+    db.flush()
+    return db.execute(
         select(League).where(League.yahoo_league_key == DEV_LEAGUE_KEY)
-    ).scalar_one_or_none()
-    if league is None:
-        league = League(
-            yahoo_league_key=DEV_LEAGUE_KEY,
-            name="Dev League",
-            season=DEV_LEAGUE_SEASON,
-            num_teams=2,
-            scoring_type="head",
-            settings_json=DEV_LEAGUE_SETTINGS_JSON,
-        )
-        db.add(league)
-        db.flush()
-    elif league.settings_json != DEV_LEAGUE_SETTINGS_JSON:
-        # self-heal: a league seeded before this constant existed (or before it
-        # changed) would otherwise carry stale/empty settings_json forever, since
-        # get-or-create only writes on insert -- re-login is the natural point to
-        # bring it current, and it's a no-op once it matches
-        league.settings_json = DEV_LEAGUE_SETTINGS_JSON
-        db.flush()
-    return league
+    ).scalar_one()
 
 
 def _get_or_create_team(
@@ -568,94 +823,89 @@ def _get_or_create_team(
     is_users_team: bool,
     user_id: int | None,
 ) -> Team:
-    team = db.execute(select(Team).where(Team.yahoo_team_key == team_key)).scalar_one_or_none()
-    if team is None:
-        team = Team(
-            league_id=league.id,
-            yahoo_team_key=team_key,
-            name=name,
-            is_users_team=is_users_team,
-            user_id=user_id,
-        )
-        db.add(team)
-        db.flush()
-    return team
+    stmt = pg_insert(Team).values(
+        league_id=league.id,
+        yahoo_team_key=team_key,
+        name=name,
+        is_users_team=is_users_team,
+        user_id=user_id,
+    )
+    stmt = stmt.on_conflict_do_nothing(index_elements=[Team.yahoo_team_key])
+    db.execute(stmt)
+    db.flush()
+    return db.execute(select(Team).where(Team.yahoo_team_key == team_key)).scalar_one()
 
 
 def _get_or_create_standing(
     db: Session, league: League, team: Team, *, rank: int, wins: int, losses: int, ties: int
 ) -> None:
-    existing = db.execute(
-        select(Standing).where(Standing.league_id == league.id, Standing.team_id == team.id)
-    ).scalar_one_or_none()
-    if existing is None:
-        db.add(
-            Standing(
-                league_id=league.id, team_id=team.id, rank=rank, wins=wins, losses=losses, ties=ties
-            )
-        )
-        db.flush()
+    stmt = pg_insert(Standing).values(
+        league_id=league.id, team_id=team.id, rank=rank, wins=wins, losses=losses, ties=ties
+    )
+    stmt = stmt.on_conflict_do_nothing(index_elements=[Standing.league_id, Standing.team_id])
+    db.execute(stmt)
+    db.flush()
 
 
 def _get_or_create_roster_slot(
     db: Session, team: Team, *, player_key: str, name: str, position: str, injury_status: str | None
 ) -> None:
-    existing = db.execute(
-        select(RosterSlot).where(
-            RosterSlot.team_id == team.id, RosterSlot.yahoo_player_key == player_key
-        )
-    ).scalar_one_or_none()
-    if existing is None:
-        db.add(
-            RosterSlot(
-                team_id=team.id,
-                yahoo_player_key=player_key,
-                player_name=name,
-                position=position,
-                injury_status=injury_status,
-            )
-        )
-        db.flush()
+    stmt = pg_insert(RosterSlot).values(
+        team_id=team.id,
+        yahoo_player_key=player_key,
+        player_name=name,
+        position=position,
+        injury_status=injury_status,
+    )
+    stmt = stmt.on_conflict_do_nothing(
+        index_elements=[RosterSlot.team_id, RosterSlot.yahoo_player_key]
+    )
+    db.execute(stmt)
+    db.flush()
 
 
 def _get_or_create_nba_player(
-    db: Session, *, person_id: int, full_name: str, position: str | None = None
+    db: Session,
+    *,
+    person_id: int,
+    full_name: str,
+    position: str | None = None,
+    nba_team_id: int | None = None,
 ) -> NbaPlayer:
-    player = db.execute(
+    insert_stmt = pg_insert(NbaPlayer).values(
+        nba_person_id=person_id, full_name=full_name, position=position, nba_team_id=nba_team_id
+    )
+    stmt = insert_stmt.on_conflict_do_update(
+        index_elements=[NbaPlayer.nba_person_id],
+        set_={
+            # self-heal: a row seeded before the position column existed (or
+            # before a seed constant's name/position/team changed) would
+            # otherwise carry stale data forever -- re-login is the natural
+            # point to bring it current; no-op once it already matches
+            "full_name": insert_stmt.excluded.full_name,
+            "position": insert_stmt.excluded.position,
+            "nba_team_id": insert_stmt.excluded.nba_team_id,
+        },
+    )
+    db.execute(stmt)
+    db.flush()
+    return db.execute(
         select(NbaPlayer).where(NbaPlayer.nba_person_id == person_id)
-    ).scalar_one_or_none()
-    if player is None:
-        player = NbaPlayer(nba_person_id=person_id, full_name=full_name, position=position)
-        db.add(player)
-        db.flush()
-    elif player.full_name != full_name or player.position != position:
-        # self-heal: get-or-create only writes on insert, so a row seeded
-        # before the position column existed (or before a seed constant's
-        # name/position changed) would otherwise carry stale data forever --
-        # re-login is the natural point to bring it current; no-op once it
-        # already matches (same pattern as League.settings_json above)
-        player.full_name = full_name
-        player.position = position
-        db.flush()
-    return player
+    ).scalar_one()
 
 
 def _get_or_create_player_id_map(
     db: Session, *, yahoo_player_key: str, yahoo_name: str, nba_player_id: int
 ) -> None:
-    existing = db.execute(
-        select(PlayerIdMap).where(PlayerIdMap.yahoo_player_key == yahoo_player_key)
-    ).scalar_one_or_none()
-    if existing is None:
-        db.add(
-            PlayerIdMap(
-                nba_player_id=nba_player_id,
-                yahoo_player_key=yahoo_player_key,
-                yahoo_name=yahoo_name,
-                match_method="exact",
-            )
-        )
-        db.flush()
+    stmt = pg_insert(PlayerIdMap).values(
+        nba_player_id=nba_player_id,
+        yahoo_player_key=yahoo_player_key,
+        yahoo_name=yahoo_name,
+        match_method="exact",
+    )
+    stmt = stmt.on_conflict_do_nothing(index_elements=[PlayerIdMap.yahoo_player_key])
+    db.execute(stmt)
+    db.flush()
 
 
 def _get_or_create_season_average(
@@ -666,30 +916,26 @@ def _get_or_create_season_average(
     averages: dict[str, float],
     games_played: int = 70,
 ) -> None:
-    existing = db.execute(
-        select(PlayerSeasonAverage).where(
-            PlayerSeasonAverage.nba_player_id == nba_player_id,
-            PlayerSeasonAverage.season == season,
-        )
-    ).scalar_one_or_none()
-    if existing is None:
-        db.add(
-            PlayerSeasonAverage(
-                nba_player_id=nba_player_id, season=season, games_played=games_played, **averages
-            )
-        )
-        db.flush()
-    else:
-        # self-heal: an edited seed stat line must not be a silent no-op
-        # against a pre-existing dev row (same rationale as NbaPlayer above)
-        changed = existing.games_played != games_played
-        existing.games_played = games_played
-        for key, value in averages.items():
-            if getattr(existing, key) != value:
-                setattr(existing, key, value)
-                changed = True
-        if changed:
-            db.flush()
+    insert_stmt = pg_insert(PlayerSeasonAverage).values(
+        nba_player_id=nba_player_id, season=season, games_played=games_played, **averages
+    )
+    stmt = insert_stmt.on_conflict_do_update(
+        # (nba_player_id, season) is the table's actual unique constraint
+        index_elements=[PlayerSeasonAverage.nba_player_id, PlayerSeasonAverage.season],
+        set_={
+            # self-heal: an edited seed stat line must not be a silent no-op
+            # against a pre-existing dev row (same rationale as NbaPlayer above)
+            "games_played": insert_stmt.excluded.games_played,
+            **{key: getattr(insert_stmt.excluded, key) for key in averages},
+            # onupdate=func.now() on the column does NOT fire for ON CONFLICT
+            # updates (SQLAlchemy only applies onupdate to ORM-driven UPDATEs),
+            # so it must be set explicitly here, same fix as
+            # warehouse/nba_schedule.py's sync_schedule
+            "synced_at": func.now(),
+        },
+    )
+    db.execute(stmt)
+    db.flush()
 
 
 def _get_or_create_projection(
@@ -705,34 +951,28 @@ def _get_or_create_projection(
     # actual unique constraint (nba_player_id, season, source) instead of just
     # (nba_player_id, season), since a player can carry projections from
     # multiple sources at once
-    existing = db.execute(
-        select(PlayerProjection).where(
-            PlayerProjection.nba_player_id == nba_player_id,
-            PlayerProjection.season == season,
-            PlayerProjection.source == source,
-        )
-    ).scalar_one_or_none()
-    if existing is None:
-        db.add(
-            PlayerProjection(
-                nba_player_id=nba_player_id,
-                season=season,
-                source=source,
-                projected_games=projected_games,
-                **averages,
-            )
-        )
-        db.flush()
-    else:
-        # self-heal: same rationale as _get_or_create_season_average above
-        changed = existing.projected_games != projected_games
-        existing.projected_games = projected_games
-        for key, value in averages.items():
-            if getattr(existing, key) != value:
-                setattr(existing, key, value)
-                changed = True
-        if changed:
-            db.flush()
+    insert_stmt = pg_insert(PlayerProjection).values(
+        nba_player_id=nba_player_id,
+        season=season,
+        source=source,
+        projected_games=projected_games,
+        **averages,
+    )
+    stmt = insert_stmt.on_conflict_do_update(
+        index_elements=[
+            PlayerProjection.nba_player_id,
+            PlayerProjection.season,
+            PlayerProjection.source,
+        ],
+        set_={
+            # self-heal: same rationale as _get_or_create_season_average above
+            "projected_games": insert_stmt.excluded.projected_games,
+            **{key: getattr(insert_stmt.excluded, key) for key in averages},
+            "synced_at": func.now(),
+        },
+    )
+    db.execute(stmt)
+    db.flush()
 
 
 def _warm_scoreboard_cache(db: Session, *, user_id: int, league_key: str) -> None:
@@ -742,17 +982,73 @@ def _warm_scoreboard_cache(db: Session, *, user_id: int, league_key: str) -> Non
     matchup, which would try to refresh a Yahoo access token the dev user
     doesn't have and 401 the whole dashboard. A fresh cache row, keyed with
     the gateway's own _path_hash (not a reimplementation of it), makes the
-    gateway serve this canned "no matchups" payload instead of ever touching
-    the token refresh / network path. Always re-upserted (not get-or-create)
-    so the cache is fresh -- and thus actually hit -- on every dev-login call.
+    gateway serve this canned matchup payload instead of ever touching the
+    token refresh / network path. Always re-upserted (not get-or-create) so
+    the cache is fresh -- and thus actually hit -- on every dev-login call.
+
+    The payload shape mirrors tests/fixtures/yahoo/league_scoreboard.json (the
+    shape parse_scoreboard actually walks) and carries a real dev-team-vs-rival
+    matchup for DEMO_WEEK_NUMBER: stat_ids match DEV_LEAGUE_SETTINGS_JSON's
+    categories, and the two lines are deliberately lopsided in different
+    categories (dev team ahead on AST/3PM/ST, rival ahead on REB/BLK/FG%) to
+    match the two rosters' guard-heavy vs big-heavy builds -- these are a
+    plausible weekly scoreboard snapshot, not derived from the roster/schedule
+    seeded below, since a live scoreboard and a weekly projection are two
+    different kinds of number.
     """
     resource_path = f"league/{league_key}/scoreboard"
     path_hash = _path_hash(resource_path)
+
+    def _team_block(team_key: str, name: str, stat_values: list[str]) -> dict:
+        stat_ids = [c.stat_id for c in _DEV_LEAGUE_SETTINGS.categories]
+        return {
+            "team": [
+                [{"team_key": team_key}, {"name": name}],
+                {
+                    "team_stats": {
+                        "stats": [
+                            {"stat": {"stat_id": str(stat_id), "value": value}}
+                            for stat_id, value in zip(stat_ids, stat_values)
+                        ]
+                    }
+                },
+            ]
+        }
+
     payload = {
         "fantasy_content": {
             "league": [
                 {"league_key": league_key, "name": "Dev League"},
-                {"scoreboard": [{"matchups": {"count": 0}}]},
+                {
+                    "scoreboard": [
+                        {
+                            "matchups": {
+                                "0": {
+                                    "matchup": {
+                                        "week": str(DEMO_WEEK_NUMBER),
+                                        "0": {
+                                            "teams": {
+                                                "0": _team_block(
+                                                    DEV_TEAM_KEY,
+                                                    "Dev Team",
+                                                    # FG% FT% 3PTM PTS REB AST ST BLK TO
+                                                    [".478", ".812", "42", "612", "210", "178", "48", "22", "68"],
+                                                ),
+                                                "1": _team_block(
+                                                    DEV_OTHER_TEAM_KEY,
+                                                    "Rival Team",
+                                                    [".512", ".734", "18", "598", "298", "112", "39", "51", "54"],
+                                                ),
+                                                "count": 2,
+                                            }
+                                        },
+                                    }
+                                },
+                                "count": 1,
+                            }
+                        }
+                    ]
+                },
             ]
         }
     }
@@ -787,6 +1083,28 @@ def dev_login(db: Session = Depends(get_session)) -> Response:
     _get_or_create_standing(db, league, dev_team, rank=1, wins=10, losses=5, ties=0)
     _get_or_create_standing(db, league, other_team, rank=2, wins=7, losses=8, ties=0)
 
+    # demo week of NbaGame rows (see _DEV_GAMES) -- without this, every seeded
+    # player's games_in_range is 0 and all weekly projection math renders as
+    # zeros. sync_schedule upserts NbaTeam rows too, so this must run before any
+    # _get_or_create_nba_player call below that needs to resolve a team's
+    # internal id.
+    sync_schedule(db, season=settings.current_season, fetcher=_dev_schedule_fetcher)
+    db.flush()
+    # sync_schedule keys NbaTeam by NBA.com's own id; invert that back to
+    # abbreviation so each player lookup below can go abbr -> internal PK
+    # (the FK NbaPlayer.nba_team_id actually stores) in one step
+    _nba_team_id_to_abbr = {
+        nba_team_id: abbr for abbr, (nba_team_id, _name) in _DEV_NBA_TEAM_INFO.items()
+    }
+    teams = (
+        db.execute(select(NbaTeam).where(NbaTeam.nba_team_id.in_(_nba_team_id_to_abbr)))
+        .scalars()
+        .all()
+    )
+    team_internal_id_by_abbr: dict[str, int] = {
+        _nba_team_id_to_abbr[team.nba_team_id]: team.id for team in teams
+    }
+
     for spec in _DEV_PLAYERS:
         player_key = f"{DEV_LEAGUE_KEY}.p.{spec['person_id']}"
         _get_or_create_roster_slot(
@@ -798,7 +1116,11 @@ def dev_login(db: Session = Depends(get_session)) -> Response:
             injury_status=spec["injury_status"],
         )
         nba_player = _get_or_create_nba_player(
-            db, person_id=spec["person_id"], full_name=spec["name"], position=spec["position"]
+            db,
+            person_id=spec["person_id"],
+            full_name=spec["name"],
+            position=spec["position"],
+            nba_team_id=team_internal_id_by_abbr[_DEV_PLAYER_TEAM_ABBR[spec["person_id"]]],
         )
         _get_or_create_player_id_map(
             db, yahoo_player_key=player_key, yahoo_name=spec["name"], nba_player_id=nba_player.id
@@ -810,11 +1132,19 @@ def dev_login(db: Session = Depends(get_session)) -> Response:
     # draftable pool: unrostered players (no RosterSlot) so the draft board has
     # something to rank without ever calling Yahoo. Each gets a season average
     # AND a projection row -- the engine prefers the projection, falling back
-    # to the average, so both paths are exercised by the same dev data.
+    # to the average, so both paths are exercised by the same dev data. A
+    # subset (_DEV_ROSTER_ASSIGNMENTS) also gets a RosterSlot on the dev team or
+    # rival team, so the draft board's league-wide rostered-player exclusion
+    # (api/routes.py's _league_rostered_player_ids) removes them from free
+    # agents same as it would for a real synced league.
     for spec in _DEV_POOL_PLAYERS:
         player_key = f"{DEV_LEAGUE_KEY}.p.{spec['person_id']}"
         nba_player = _get_or_create_nba_player(
-            db, person_id=spec["person_id"], full_name=spec["name"], position=spec["position"]
+            db,
+            person_id=spec["person_id"],
+            full_name=spec["name"],
+            position=spec["position"],
+            nba_team_id=team_internal_id_by_abbr[_DEV_PLAYER_TEAM_ABBR[spec["person_id"]]],
         )
         _get_or_create_player_id_map(
             db, yahoo_player_key=player_key, yahoo_name=spec["name"], nba_player_id=nba_player.id
@@ -834,6 +1164,16 @@ def dev_login(db: Session = Depends(get_session)) -> Response:
             projected_games=spec["games"],
             averages=spec["averages"],
         )
+        roster_team = _DEV_ROSTER_ASSIGNMENTS.get(spec["person_id"])
+        if roster_team is not None:
+            _get_or_create_roster_slot(
+                db,
+                dev_team if roster_team == "user" else other_team,
+                player_key=player_key,
+                name=spec["name"],
+                position=spec["position"],
+                injury_status=None,
+            )
 
     _warm_scoreboard_cache(db, user_id=user.id, league_key=DEV_LEAGUE_KEY)
 

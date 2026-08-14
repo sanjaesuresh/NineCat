@@ -1,7 +1,8 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import (
     BigInteger,
+    Date,
     DateTime,
     ForeignKey,
     Identity,
@@ -130,6 +131,79 @@ class RosterSlot(Base):
     player_name: Mapped[str] = mapped_column(Text, nullable=False)
     position: Mapped[str] = mapped_column(Text, nullable=False)
     injury_status: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # yahoo's editorial_team_abbr (e.g. "LAL"), sent on every roster entry;
+    # nullable since not every caller populates it -- gives a roster-slot-to-
+    # NBA-team path that doesn't depend on the name-matched PlayerIdMap
+    nba_team_abbr: Mapped[str | None] = mapped_column(Text, nullable=True)
     synced_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class FantasyWeek(Base):
+    """A league's fantasy week date range, parsed from Yahoo or derived when absent.
+
+    The scoreboard parser currently extracts only the week number -- Yahoo's
+    week_start/week_end are neither parsed nor present in our fixtures -- so
+    every piece of weekly math (games this week, streaming days) is blocked on
+    having a date range. date_source records whether the range is Yahoo-
+    authoritative or a best-effort derivation, so the UI can be honest about it.
+    """
+
+    __tablename__ = "fantasy_weeks"
+    # one date range per league per week; upserted in place, never duplicated
+    # by a later re-parse or re-derivation
+    __table_args__ = (UniqueConstraint("league_id", "week"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    league_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("leagues.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    week: Mapped[int] = mapped_column(Integer, nullable=False)
+    # nullable together: a week can be known (from the scoreboard) before its
+    # dates are resolved (date resolution is a separate step) -- a dateless row
+    # with a null source is how "known but not yet dated" is represented, rather
+    # than forcing a fabricated placeholder date
+    start_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # "yahoo" (parsed from the scoreboard payload) or "derived" (computed from
+    # a configured season start plus the week number); null iff both dates are
+    # null
+    date_source: Mapped[str | None] = mapped_column(Text, nullable=True)
+    synced_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+
+class WeekResult(Base):
+    """A completed fantasy week's per-category totals and outcome, for one team.
+
+    Nothing historical is stored today: standings are an overwritten snapshot
+    and roster slots are deleted and re-inserted on every sync, so week data is
+    otherwise lost permanently as the season runs. This table is written by a
+    later sync step (out of scope here) that observes a completed week; this
+    migration only lands the shape.
+    """
+
+    __tablename__ = "week_results"
+    # one result row per league per week per team; re-observing an already-
+    # completed week upserts in place rather than duplicating
+    __table_args__ = (UniqueConstraint("league_id", "week", "team_id"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    league_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("leagues.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    team_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("teams.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    week: Mapped[int] = mapped_column(Integer, nullable=False)
+    # keyed by stat_id (JSON object keys are always strings) -> yahoo's raw stat
+    # value string; mirrors MatchupTeam.category_totals and follows the same
+    # parsed-Yahoo-shape-as-JSONB convention as League.settings_json
+    category_totals: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    # "win" | "loss" | "tie", from this team's own perspective
+    result: Mapped[str] = mapped_column(Text, nullable=False)
+    synced_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
     )

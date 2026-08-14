@@ -1,4 +1,5 @@
 import json
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -185,6 +186,9 @@ def test_get_scoreboard_parses_two_matchups_with_category_totals_keyed_by_stat_i
     assert first.teams[0].category_totals[19] == "38"
     assert first.teams[1].name == "Rebound City"
     assert first.teams[1].category_totals[5] == ".501"
+    # matchup 0's fixture carries yahoo's week_start/week_end -- the present path
+    assert first.week_start == date(2024, 11, 4)
+    assert first.week_end == date(2024, 11, 10)
 
     # matchup 1's fixture gives "teams" flat (no "0" wrapper) as a plain array --
     # the tolerant fallback path, exercised separately from matchup 0's wrapped form
@@ -192,6 +196,10 @@ def test_get_scoreboard_parses_two_matchups_with_category_totals_keyed_by_stat_i
     assert second.week == 3
     assert [t.name for t in second.teams] == ["Splash Zone", "Paint Patrol"]
     assert second.teams[0].category_totals[19] == "41"
+    # matchup 1's fixture carries no week_start/week_end -- the absent path,
+    # the normal case today since our fixtures don't include them
+    assert second.week_start is None
+    assert second.week_end is None
 
     assert gateway.calls == [
         (f"league/{LEAGUE_KEY}/scoreboard;week={WEEK}", SCOREBOARD_CACHE_TTL_SECONDS)

@@ -1,3 +1,4 @@
+from datetime import date
 from functools import lru_cache
 from pathlib import Path
 
@@ -27,11 +28,32 @@ class Settings(BaseSettings):
     dev_auth_enabled: bool = False
     # which PlayerSeasonAverage.season row the dashboard (roster averages, build
     # profile population) reads; bump this once a season when the new season's
-    # averages are worth showing instead of last year's
+    # averages are worth showing instead of last year's. This is the single
+    # source of truth for "what season is it" -- every warehouse sync
+    # (nba_schedule, player_stats, player_positions) and every API route that
+    # reads warehouse tables takes/derives its season from this setting, never
+    # from a separately hardcoded or independently-computed string.
+    #
+    # wrinkle (documented here, not re-derived elsewhere): the warehouse uses
+    # this hyphenated season string ("2025-26") as the season key on NbaGame,
+    # PlayerSeasonAverage and PlayerProjection, but League.season (populated
+    # from Yahoo, see sync/league_sync.py) is stored as a plain integer season-
+    # start year (2025). The two representations meet at exactly two
+    # conversion points in the codebase: sync/league_sync.py does
+    # `int(info.season)` when writing League.season from Yahoo's response, and
+    # api/routes.py does `str(league.season)` when shaping the League payload
+    # for the frontend. If a third conversion is ever needed, it should derive
+    # from current_season's leading 4 digits rather than reintroducing its own
+    # int(season[:4])-style parsing.
     current_season: str = "2025-26"
     # off by default so tests/dev never spin up a background scheduler thread;
     # production sets SCHEDULER_ENABLED=true to run the nightly warehouse sync
     scheduler_enabled: bool = False
+    # anchor for deriving fantasy-week date ranges when yahoo doesn't supply
+    # week_start/week_end on the scoreboard: week 1 is the monday of the week
+    # containing this date, monday-to-sunday from there. 2025-10-20 is the
+    # monday of 2025-26 NBA opening week; bump alongside current_season.
+    fantasy_season_start: date = date(2025, 10, 20)
 
 
 @lru_cache

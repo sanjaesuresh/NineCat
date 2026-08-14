@@ -1,5 +1,14 @@
 from ninecat.models.cache import YahooApiCache
-from ninecat.models.core import League, RosterSlot, Standing, Team, User, YahooToken
+from ninecat.models.core import (
+    FantasyWeek,
+    League,
+    RosterSlot,
+    Standing,
+    Team,
+    User,
+    WeekResult,
+    YahooToken,
+)
 from ninecat.models.jobs import JobRun
 from ninecat.models.warehouse import (
     NbaGame,
@@ -11,6 +20,7 @@ from ninecat.models.warehouse import (
 )
 
 __all__ = [
+    "FantasyWeek",
     "JobRun",
     "League",
     "NbaGame",
@@ -23,6 +33,7 @@ __all__ = [
     "Standing",
     "Team",
     "User",
+    "WeekResult",
     "YahooApiCache",
     "YahooToken",
 ]

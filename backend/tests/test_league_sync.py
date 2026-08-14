@@ -277,8 +277,43 @@ def test_sync_league_detail_creates_settings_teams_standings_and_rosters(db_sess
     assert len(slots) == 2
     lebron = next(s for s in slots if s.player_name == "LeBron James")
     assert lebron.injury_status == "INJ"
+    assert lebron.nba_team_abbr == "LAL"
     jokic = next(s for s in slots if s.player_name == "Nikola Jokic")
     assert jokic.injury_status is None
+    assert jokic.nba_team_abbr == "DEN"
+
+
+def test_sync_league_detail_roster_tolerates_blank_nba_team_abbr(db_session):
+    # a roster entry can arrive with a blank editorial_team_abbr (e.g. a free
+    # agent Yahoo hasn't assigned a current team to); the sync must store NULL
+    # rather than the empty string or crash on it
+    league = _make_league(db_session)
+    client = _StubClient(
+        settings_by_league={"466.l.1": _make_settings()},
+        teams_by_league={"466.l.1": _make_teams()},
+        standings_by_league={"466.l.1": _make_standings()},
+        roster_by_team={
+            "466.l.1.t.1": [
+                RosterEntry(
+                    player_key="466.p.9",
+                    name="No Team Guy",
+                    eligible_positions=["SF"],
+                    selected_position="SF",
+                    injury_status=None,
+                    nba_team_abbr="",
+                )
+            ],
+            "466.l.1.t.2": [],
+        },
+    )
+
+    sync_league_detail(db_session, client, league.id)
+    db_session.flush()
+    db_session.expire_all()
+
+    air_bud = db_session.scalars(select(Team).where(Team.yahoo_team_key == "466.l.1.t.1")).one()
+    slot = db_session.scalars(select(RosterSlot).where(RosterSlot.team_id == air_bud.id)).one()
+    assert slot.nba_team_abbr is None
 
 
 def test_sync_league_detail_rerun_with_changed_roster_replaces_exactly(db_session):
@@ -336,6 +371,9 @@ def test_sync_league_detail_rerun_with_changed_roster_replaces_exactly(db_sessio
     assert "LeBron James" not in names
     # no duplicates left behind by the replace
     assert len(after) == len(set(s.yahoo_player_key for s in after))
+    # re-synced slots carry nba_team_abbr too, not just the first sync's rows
+    davis = next(s for s in after if s.player_name == "Anthony Davis")
+    assert davis.nba_team_abbr == "LAL"
 
     # standings updated in place -- row count stable, not doubled, and the
     # new (not the original) rank/wins values are what's actually stored

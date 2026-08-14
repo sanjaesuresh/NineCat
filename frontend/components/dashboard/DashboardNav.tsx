@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import LogoutButton from "./LogoutButton";
 
 // tools not built yet, in the same season order as the landing page's roadmap
-const COMING_SOON = ["Matchup", "Adds", "Trades"];
+const COMING_SOON = ["Adds", "Trades"];
 
 /** Dashboard chrome for a single league: section nav, coming-soon tools, settings, logout. */
 export default function DashboardNav({
@@ -18,9 +18,11 @@ export default function DashboardNav({
   const pathname = usePathname();
   const teamHref = `/dashboard/${leagueId}`;
   const draftHref = `/dashboard/${leagueId}/draft`;
+  const matchupHref = `/dashboard/${leagueId}/matchup`;
   const settingsHref = `/dashboard/${leagueId}/settings`;
   const onTeam = pathname === teamHref;
   const onDraft = pathname === draftHref;
+  const onMatchup = pathname === matchupHref;
   const onSettings = pathname === settingsHref;
 
   // inline-flex + py-1.5 pads the link's hit area to a ~24px target (WCAG 2.2
@@ -51,6 +53,9 @@ export default function DashboardNav({
           </Link>
           <Link href={draftHref} aria-current={onDraft ? "page" : undefined} className={linkClass(onDraft)}>
             Draft
+          </Link>
+          <Link href={matchupHref} aria-current={onMatchup ? "page" : undefined} className={linkClass(onMatchup)}>
+            Matchup
           </Link>
           {COMING_SOON.map((tool) => (
             <span

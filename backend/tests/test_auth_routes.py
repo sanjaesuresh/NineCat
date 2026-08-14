@@ -1,5 +1,6 @@
 import dataclasses
 import json
+import threading
 from collections.abc import Generator
 from datetime import datetime, timezone
 from http.cookies import SimpleCookie
@@ -11,37 +12,53 @@ import pytest
 from cryptography.fernet import Fernet
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import delete, select
+from sqlalchemy.orm import sessionmaker
 
 from ninecat.auth.crypto import decrypt_token
 from ninecat.auth.routes import (
+    DEMO_WEEK_END,
+    DEMO_WEEK_NUMBER,
+    DEMO_WEEK_START,
     DEV_LEAGUE_KEY,
     DEV_LEAGUE_SETTINGS_JSON,
+    DEV_OTHER_TEAM_KEY,
+    DEV_TEAM_KEY,
     DEV_USER_GUID,
     OAUTH_NONCE_COOKIE_NAME,
     YAHOO_AUTHORIZE_URL,
+    _DEV_GAMES,
+    _DEV_NBA_TEAM_INFO,
+    _DEV_PLAYER_TEAM_ABBR,
     _DEV_PLAYERS,
     _DEV_POOL_PLAYERS,
+    _DEV_RIVAL_ROSTER_IDS,
+    _DEV_ROSTER_ASSIGNMENTS,
+    _DEV_USER_EXTRA_ROSTER_IDS,
     get_http_client,
     router,
 )
 from ninecat.auth.sessions import SESSION_COOKIE_NAME, verify_session_cookie
 from ninecat.config import get_settings
-from ninecat.db import get_session
+from ninecat.db import get_engine, get_session
 from ninecat.models import (
     League,
+    NbaGame,
     NbaPlayer,
+    NbaTeam,
     PlayerIdMap,
     PlayerProjection,
     PlayerSeasonAverage,
     RosterSlot,
+    Standing,
     Team,
     User,
     YahooApiCache,
     YahooToken,
 )
+from ninecat.warehouse.nba_schedule import back_to_backs_in_range, games_in_range
 from ninecat.yahoo.gateway import _path_hash
-from ninecat.yahoo.parsers import parse_league_settings
+from ninecat.yahoo.parsers import parse_league_settings, parse_scoreboard
 
 # total NbaPlayer/PlayerIdMap/PlayerSeasonAverage rows a dev-login seeds: the
 # 3 rostered dev players plus the unrostered draftable pool
@@ -538,11 +555,12 @@ def test_dev_login_seeds_dataset_and_sets_session_cookie(
         .scalars()
         .all()
     )
-    assert {slot.player_name for slot in roster} == {
-        "Dev Player One",
-        "Dev Player Two",
-        "Dev Player Three",
+    # the 3 fixed dev players are always present; the rest is pool players
+    # filling out a realistic starting roster (see _DEV_USER_EXTRA_ROSTER_IDS)
+    assert {"Dev Player One", "Dev Player Two", "Dev Player Three"} <= {
+        slot.player_name for slot in roster
     }
+    assert len(roster) == len(_DEV_PLAYERS) + len(_DEV_USER_EXTRA_ROSTER_IDS)
     injured = next(s for s in roster if s.player_name == "Dev Player Two")
     assert injured.injury_status == "INJ"
     healthy = next(s for s in roster if s.player_name == "Dev Player One")
@@ -568,9 +586,13 @@ def test_dev_login_seeds_dataset_and_sets_session_cookie(
     assert all(avg.games_played == 70 for avg in season_avgs if avg.nba_player_id in rostered_ids)
 
 
-def test_dev_login_seeds_draftable_pool_unrostered_with_projections(
+def test_dev_login_seeds_draftable_pool_with_projections(
     db_session, monkeypatch: pytest.MonkeyPatch
 ):
+    # every pool player gets a season average + projection regardless of
+    # roster status; a subset (_DEV_ROSTER_ASSIGNMENTS) is also rostered onto
+    # the dev or rival team (see the roster tests below) -- the rest stays
+    # draftable, which this test pins
     monkeypatch.setenv("DEV_AUTH_ENABLED", "true")
     get_settings.cache_clear()
     client = _client(_app(db_session))
@@ -586,12 +608,27 @@ def test_dev_login_seeds_draftable_pool_unrostered_with_projections(
         .all()
     )
     assert len(pool_players) == len(_DEV_POOL_PLAYERS)
-    # unrostered: none of the pool player ids show up as a RosterSlot player_key
-    pool_keys = {f"{DEV_LEAGUE_KEY}.p.{pid}" for pid in pool_person_ids}
-    rostered_keys = {
-        slot.yahoo_player_key for slot in db_session.execute(select(RosterSlot)).scalars().all()
+    dev_team = db_session.execute(select(Team).where(Team.yahoo_team_key == DEV_TEAM_KEY)).scalar_one()
+    other_team = db_session.execute(
+        select(Team).where(Team.yahoo_team_key == DEV_OTHER_TEAM_KEY)
+    ).scalar_one()
+    league_rostered_keys = {
+        slot.yahoo_player_key
+        for slot in db_session.execute(
+            select(RosterSlot).where(RosterSlot.team_id.in_([dev_team.id, other_team.id]))
+        )
+        .scalars()
+        .all()
     }
-    assert pool_keys.isdisjoint(rostered_keys)
+    unrostered_pool_ids = [
+        pid for pid in pool_person_ids if pid not in _DEV_ROSTER_ASSIGNMENTS
+    ]
+    unrostered_pool_keys = {f"{DEV_LEAGUE_KEY}.p.{pid}" for pid in unrostered_pool_ids}
+    assert unrostered_pool_keys.isdisjoint(league_rostered_keys)
+    rostered_pool_keys = {
+        f"{DEV_LEAGUE_KEY}.p.{pid}" for pid in _DEV_ROSTER_ASSIGNMENTS
+    }
+    assert rostered_pool_keys <= league_rostered_keys
     # every pool player has a position (draft-engine scarcity depends on it)
     assert all(p.position for p in pool_players)
 
@@ -707,12 +744,61 @@ def test_dev_login_is_idempotent(db_session, monkeypatch: pytest.MonkeyPatch):
         select(League).where(League.yahoo_league_key == DEV_LEAGUE_KEY)
     ).scalar_one()
     assert len(db_session.execute(select(Team).where(Team.league_id == league.id)).scalars().all()) == 2
-    assert len(db_session.execute(select(RosterSlot)).scalars().all()) == 3
+    # 3 fixed dev-team players + the pool players rostered onto either team
+    # (dev team's extras and the rival team's whole roster)
+    expected_roster_slots = (
+        len(_DEV_PLAYERS) + len(_DEV_USER_EXTRA_ROSTER_IDS) + len(_DEV_RIVAL_ROSTER_IDS)
+    )
+    assert len(db_session.execute(select(RosterSlot)).scalars().all()) == expected_roster_slots
     assert len(db_session.execute(select(NbaPlayer)).scalars().all()) == _TOTAL_DEV_PLAYERS
     assert len(db_session.execute(select(PlayerIdMap)).scalars().all()) == _TOTAL_DEV_PLAYERS
     assert len(db_session.execute(select(PlayerSeasonAverage)).scalars().all()) == _TOTAL_DEV_PLAYERS
     assert len(db_session.execute(select(PlayerProjection)).scalars().all()) == len(_DEV_POOL_PLAYERS)
     assert league.settings_json == DEV_LEAGUE_SETTINGS_JSON
+
+
+def test_dev_login_league_season_follows_current_season_setting(
+    db_session, monkeypatch: pytest.MonkeyPatch
+):
+    # regression: League.season used to be a literal hardcoded independently
+    # of current_season, so it would silently drift the moment that setting
+    # was bumped for a new NBA season -- it must always derive from the
+    # setting's leading 4 digits (config.py's documented conversion rule)
+    monkeypatch.setenv("DEV_AUTH_ENABLED", "true")
+    monkeypatch.setenv("CURRENT_SEASON", "2026-27")
+    get_settings.cache_clear()
+    client = _client(_app(db_session))
+
+    client.post("/api/auth/dev-login")
+
+    league = db_session.execute(
+        select(League).where(League.yahoo_league_key == DEV_LEAGUE_KEY)
+    ).scalar_one()
+    assert league.season == 2026
+
+
+def test_dev_login_heals_league_season_on_setting_bump(
+    db_session, monkeypatch: pytest.MonkeyPatch
+):
+    # a league seeded under an older current_season must not carry that stale
+    # season forever -- re-login is the natural point to bring it current,
+    # same self-heal rationale as settings_json
+    monkeypatch.setenv("DEV_AUTH_ENABLED", "true")
+    get_settings.cache_clear()
+    client = _client(_app(db_session))
+    client.post("/api/auth/dev-login")
+
+    league = db_session.execute(
+        select(League).where(League.yahoo_league_key == DEV_LEAGUE_KEY)
+    ).scalar_one()
+    assert league.season == 2025
+
+    monkeypatch.setenv("CURRENT_SEASON", "2026-27")
+    get_settings.cache_clear()
+    client.post("/api/auth/dev-login")
+    db_session.expire(league)
+
+    assert league.season == 2026
 
 
 def test_dev_login_warms_scoreboard_cache_with_gateways_own_path_hash(
@@ -741,3 +827,452 @@ def test_dev_login_warms_scoreboard_cache_with_gateways_own_path_hash(
     client.post("/api/auth/dev-login")
     db_session.expire(cache_row)
     assert cache_row.fetched_at > first_fetched_at
+
+
+# --- POST /api/auth/dev-login: Matchup Monitor demo data (T3) ---
+#
+# Regression guard for the bug this task fixes: the dev seed used to create no
+# NbaTeam/NbaGame rows and leave NbaPlayer.nba_team_id NULL, so
+# warehouse/nba_schedule.py's games_in_range returned 0 for every seeded player
+# and all weekly projection math rendered as zeros. Every assertion below is
+# scoped to rows this seed itself owns (known nba_team_id set, "dev-" prefixed
+# nba_game_id, known nba_person_id set, the two dev team ids) -- never an
+# unfiltered table count -- per the repo-wide pollution-proofing rule.
+
+_ALL_DEV_PERSON_IDS = [spec["person_id"] for spec in _DEV_PLAYERS] + [
+    spec["person_id"] for spec in _DEV_POOL_PLAYERS
+]
+_DEV_NBA_TEAM_IDS = {nba_team_id for nba_team_id, _name in _DEV_NBA_TEAM_INFO.values()}
+
+
+def test_dev_login_seeds_nba_teams_and_a_demo_week_of_games(
+    db_session, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setenv("DEV_AUTH_ENABLED", "true")
+    get_settings.cache_clear()
+    client = _client(_app(db_session))
+
+    client.post("/api/auth/dev-login")
+
+    teams = (
+        db_session.execute(select(NbaTeam).where(NbaTeam.nba_team_id.in_(_DEV_NBA_TEAM_IDS)))
+        .scalars()
+        .all()
+    )
+    assert len(teams) == len(_DEV_NBA_TEAM_INFO)
+    assert {t.abbreviation for t in teams} == set(_DEV_NBA_TEAM_INFO.keys())
+
+    games = (
+        db_session.execute(select(NbaGame).where(NbaGame.nba_game_id.like("dev-%")))
+        .scalars()
+        .all()
+    )
+    assert len(games) == len(_DEV_GAMES)
+    assert all(DEMO_WEEK_START <= g.game_date <= DEMO_WEEK_END for g in games)
+
+
+def test_dev_login_links_every_seeded_player_to_their_real_nba_team(
+    db_session, monkeypatch: pytest.MonkeyPatch
+):
+    # this is the exact bug: without nba_team_id wired up, games_in_range is 0
+    # for every player and all weekly math is zeros -- fail loudly if a future
+    # edit drops the link again
+    monkeypatch.setenv("DEV_AUTH_ENABLED", "true")
+    get_settings.cache_clear()
+    client = _client(_app(db_session))
+
+    client.post("/api/auth/dev-login")
+
+    players = (
+        db_session.execute(select(NbaPlayer).where(NbaPlayer.nba_person_id.in_(_ALL_DEV_PERSON_IDS)))
+        .scalars()
+        .all()
+    )
+    assert len(players) == len(_ALL_DEV_PERSON_IDS)
+    assert all(p.nba_team_id is not None for p in players)
+
+    teams_by_internal_id = {
+        t.id: t
+        for t in db_session.execute(
+            select(NbaTeam).where(NbaTeam.nba_team_id.in_(_DEV_NBA_TEAM_IDS))
+        )
+        .scalars()
+        .all()
+    }
+    for player in players:
+        team = teams_by_internal_id[player.nba_team_id]
+        assert team.abbreviation == _DEV_PLAYER_TEAM_ABBR[player.nba_person_id]
+
+
+def test_dev_login_games_in_range_is_nonzero_for_a_seeded_player(
+    db_session, monkeypatch: pytest.MonkeyPatch
+):
+    # the regression guard: this is the exact call the weekly projection engine
+    # makes, and it used to always return 0 -- pin the real (non-zero, plausible)
+    # count for the demo week instead of just asserting "> 0"
+    monkeypatch.setenv("DEV_AUTH_ENABLED", "true")
+    get_settings.cache_clear()
+    client = _client(_app(db_session))
+
+    client.post("/api/auth/dev-login")
+
+    den_nba_team_id, _name = _DEV_NBA_TEAM_INFO["DEN"]
+    expected_count = sum(1 for _day, home, away in _DEV_GAMES if "DEN" in (home, away))
+    assert expected_count > 0
+
+    result = games_in_range(db_session, den_nba_team_id, DEMO_WEEK_START, DEMO_WEEK_END)
+
+    assert result.count == expected_count
+    assert result.count > 0
+
+
+def test_dev_login_demo_week_has_at_least_one_back_to_back(
+    db_session, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setenv("DEV_AUTH_ENABLED", "true")
+    get_settings.cache_clear()
+    client = _client(_app(db_session))
+
+    client.post("/api/auth/dev-login")
+
+    found_back_to_back = False
+    for abbr, (nba_team_id, _name) in _DEV_NBA_TEAM_INFO.items():
+        pairs = back_to_backs_in_range(db_session, nba_team_id, DEMO_WEEK_START, DEMO_WEEK_END)
+        if pairs:
+            found_back_to_back = True
+            # consecutive calendar days, exactly what a back-to-back means
+            for prev_date, curr_date in pairs:
+                assert (curr_date - prev_date).days == 1
+    assert found_back_to_back
+
+
+def test_dev_login_rival_roster_is_realistic_and_disjoint_from_user_roster(
+    db_session, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setenv("DEV_AUTH_ENABLED", "true")
+    get_settings.cache_clear()
+    client = _client(_app(db_session))
+
+    client.post("/api/auth/dev-login")
+
+    dev_team = db_session.execute(select(Team).where(Team.yahoo_team_key == DEV_TEAM_KEY)).scalar_one()
+    other_team = db_session.execute(
+        select(Team).where(Team.yahoo_team_key == DEV_OTHER_TEAM_KEY)
+    ).scalar_one()
+
+    dev_slots = (
+        db_session.execute(select(RosterSlot).where(RosterSlot.team_id == dev_team.id)).scalars().all()
+    )
+    rival_slots = (
+        db_session.execute(select(RosterSlot).where(RosterSlot.team_id == other_team.id))
+        .scalars()
+        .all()
+    )
+
+    # 3 fixed dev-team players + the extras pulled from the pool
+    assert len(dev_slots) == len(_DEV_PLAYERS) + len(_DEV_USER_EXTRA_ROSTER_IDS)
+    assert len(rival_slots) == len(_DEV_RIVAL_ROSTER_IDS)
+    # "realistic starting roster" band, not 1-3 players against a 13-slot layout
+    assert 10 <= len(dev_slots) <= 16
+    assert 10 <= len(rival_slots) <= 16
+
+    dev_keys = {slot.yahoo_player_key for slot in dev_slots}
+    rival_keys = {slot.yahoo_player_key for slot in rival_slots}
+    assert dev_keys.isdisjoint(rival_keys)
+
+    # the rival roster's players must no longer be draftable free agents --
+    # confirmed (not assumed) against api/routes.py's actual league-wide filter:
+    # it excludes anyone rostered on ANY team in the league, not just the user's
+    rival_person_ids = {int(key.rsplit(".p.", 1)[1]) for key in rival_keys}
+    assert rival_person_ids == set(_DEV_RIVAL_ROSTER_IDS)
+
+
+def test_dev_login_scoreboard_payload_parses_into_two_teams_with_category_totals(
+    db_session, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setenv("DEV_AUTH_ENABLED", "true")
+    get_settings.cache_clear()
+    client = _client(_app(db_session))
+
+    client.post("/api/auth/dev-login")
+
+    user = db_session.execute(select(User).where(User.yahoo_guid == DEV_USER_GUID)).scalar_one()
+    cache_row = db_session.execute(
+        select(YahooApiCache).where(
+            YahooApiCache.user_id == user.id,
+            YahooApiCache.path_hash == _path_hash(f"league/{DEV_LEAGUE_KEY}/scoreboard"),
+        )
+    ).scalar_one()
+
+    matchups = parse_scoreboard(cache_row.payload)
+
+    assert len(matchups) == 1
+    matchup = matchups[0]
+    assert matchup.week == DEMO_WEEK_NUMBER
+    assert {t.team_key for t in matchup.teams} == {DEV_TEAM_KEY, DEV_OTHER_TEAM_KEY}
+
+    expected_stat_ids = {c["stat_id"] for c in DEV_LEAGUE_SETTINGS_JSON["categories"]}
+    dev_team = next(t for t in matchup.teams if t.team_key == DEV_TEAM_KEY)
+    rival_team = next(t for t in matchup.teams if t.team_key == DEV_OTHER_TEAM_KEY)
+    assert set(dev_team.category_totals) == expected_stat_ids
+    assert set(rival_team.category_totals) == expected_stat_ids
+
+    # real contrast, not two identical lines: dev team (guard-heavy) leads
+    # assists (stat_id 16), rival (big-heavy) leads rebounds (stat_id 15)
+    assert float(dev_team.category_totals[16]) > float(rival_team.category_totals[16])
+    assert float(rival_team.category_totals[15]) > float(dev_team.category_totals[15])
+
+
+def test_dev_login_nba_teams_games_and_rosters_are_idempotent(
+    db_session, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setenv("DEV_AUTH_ENABLED", "true")
+    get_settings.cache_clear()
+    client = _client(_app(db_session))
+
+    client.post("/api/auth/dev-login")
+
+    teams_before = (
+        db_session.execute(select(NbaTeam).where(NbaTeam.nba_team_id.in_(_DEV_NBA_TEAM_IDS)))
+        .scalars()
+        .all()
+    )
+    games_before = (
+        db_session.execute(select(NbaGame).where(NbaGame.nba_game_id.like("dev-%")))
+        .scalars()
+        .all()
+    )
+    dev_team = db_session.execute(select(Team).where(Team.yahoo_team_key == DEV_TEAM_KEY)).scalar_one()
+    other_team = db_session.execute(
+        select(Team).where(Team.yahoo_team_key == DEV_OTHER_TEAM_KEY)
+    ).scalar_one()
+    dev_keys_before = {
+        slot.yahoo_player_key
+        for slot in db_session.execute(
+            select(RosterSlot).where(RosterSlot.team_id == dev_team.id)
+        )
+        .scalars()
+        .all()
+    }
+    rival_keys_before = {
+        slot.yahoo_player_key
+        for slot in db_session.execute(
+            select(RosterSlot).where(RosterSlot.team_id == other_team.id)
+        )
+        .scalars()
+        .all()
+    }
+    one_game_before = db_session.execute(
+        select(NbaGame).where(NbaGame.nba_game_id == games_before[0].nba_game_id)
+    ).scalar_one()
+    game_date_before = one_game_before.game_date
+
+    client.post("/api/auth/dev-login")
+    db_session.expire_all()
+
+    teams_after = (
+        db_session.execute(select(NbaTeam).where(NbaTeam.nba_team_id.in_(_DEV_NBA_TEAM_IDS)))
+        .scalars()
+        .all()
+    )
+    games_after = (
+        db_session.execute(select(NbaGame).where(NbaGame.nba_game_id.like("dev-%")))
+        .scalars()
+        .all()
+    )
+    dev_keys_after = {
+        slot.yahoo_player_key
+        for slot in db_session.execute(
+            select(RosterSlot).where(RosterSlot.team_id == dev_team.id)
+        )
+        .scalars()
+        .all()
+    }
+    rival_keys_after = {
+        slot.yahoo_player_key
+        for slot in db_session.execute(
+            select(RosterSlot).where(RosterSlot.team_id == other_team.id)
+        )
+        .scalars()
+        .all()
+    }
+
+    assert len(teams_after) == len(teams_before)
+    assert len(games_after) == len(games_before)
+    assert dev_keys_after == dev_keys_before
+    assert rival_keys_after == rival_keys_before
+    # no drift: the same game's date wasn't perturbed by the rerun
+    assert one_game_before.game_date == game_date_before
+
+
+# --- POST /api/auth/dev-login: real concurrency (regression guard) ---
+#
+# The bug this whole task fixes: the seed's get-or-create helpers used to be
+# plain SELECT-then-INSERT-if-missing, so two dev-logins racing on SEPARATE
+# transactions could both pass the SELECT before either INSERT landed, and the
+# loser died on a unique-constraint IntegrityError (live-observed in the T8
+# e2e run and in a backend-suite run overlapping a second process -- see
+# progress.md's "ENV INCIDENT" and dev-login bug entries). This suite's normal
+# db_session fixture can't reproduce that: it's ONE connection wrapped in ONE
+# outer transaction that always rolls back, so there is no second transaction
+# to race against. This test deliberately does NOT use db_session -- it builds
+# the app with the real get_session dependency (no override), so each of the
+# two racing HTTP calls gets its own pooled connection and really commits,
+# same as two real concurrent dev-login requests would in production.
+#
+# Because it commits for real (the only test in this file that does), it
+# cleans up everything it writes in a finally block, scoped strictly to the
+# DEV_* natural keys -- never a table-wide delete. NbaTeam rows ARE deleted
+# too (scoped to _DEV_NBA_TEAM_IDS, the seed's own 30 real NBA.com team ids):
+# the seed grew from a handful of dev-only teams to the full 30-team league so
+# the demo schedule/weekly-projection math has real data, and those rows are
+# cheap, regenerable seed data the next sync_schedule run recreates -- leaving
+# them behind leaked into other suites' global-row-count assertions (see
+# test_nba_schedule.py/test_player_stats.py).
+
+
+def _cleanup_dev_seed(session) -> None:
+    # PlayerIdMap.nba_player_id is ON DELETE SET NULL (not CASCADE), so it
+    # must be deleted explicitly before/independent of the NbaPlayer rows --
+    # everything else below cascades (League -> Team/Standing/RosterSlot,
+    # NbaPlayer -> PlayerSeasonAverage/PlayerProjection, User -> YahooToken/
+    # YahooApiCache), so those single deletes are enough.
+    session.execute(
+        delete(PlayerIdMap).where(PlayerIdMap.yahoo_player_key.like(f"{DEV_LEAGUE_KEY}.p.%"))
+    )
+    session.execute(delete(NbaPlayer).where(NbaPlayer.nba_person_id.in_(_ALL_DEV_PERSON_IDS)))
+    session.execute(delete(League).where(League.yahoo_league_key == DEV_LEAGUE_KEY))
+    session.execute(delete(User).where(User.yahoo_guid == DEV_USER_GUID))
+    session.execute(delete(NbaGame).where(NbaGame.nba_game_id.like("dev-%")))
+    # NbaTeam rows the seed's own sync_schedule call upserts -- scoped to the
+    # seed's own 30 real NBA.com team ids, never a table-wide `delete from
+    # nba_teams` that could destroy a real warehouse sync's data
+    session.execute(delete(NbaTeam).where(NbaTeam.nba_team_id.in_(_DEV_NBA_TEAM_IDS)))
+
+
+def test_concurrent_dev_logins_on_separate_connections_do_not_race(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv("DEV_AUTH_ENABLED", "true")
+    get_settings.cache_clear()
+
+    engine = get_engine()
+    session_factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+
+    # refuse to run the destructive commit+cleanup path against a database
+    # that already has a real DEVUSER row (a live local dev-login/e2e session
+    # in progress) -- this test must only ever touch data it created itself
+    probe = session_factory()
+    try:
+        pre_existing = probe.execute(
+            select(User).where(User.yahoo_guid == DEV_USER_GUID)
+        ).scalar_one_or_none()
+    finally:
+        probe.close()
+    if pre_existing is not None:
+        pytest.skip(
+            "a DEVUSER row already exists in this database (a real dev-login/e2e "
+            "session appears to be in progress) -- refusing to run the destructive "
+            "concurrency probe against shared data"
+        )
+
+    app = FastAPI()
+    app.include_router(router)
+    # deliberately NOT overriding get_session: each request must get its own
+    # real pooled connection and commit for itself, or this test proves nothing
+    clients = [_client(app), _client(app)]
+
+    # forces both requests to start within the same instant rather than
+    # trusting thread-scheduling luck to overlap them
+    barrier = threading.Barrier(2)
+    results: list[httpx.Response | None] = [None, None]
+    errors: list[BaseException | None] = [None, None]
+
+    def _run(i: int) -> None:
+        barrier.wait()
+        try:
+            results[i] = clients[i].post("/api/auth/dev-login")
+        except BaseException as exc:  # capture on the thread so the main thread can assert on it
+            errors[i] = exc
+
+    threads = [threading.Thread(target=_run, args=(i,)) for i in range(2)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    try:
+        # neither racer may have died with an IntegrityError (the exact bug) --
+        # both real dev-login requests must succeed
+        assert errors == [None, None], errors
+        assert results[0] is not None and results[0].status_code == 204
+        assert results[1] is not None and results[1].status_code == 204
+
+        # verify via a THIRD, fresh connection -- neither racer's own session
+        # (whose identity map/expiry state reflects only its own view)
+        verify = session_factory()
+        try:
+            assert (
+                len(verify.execute(select(User).where(User.yahoo_guid == DEV_USER_GUID)).scalars().all())
+                == 1
+            )
+            league = verify.execute(
+                select(League).where(League.yahoo_league_key == DEV_LEAGUE_KEY)
+            ).scalar_one()
+            teams = verify.execute(select(Team).where(Team.league_id == league.id)).scalars().all()
+            assert len(teams) == 2
+            standings = verify.execute(
+                select(Standing).where(Standing.league_id == league.id)
+            ).scalars().all()
+            assert len(standings) == 2
+            assert (
+                len(
+                    verify.execute(
+                        select(NbaPlayer).where(NbaPlayer.nba_person_id.in_(_ALL_DEV_PERSON_IDS))
+                    )
+                    .scalars()
+                    .all()
+                )
+                == len(_ALL_DEV_PERSON_IDS)
+            )
+            assert (
+                len(
+                    verify.execute(
+                        select(PlayerIdMap).where(
+                            PlayerIdMap.yahoo_player_key.like(f"{DEV_LEAGUE_KEY}.p.%")
+                        )
+                    )
+                    .scalars()
+                    .all()
+                )
+                == len(_ALL_DEV_PERSON_IDS)
+            )
+            expected_roster_slots = (
+                len(_DEV_PLAYERS) + len(_DEV_USER_EXTRA_ROSTER_IDS) + len(_DEV_RIVAL_ROSTER_IDS)
+            )
+            assert (
+                len(
+                    verify.execute(
+                        select(RosterSlot).where(RosterSlot.team_id.in_([t.id for t in teams]))
+                    )
+                    .scalars()
+                    .all()
+                )
+                == expected_roster_slots
+            )
+            games = verify.execute(
+                select(NbaGame).where(NbaGame.nba_game_id.like("dev-%"))
+            ).scalars().all()
+            assert len(games) == len(_DEV_GAMES)
+        finally:
+            verify.close()
+    finally:
+        # this test is the only one in the suite that commits for real, so it
+        # must clean up everything it wrote itself, scoped to the DEV_*
+        # natural keys (never a blind/table-wide delete)
+        cleanup = session_factory()
+        try:
+            _cleanup_dev_seed(cleanup)
+            cleanup.commit()
+        finally:
+            cleanup.close()

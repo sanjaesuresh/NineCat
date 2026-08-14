@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from datetime import date, datetime
 
 
 class YahooParseError(ValueError):
@@ -108,6 +109,11 @@ class MatchupTeam:
 class Matchup:
     week: int
     teams: list[MatchupTeam]
+    # yahoo's week_start/week_end (Task 2, matchup monitor): absent from our
+    # current fixtures and not guaranteed on every response, so both default to
+    # None -- callers (week resolution) fall back to a derived range when unset
+    week_start: date | None = None
+    week_end: date | None = None
 
 
 @dataclass(frozen=True)
@@ -146,6 +152,21 @@ def _get_optional_int(value, path: str) -> int | None:
     if normalized == "" or normalized == "-1":
         return None
     return _get_int(normalized, path)
+
+
+def _optional_date(value, path: str) -> date | None:
+    # week_start/week_end are absent from our fixtures and not guaranteed on
+    # every yahoo response, so a missing key AND a malformed value both
+    # degrade to None here -- unlike _get_optional_int's sentinel handling,
+    # there's no well-known "unset" string for a date, and this is UI-honesty
+    # metadata rather than something worth hard-failing a whole scoreboard
+    # parse over
+    if value is None:
+        return None
+    try:
+        return datetime.strptime(str(value), "%Y-%m-%d").date()
+    except ValueError:
+        return None
 
 
 def _collection_items(d, path: str) -> list:
@@ -455,6 +476,11 @@ def parse_scoreboard(raw: dict) -> list[Matchup]:
         matchup_path = f"fantasy_content.league.scoreboard.matchups[{i}]"
         matchup = _get(matchup_wrap, "matchup", matchup_path)
         week = _get_int(_get(matchup, "week", f"{matchup_path}.matchup"), f"{matchup_path}.matchup.week")
+        # week_start/week_end are optional siblings of "week" on the matchup
+        # dict itself (not under the "0" wrapper with teams); .get, not _get,
+        # since their absence is the normal path today, not a parse error
+        week_start = _optional_date(matchup.get("week_start"), f"{matchup_path}.matchup.week_start")
+        week_end = _optional_date(matchup.get("week_end"), f"{matchup_path}.matchup.week_end")
         # the teams collection nests under matchup's own "0" key alongside the
         # "week" sibling in the realistic shape, but some responses give it flat
         teams_body = _unwrap(matchup, f"{matchup_path}.matchup")
@@ -489,7 +515,9 @@ def parse_scoreboard(raw: dict) -> list[Matchup]:
                 )
             )
 
-        matchups.append(Matchup(week=week, teams=matchup_teams))
+        matchups.append(
+            Matchup(week=week, teams=matchup_teams, week_start=week_start, week_end=week_end)
+        )
 
     return matchups
 

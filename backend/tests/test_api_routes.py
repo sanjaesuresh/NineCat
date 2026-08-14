@@ -1,6 +1,6 @@
 import math
 from collections import Counter
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from http.cookies import SimpleCookie
 
 import pytest
@@ -22,6 +22,7 @@ from ninecat.engine import CATEGORIES
 from ninecat.models import (
     League,
     NbaPlayer,
+    NbaTeam,
     PlayerIdMap,
     PlayerProjection,
     PlayerSeasonAverage,
@@ -31,6 +32,7 @@ from ninecat.models import (
     User,
     YahooToken,
 )
+from ninecat.warehouse.nba_schedule import sync_schedule
 from ninecat.yahoo.gateway import YahooAuthError, YahooUnavailableError
 from ninecat.yahoo.parsers import (
     CategoryInfo,
@@ -1465,3 +1467,1117 @@ def test_draft_recommend_rejects_unknown_player_keys(db_session):
     detail = response.json()["detail"]
     assert "999999" in detail
     assert "not-a-number" in detail
+
+
+# --- GET /api/leagues/{id}/matchup ---
+
+# fantasy week 5 under Settings.fantasy_season_start (2025-10-20, a Monday) --
+# hand-verified equal to warehouse.fantasy_weeks.derive_week_range(5), so the
+# derived-dates test and the explicit-yahoo-dates test share these exact
+# literals rather than risking two independently-computed date sets drifting
+MATCHUP_WEEK = 5
+MATCHUP_WEEK_START = date(2025, 11, 17)
+MATCHUP_WEEK_END = date(2025, 11, 23)
+
+# 3 real NBA teams per side so games_in_range has something to count;
+# distinct abbreviations from the LEAGUE_KEY/TEAM_KEY fixtures used elsewhere
+# in this file, but real nba.com team ids (sync_schedule upserts NbaTeam by
+# that id, so a made-up id would silently create a bogus team row)
+_MATCHUP_NBA_TEAM_IDS = {
+    "BOS": 1610612738,
+    "LAL": 1610612747,
+    "DAL": 1610612742,
+    "MIA": 1610612748,
+    "DEN": 1610612743,
+    "OKC": 1610612760,
+}
+# (day offset from base_date, home abbr, away abbr) -- gives every team 2-3
+# games in a 7-day window so per-side totals differ meaningfully
+_MATCHUP_GAMES = [
+    (0, "BOS", "LAL"), (1, "DAL", "MIA"), (2, "BOS", "DEN"),
+    (3, "LAL", "OKC"), (4, "DAL", "BOS"), (5, "MIA", "DEN"), (6, "OKC", "LAL"),
+]  # fmt: skip
+
+
+def _matchup_schedule_fetcher(base_date: date):
+    def _fetch(season: str) -> list[dict]:
+        rows = []
+        for day_offset, home, away in _MATCHUP_GAMES:
+            game_date = base_date + timedelta(days=day_offset)
+            rows.append(
+                {
+                    "game_id": f"matchup-test-{game_date.isoformat()}-{home}-{away}",
+                    "game_date": game_date.isoformat(),
+                    "home_team_id": _MATCHUP_NBA_TEAM_IDS[home],
+                    "home_team_name": home,
+                    "home_team_abbreviation": home,
+                    "away_team_id": _MATCHUP_NBA_TEAM_IDS[away],
+                    "away_team_name": away,
+                    "away_team_abbreviation": away,
+                }
+            )
+        return rows
+
+    return _fetch
+
+
+def _seed_matchup_schedule(db_session, *, base_date: date = MATCHUP_WEEK_START) -> dict[str, int]:
+    """Upserts NbaTeam/NbaGame rows via the real sync_schedule path (idempotent
+    on re-run, unlike a raw NbaTeam(...) insert, which matters since other
+    tests/agents may upsert the same real team ids concurrently) and returns
+    abbreviation -> internal NbaTeam.id, the FK NbaPlayer.nba_team_id needs.
+    `base_date` != MATCHUP_WEEK_START lets a test put real games outside the
+    matchup week -- the "schedule not synced for this week yet" shape.
+    """
+    sync_schedule(
+        db_session, season=get_settings().current_season, fetcher=_matchup_schedule_fetcher(base_date)
+    )
+    db_session.flush()
+    teams = (
+        db_session.execute(
+            select(NbaTeam).where(NbaTeam.nba_team_id.in_(_MATCHUP_NBA_TEAM_IDS.values()))
+        )
+        .scalars()
+        .all()
+    )
+    nba_id_to_abbr = {v: k for k, v in _MATCHUP_NBA_TEAM_IDS.items()}
+    return {nba_id_to_abbr[t.nba_team_id]: t.id for t in teams}
+
+
+def _seed_matchup_player(
+    db_session,
+    person_id: int,
+    name: str,
+    position: str,
+    team_abbr: str,
+    team_internal_id_by_abbr: dict[str, int],
+    roster_team: Team,
+    **stats,
+) -> None:
+    """An NbaPlayer with a season average, PlayerIdMap, and RosterSlot on
+    `roster_team` -- the full chain _team_side walks to build a
+    WeeklyPlayerRate. team_internal_id_by_abbr empty (no schedule seeded)
+    leaves nba_team_id None, exercising the "can't resolve a team" path.
+    """
+    player = NbaPlayer(
+        nba_person_id=person_id,
+        full_name=name,
+        position=position,
+        nba_team_id=team_internal_id_by_abbr.get(team_abbr),
+    )
+    db_session.add(player)
+    db_session.flush()
+    db_session.add(
+        PlayerSeasonAverage(
+            nba_player_id=player.id, season=get_settings().current_season, games_played=70, **stats
+        )
+    )
+    player_key = f"{LEAGUE_KEY}.p.{person_id}"
+    db_session.add(
+        PlayerIdMap(
+            nba_player_id=player.id, yahoo_player_key=player_key, yahoo_name=name, match_method="exact"
+        )
+    )
+    db_session.add(
+        RosterSlot(
+            team_id=roster_team.id,
+            yahoo_player_key=player_key,
+            player_name=name,
+            position=position,
+            injury_status=None,
+        )
+    )
+    db_session.flush()
+
+
+def _seed_full_matchup(
+    db_session,
+    user,
+    *,
+    with_schedule: bool = True,
+    week_start: date | None = None,
+    week_end: date | None = None,
+):
+    """A league with a guard-heavy "mine" roster and a big-heavy "rival"
+    roster (deliberately different category shapes, per the plan's mandatory
+    fan-plausibility test), each with a real NBA team assigned so the
+    schedule wires through end to end. Returns (league, team, rival, stub).
+    """
+    league, team, rival = _seed_league_with_team(db_session, user)
+    league.settings_json = {"max_weekly_adds": 3}
+    db_session.flush()
+
+    team_internal_id_by_abbr = _seed_matchup_schedule(db_session) if with_schedule else {}
+
+    _seed_matchup_player(
+        db_session, 910101, "Guard A", "PG", "BOS", team_internal_id_by_abbr, team,
+        fgm=8.0, fga=17.0, ftm=4.0, fta=5.0, tpm=3.0, pts=23.0, reb=4.0, ast=8.0, stl=1.2, blk=0.2, tov=2.5,
+    )
+    _seed_matchup_player(
+        db_session, 910102, "Guard B", "SG", "LAL", team_internal_id_by_abbr, team,
+        fgm=7.0, fga=15.0, ftm=3.0, fta=4.0, tpm=2.5, pts=19.5, reb=3.0, ast=6.0, stl=1.0, blk=0.1, tov=2.0,
+    )
+    _seed_matchup_player(
+        db_session, 910103, "Guard C", "PG", "DAL", team_internal_id_by_abbr, team,
+        fgm=6.0, fga=13.0, ftm=3.0, fta=3.5, tpm=2.0, pts=17.0, reb=3.5, ast=5.0, stl=0.9, blk=0.2, tov=1.8,
+    )
+    _seed_matchup_player(
+        db_session, 910201, "Big A", "C", "MIA", team_internal_id_by_abbr, rival,
+        fgm=8.0, fga=13.0, ftm=3.0, fta=5.0, tpm=0.0, pts=19.0, reb=12.0, ast=1.5, stl=0.6, blk=2.2, tov=1.8,
+    )
+    _seed_matchup_player(
+        db_session, 910202, "Big B", "C", "DEN", team_internal_id_by_abbr, rival,
+        fgm=7.0, fga=11.0, ftm=2.5, fta=4.0, tpm=0.0, pts=16.5, reb=10.5, ast=1.2, stl=0.5, blk=1.8, tov=1.5,
+    )
+    _seed_matchup_player(
+        db_session, 910203, "Big C", "PF", "OKC", team_internal_id_by_abbr, rival,
+        fgm=6.5, fga=10.0, ftm=2.0, fta=3.5, tpm=0.0, pts=15.0, reb=9.5, ast=1.0, stl=0.4, blk=1.5, tov=1.3,
+    )  # fmt: skip
+
+    stub = _StubYahooClient(
+        scoreboard_by_league={
+            LEAGUE_KEY: [
+                Matchup(
+                    week=MATCHUP_WEEK,
+                    teams=[
+                        MatchupTeam(team_key=TEAM_KEY, name="My Team", category_totals={}),
+                        MatchupTeam(team_key=RIVAL_TEAM_KEY, name="Rival", category_totals={}),
+                    ],
+                    week_start=week_start,
+                    week_end=week_end,
+                )
+            ]
+        }
+    )
+    return league, team, rival, stub
+
+
+def test_matchup_404_for_foreign_league(db_session):
+    user = _seed_user(db_session, guid="guid-a", name="A")
+    other = _seed_user(db_session, guid="guid-b", name="B")
+    league, _team, _rival = _seed_league_with_team(db_session, other)
+
+    client = _authed_client(db_session, user)
+    response = client.get(f"/api/leagues/{league.id}/matchup")
+
+    assert response.status_code == 404
+
+
+def test_matchup_projects_both_sides_and_compares(db_session):
+    user = _seed_user(db_session)
+    league, _team, _rival, stub = _seed_full_matchup(
+        db_session, user, week_start=MATCHUP_WEEK_START, week_end=MATCHUP_WEEK_END
+    )
+    client = _authed_client(db_session, user, stub)
+
+    response = client.get(
+        f"/api/leagues/{league.id}/matchup", params={"as_of": MATCHUP_WEEK_START.isoformat()}
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert set(body.keys()) == {
+        "week", "week_range", "as_of", "mine", "opponent", "opponent_reason",
+        "comparison", "schedule_coverage", "streaming", "stale", "synced_at",
+    }  # fmt: skip
+    assert body["week"] == MATCHUP_WEEK
+    assert body["week_range"] == {
+        "start_date": MATCHUP_WEEK_START.isoformat(),
+        "end_date": MATCHUP_WEEK_END.isoformat(),
+        "is_derived": False,
+    }
+    assert body["opponent"] is not None
+    assert body["opponent_reason"] is None
+    assert body["mine"]["projection"]["games"] > 0
+    assert body["opponent"]["projection"]["games"] > 0
+    assert body["schedule_coverage"] == {
+        "mine_games": body["mine"]["projection"]["games"],
+        "opponent_games": body["opponent"]["projection"]["games"],
+        "ok": True,
+    }
+
+    comparison = body["comparison"]
+    assert comparison is not None
+    mine_wins, their_wins = comparison["projected_score"]
+    assert mine_wins + their_wins <= 9
+    assert {cv["category"] for cv in comparison["categories"]} == NINE_CATEGORIES
+
+    # no free agents seeded (the only draftable players are the 6 rostered
+    # ones, all excluded) -- proves the streaming wiring runs end to end and
+    # degrades gracefully rather than erroring on an empty candidate pool.
+    # as_of falls inside the week -> "remaining days" basis, live-week behavior
+    assert body["streaming"] == {
+        "slots": [], "adds_used": 0, "adds_reserved": 0, "notes": ["no_candidates"],
+        "window_basis": "remaining",
+    }  # fmt: skip
+
+
+def test_matchup_streaming_full_week_when_as_of_after_week_end(db_session):
+    """The demo-blocking case: as_of (defaults to the real wall clock) can
+    land AFTER a fixed/seeded week's end, not just before its start. The
+    window must clamp INTO the week (plan the whole thing) rather than
+    produce an empty invalid_window -- and a real free agent in a genuinely
+    close category must still produce a non-empty plan end to end (the
+    concrete non-empty case, distinct from the no-candidates empty path
+    covered elsewhere)."""
+    user = _seed_user(db_session)
+    league, team, rival = _seed_league_with_team(db_session, user)
+    league.settings_json = {"max_weekly_adds": 3}
+    db_session.flush()
+
+    team_internal_id_by_abbr = _seed_matchup_schedule(db_session)
+
+    # identical stat lines, identical games (BOS and LAL both have 3 games in
+    # _MATCHUP_GAMES) -> every non-zero category is an EXACT tie, which
+    # compare_matchup still counts as "close" (a dead-level, flippable
+    # category, distinct from the 0-0 missing-data case) -- guarantees
+    # close_categories is the full 9, so any positive-value free agent scores
+    tied_stats = dict(
+        fgm=7.0, fga=15.0, ftm=3.0, fta=4.0, tpm=2.0, pts=19.0,
+        reb=5.0, ast=4.0, stl=1.0, blk=0.5, tov=2.0,
+    )  # fmt: skip
+    _seed_matchup_player(db_session, 910401, "Mine One", "PG", "BOS", team_internal_id_by_abbr, team, **tied_stats)
+    _seed_matchup_player(db_session, 910402, "Rival One", "PG", "LAL", team_internal_id_by_abbr, rival, **tied_stats)
+
+    # a free agent -- not rostered on either team -- with games in the week
+    # and all-around positive stats (low tov relative to everything else, so
+    # its net signed value is clearly positive)
+    fa = NbaPlayer(
+        nba_person_id=910403, full_name="Free Agent One", position="SF",
+        nba_team_id=team_internal_id_by_abbr["DAL"],
+    )  # fmt: skip
+    db_session.add(fa)
+    db_session.flush()
+    db_session.add(
+        PlayerSeasonAverage(
+            nba_player_id=fa.id, season=get_settings().current_season, games_played=70,
+            fgm=6.0, fga=12.0, ftm=2.0, fta=2.5, tpm=1.5, pts=15.5,
+            reb=6.0, ast=3.0, stl=1.0, blk=0.5, tov=1.5,
+        )
+    )  # fmt: skip
+    db_session.flush()
+
+    stub = _StubYahooClient(
+        scoreboard_by_league={
+            LEAGUE_KEY: [
+                Matchup(
+                    week=MATCHUP_WEEK,
+                    teams=[
+                        MatchupTeam(team_key=TEAM_KEY, name="My Team", category_totals={}),
+                        MatchupTeam(team_key=RIVAL_TEAM_KEY, name="Rival", category_totals={}),
+                    ],
+                    week_start=MATCHUP_WEEK_START,
+                    week_end=MATCHUP_WEEK_END,
+                )
+            ]
+        }
+    )
+    client = _authed_client(db_session, user, stub)
+
+    # as_of is well after MATCHUP_WEEK_END (2025-11-23) -- the week is
+    # entirely in the past relative to this "now"
+    response = client.get(
+        f"/api/leagues/{league.id}/matchup", params={"as_of": "2026-01-01"}
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    streaming = body["streaming"]
+    assert streaming is not None
+    assert streaming["window_basis"] == "full_week"
+    assert streaming["slots"], "expected a non-empty plan for a genuinely close matchup with a viable free agent"
+    assert streaming["slots"][0]["player_key"] == str(fa.id)
+    # the plan covers the FULL week, not "remaining days from as_of" (which
+    # would be empty/invalid since as_of is after week_end)
+    assert date.fromisoformat(streaming["slots"][0]["day"]) >= MATCHUP_WEEK_START
+    # regression guard: a streaming slot used to carry only player_key, which
+    # rendered as "Player #<id>" on the page -- must carry the same display
+    # fields the draft board/adds endpoint emit
+    assert streaming["slots"][0]["name"] == "Free Agent One"
+    assert streaming["slots"][0]["position"] == "SF"
+    assert streaming["slots"][0]["nba_person_id"] == 910403
+    assert streaming["slots"][0]["headshot_url"] == (
+        "https://cdn.nba.com/headshots/nba/latest/1040x760/910403.png"
+    )
+
+
+def test_matchup_missing_schedule_flags_zero_games(db_session):
+    user = _seed_user(db_session)
+    league, _team, _rival, stub = _seed_full_matchup(
+        db_session, user, with_schedule=False, week_start=MATCHUP_WEEK_START, week_end=MATCHUP_WEEK_END
+    )
+    client = _authed_client(db_session, user, stub)
+
+    response = client.get(f"/api/leagues/{league.id}/matchup")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["mine"]["projection"]["games"] == 0.0
+    assert body["opponent"]["projection"]["games"] == 0.0
+    assert body["schedule_coverage"] == {"mine_games": 0.0, "opponent_games": 0.0, "ok": False}
+    # zero games -> every counting total is zero -- the guard flag above is
+    # what tells the UI not to present this 0-0 comparison as real
+    for cv in body["comparison"]["categories"]:
+        assert cv["mine"] == 0.0
+        assert cv["theirs"] == 0.0
+
+
+def test_matchup_schedule_outside_week_range_also_flags_zero_games(db_session):
+    """Distinct from the no-team-mapping case above: NbaTeam/NbaGame rows
+    exist (player -> team resolves fine) but none of the synced games fall
+    inside this specific matchup week -- the realistic "schedule sync is
+    stale for this week" shape the guard exists to catch."""
+    user = _seed_user(db_session)
+    league, team, rival = _seed_league_with_team(db_session, user)
+    team_internal_id_by_abbr = _seed_matchup_schedule(db_session, base_date=date(2026, 3, 2))
+    _seed_matchup_player(
+        db_session, 910301, "Guard A", "PG", "BOS", team_internal_id_by_abbr, team,
+        fgm=8.0, fga=17.0, ftm=4.0, fta=5.0, tpm=3.0, pts=23.0, reb=4.0, ast=8.0, stl=1.2, blk=0.2, tov=2.5,
+    )
+    _seed_matchup_player(
+        db_session, 910302, "Big A", "C", "MIA", team_internal_id_by_abbr, rival,
+        fgm=8.0, fga=13.0, ftm=3.0, fta=5.0, tpm=0.0, pts=19.0, reb=12.0, ast=1.5, stl=0.6, blk=2.2, tov=1.8,
+    )  # fmt: skip
+    stub = _StubYahooClient(
+        scoreboard_by_league={
+            LEAGUE_KEY: [
+                Matchup(
+                    week=MATCHUP_WEEK,
+                    teams=[
+                        MatchupTeam(team_key=TEAM_KEY, name="My Team", category_totals={}),
+                        MatchupTeam(team_key=RIVAL_TEAM_KEY, name="Rival", category_totals={}),
+                    ],
+                    week_start=MATCHUP_WEEK_START,
+                    week_end=MATCHUP_WEEK_END,
+                )
+            ]
+        }
+    )
+    client = _authed_client(db_session, user, stub)
+
+    response = client.get(f"/api/leagues/{league.id}/matchup")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["schedule_coverage"]["ok"] is False
+    assert body["mine"]["projection"]["games"] == 0.0
+
+
+def test_matchup_derived_dates_flag_true_without_yahoo_week_dates(db_session):
+    user = _seed_user(db_session)
+    league, _team, _rival, stub = _seed_full_matchup(db_session, user)  # week_start/end default None
+    client = _authed_client(db_session, user, stub)
+
+    response = client.get(f"/api/leagues/{league.id}/matchup")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["week_range"] == {
+        "start_date": MATCHUP_WEEK_START.isoformat(),
+        "end_date": MATCHUP_WEEK_END.isoformat(),
+        "is_derived": True,
+    }
+
+
+def test_matchup_no_opponent_when_matchup_has_only_my_team(db_session):
+    user = _seed_user(db_session)
+    league, _team, _rival, _stub = _seed_full_matchup(
+        db_session, user, week_start=MATCHUP_WEEK_START, week_end=MATCHUP_WEEK_END
+    )
+    stub = _StubYahooClient(
+        scoreboard_by_league={
+            LEAGUE_KEY: [
+                Matchup(
+                    week=MATCHUP_WEEK,
+                    teams=[MatchupTeam(team_key=TEAM_KEY, name="My Team", category_totals={})],
+                    week_start=MATCHUP_WEEK_START,
+                    week_end=MATCHUP_WEEK_END,
+                )
+            ]
+        }
+    )
+    client = _authed_client(db_session, user, stub)
+
+    response = client.get(f"/api/leagues/{league.id}/matchup")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["opponent"] is None
+    assert body["opponent_reason"] == "no_opponent_in_matchup"
+    assert body["comparison"] is None
+    assert body["streaming"] is None
+    # my own side still projects fine -- a missing opponent must never
+    # degrade my own roster's numbers
+    assert body["mine"]["projection"]["games"] > 0
+
+
+def test_matchup_no_opponent_when_scoreboard_unavailable(db_session):
+    user = _seed_user(db_session)
+    league, _team, _rival, _stub = _seed_full_matchup(
+        db_session, user, week_start=MATCHUP_WEEK_START, week_end=MATCHUP_WEEK_END
+    )
+    stub = _StubYahooClient(raise_on_scoreboard=YahooUnavailableError(stale_payload=None, synced_at=None))
+    client = _authed_client(db_session, user, stub)
+
+    response = client.get(f"/api/leagues/{league.id}/matchup", params={"week": MATCHUP_WEEK})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["opponent"] is None
+    assert body["opponent_reason"] == "yahoo_unavailable"
+    # ?week= was explicit, so the response still projects that week even
+    # though the live scoreboard couldn't be reached for opponent/date info
+    assert body["week"] == MATCHUP_WEEK
+    assert body["week_range"]["is_derived"] is True
+
+
+def test_matchup_percentages_match_components_not_double_divided(db_session):
+    user = _seed_user(db_session)
+    league, _team, _rival, stub = _seed_full_matchup(
+        db_session, user, week_start=MATCHUP_WEEK_START, week_end=MATCHUP_WEEK_END
+    )
+    client = _authed_client(db_session, user, stub)
+
+    response = client.get(f"/api/leagues/{league.id}/matchup")
+    body = response.json()
+
+    for side in ("mine", "opponent"):
+        totals = body[side]["projection"]["totals"]
+        components = body[side]["projection"]["components"]
+        expected_fg_pct = components["fgm"] / components["fga"] if components["fga"] else 0.0
+        expected_ft_pct = components["ftm"] / components["fta"] if components["fta"] else 0.0
+        assert totals["fg_pct"] == pytest.approx(expected_fg_pct, abs=0.01)
+        assert totals["ft_pct"] == pytest.approx(expected_ft_pct, abs=0.01)
+
+
+def test_matchup_fan_plausibility_guards_beat_bigs_in_ast_and_tpm(db_session):
+    """Mandatory per the plan: proves the whole roster -> schedule -> rate ->
+    projection pipeline is wired correctly, not just internally consistent
+    arithmetic. A guard-heavy roster must out-project a big-heavy one in
+    assists/3PM, and the reverse for rebounds/blocks."""
+    user = _seed_user(db_session)
+    league, _team, _rival, stub = _seed_full_matchup(
+        db_session, user, week_start=MATCHUP_WEEK_START, week_end=MATCHUP_WEEK_END
+    )
+    client = _authed_client(db_session, user, stub)
+
+    response = client.get(f"/api/leagues/{league.id}/matchup")
+    body = response.json()
+
+    mine = body["mine"]["projection"]["totals"]
+    theirs = body["opponent"]["projection"]["totals"]
+
+    assert mine["ast"] > theirs["ast"]
+    assert mine["tpm"] > theirs["tpm"]
+    assert theirs["reb"] > mine["reb"]
+    assert theirs["blk"] > mine["blk"]
+
+
+# --- GET /api/leagues/{league_id}/adds ---
+
+
+def test_adds_404_for_foreign_league(db_session):
+    user = _seed_user(db_session, guid="guid-a", name="A")
+    other = _seed_user(db_session, guid="guid-b", name="B")
+    league, _team, _rival = _seed_league_with_team(db_session, other)
+
+    client = _authed_client(db_session, user)
+    response = client.get(f"/api/leagues/{league.id}/adds")
+
+    assert response.status_code == 404
+
+
+def test_adds_shape_no_free_agents(db_session):
+    user = _seed_user(db_session)
+    league, _team, _rival, stub = _seed_full_matchup(
+        db_session, user, week_start=MATCHUP_WEEK_START, week_end=MATCHUP_WEEK_END
+    )
+    client = _authed_client(db_session, user, stub)
+
+    response = client.get(
+        f"/api/leagues/{league.id}/adds", params={"as_of": MATCHUP_WEEK_START.isoformat()}
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert set(body.keys()) == {
+        "week", "week_range", "as_of", "window_basis", "close_categories",
+        "opponent_reason", "candidates", "schedule_coverage", "stale", "synced_at",
+    }  # fmt: skip
+    assert body["week"] == MATCHUP_WEEK
+    assert body["week_range"] == {
+        "start_date": MATCHUP_WEEK_START.isoformat(),
+        "end_date": MATCHUP_WEEK_END.isoformat(),
+        "is_derived": False,
+    }
+    assert body["opponent_reason"] is None
+    assert set(body["close_categories"]) <= NINE_CATEGORIES
+    assert body["window_basis"] == "remaining"
+    assert body["schedule_coverage"]["ok"] is True
+    # no free agents seeded (the only draftable players are the 6 rostered
+    # ones, all excluded) -- proves the pool-building wiring degrades to an
+    # empty list rather than erroring, mirroring the matchup endpoint's own
+    # empty-streaming-pool test
+    assert body["candidates"] == []
+
+
+def test_adds_missing_schedule_returns_empty_candidates(db_session):
+    user = _seed_user(db_session)
+    league, _team, _rival, stub = _seed_full_matchup(
+        db_session, user, with_schedule=False, week_start=MATCHUP_WEEK_START, week_end=MATCHUP_WEEK_END
+    )
+    client = _authed_client(db_session, user, stub)
+
+    response = client.get(f"/api/leagues/{league.id}/adds")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["schedule_coverage"] == {"mine_games": 0.0, "opponent_games": 0.0, "ok": False}
+    assert body["candidates"] == []
+
+
+def test_adds_no_opponent_degrades_to_need_only_ranking(db_session):
+    """No opponent identifiable -> close_categories is empty and
+    opponent_reason names why, but the list still ranks on roster need alone
+    rather than going empty (plan requirement: a degraded matchup must still
+    produce a usable list)."""
+    user = _seed_user(db_session)
+    league, team, _rival, _stub = _seed_full_matchup(
+        db_session, user, week_start=MATCHUP_WEEK_START, week_end=MATCHUP_WEEK_END
+    )
+    # a free agent that helps this guard-heavy roster's real weaknesses
+    # (reb/blk/tov) so the need-only ranking has a genuine positive-score
+    # candidate to surface
+    team_internal_id_by_abbr = _seed_matchup_schedule(db_session)
+    fa = NbaPlayer(
+        nba_person_id=961001, full_name="Need Helper", position="C",
+        nba_team_id=team_internal_id_by_abbr["DAL"],
+    )  # fmt: skip
+    db_session.add(fa)
+    db_session.flush()
+    db_session.add(
+        PlayerSeasonAverage(
+            nba_player_id=fa.id, season=get_settings().current_season, games_played=70,
+            fgm=6.0, fga=11.0, ftm=2.0, fta=3.0, tpm=0.0, pts=14.0,
+            reb=7.0, ast=1.5, stl=0.6, blk=1.5, tov=1.2,
+        )
+    )  # fmt: skip
+    db_session.flush()
+
+    stub = _StubYahooClient(
+        scoreboard_by_league={
+            LEAGUE_KEY: [
+                Matchup(
+                    week=MATCHUP_WEEK,
+                    teams=[MatchupTeam(team_key=TEAM_KEY, name="My Team", category_totals={})],
+                    week_start=MATCHUP_WEEK_START,
+                    week_end=MATCHUP_WEEK_END,
+                )
+            ]
+        }
+    )
+    client = _authed_client(db_session, user, stub)
+
+    response = client.get(
+        f"/api/leagues/{league.id}/adds", params={"as_of": MATCHUP_WEEK_START.isoformat()}
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["opponent_reason"] == "no_opponent_in_matchup"
+    assert body["close_categories"] == []
+    assert body["candidates"], "expected a need-only ranking, not an empty list, with no opponent"
+    assert body["candidates"][0]["player_key"] == str(fa.id)
+
+
+def test_adds_punt_zeroes_a_category(db_session):
+    user = _seed_user(db_session)
+    league, _team, _rival, stub = _seed_full_matchup(
+        db_session, user, week_start=MATCHUP_WEEK_START, week_end=MATCHUP_WEEK_END
+    )
+    team_internal_id_by_abbr = _seed_matchup_schedule(db_session)
+    helper = NbaPlayer(
+        nba_person_id=962001, full_name="Multi Helper", position="C",
+        nba_team_id=team_internal_id_by_abbr["DAL"],
+    )  # fmt: skip
+    db_session.add(helper)
+    db_session.flush()
+    db_session.add(
+        PlayerSeasonAverage(
+            nba_player_id=helper.id, season=get_settings().current_season, games_played=70,
+            fgm=6.0, fga=11.0, ftm=2.0, fta=3.0, tpm=0.0, pts=14.0,
+            reb=7.0, ast=1.5, stl=0.6, blk=1.5, tov=1.2,
+        )
+    )  # fmt: skip
+    db_session.flush()
+    client = _authed_client(db_session, user, stub)
+
+    no_punt = client.get(
+        f"/api/leagues/{league.id}/adds", params={"as_of": MATCHUP_WEEK_START.isoformat()}
+    )
+    punted = client.get(
+        f"/api/leagues/{league.id}/adds",
+        params={"as_of": MATCHUP_WEEK_START.isoformat(), "punt": "blk"},
+    )
+
+    assert no_punt.status_code == 200
+    assert punted.status_code == 200
+    no_punt_candidate = next(
+        c for c in no_punt.json()["candidates"] if c["player_key"] == str(helper.id)
+    )
+    punted_candidate = next(
+        c for c in punted.json()["candidates"] if c["player_key"] == str(helper.id)
+    )
+
+    assert "category:blk" in no_punt_candidate["reasons"]
+    assert "category:blk" not in punted_candidate["reasons"]
+    assert "blk" in no_punt_candidate["categories_helped"]
+    assert "blk" not in punted_candidate["categories_helped"]
+    # punting removes ONLY blk's weight -- every other category's
+    # contribution is unchanged, so the score must strictly drop, never rise
+    assert punted_candidate["score"] < no_punt_candidate["score"]
+
+
+_ADDS_STREAM_NBA_TEAM_IDS = {
+    "BOS": 1610612738, "LAL": 1610612747, "DEN": 1610612743,
+    "OKC": 1610612760, "MIA": 1610612748, "DAL": 1610612742,
+}  # fmt: skip
+# (day offset, home, away) -- DEN gets exactly 1 game in the week, MIA
+# exactly 4, everything else is unused filler to keep the fixture minimal
+_ADDS_STREAM_GAMES = [
+    (0, "BOS", "LAL"), (0, "DEN", "OKC"), (1, "MIA", "BOS"),
+    (2, "MIA", "LAL"), (4, "MIA", "DAL"), (6, "MIA", "DAL"),
+]  # fmt: skip
+
+
+def _adds_stream_schedule_fetcher(base_date: date):
+    def _fetch(season: str) -> list[dict]:
+        rows = []
+        for day_offset, home, away in _ADDS_STREAM_GAMES:
+            game_date = base_date + timedelta(days=day_offset)
+            rows.append(
+                {
+                    "game_id": f"adds-stream-{game_date.isoformat()}-{home}-{away}",
+                    "game_date": game_date.isoformat(),
+                    "home_team_id": _ADDS_STREAM_NBA_TEAM_IDS[home],
+                    "home_team_name": home,
+                    "home_team_abbreviation": home,
+                    "away_team_id": _ADDS_STREAM_NBA_TEAM_IDS[away],
+                    "away_team_name": away,
+                    "away_team_abbreviation": away,
+                }
+            )
+        return rows
+
+    return _fetch
+
+
+def _seed_adds_stream_fixture(db_session, user):
+    """League + one rostered anchor (BOS, establishes real need weights)
+    plus two free agents on a custom schedule: fa1 (DEN, exactly 1 game in
+    the window, strong per-game rates) and fa2 (MIA, exactly 4 games, weaker
+    per-game but engineered so its 4-game TOTAL dominates fa1's 1-game total
+    in every single category, tov included -- guaranteed to outrank fa1 for
+    ANY nonnegative category-weight vector, proving the schedule -> rank
+    wiring end to end rather than asserting a hand-tuned coincidence.
+    Returns (league, team, fa1, fa2, stub) with a single-team matchup (no
+    opponent, close_categories always empty -- isolates the schedule/need
+    wiring this fixture exists to prove)."""
+    league, team, _rival = _seed_league_with_team(db_session, user)
+    league.settings_json = {"max_weekly_adds": 3}
+    db_session.flush()
+
+    sync_schedule(
+        db_session, season=get_settings().current_season,
+        fetcher=_adds_stream_schedule_fetcher(MATCHUP_WEEK_START),
+    )  # fmt: skip
+    db_session.flush()
+    teams = (
+        db_session.execute(
+            select(NbaTeam).where(NbaTeam.nba_team_id.in_(_ADDS_STREAM_NBA_TEAM_IDS.values()))
+        )
+        .scalars()
+        .all()
+    )
+    nba_id_to_abbr = {v: k for k, v in _ADDS_STREAM_NBA_TEAM_IDS.items()}
+    team_internal_id_by_abbr = {nba_id_to_abbr[t.nba_team_id]: t.id for t in teams}
+
+    _seed_matchup_player(
+        db_session, 963001, "Anchor", "SF", "BOS", team_internal_id_by_abbr, team,
+        fgm=6.0, fga=13.0, ftm=2.0, fta=2.8, tpm=1.5, pts=15.5,
+        reb=5.0, ast=3.5, stl=0.9, blk=0.6, tov=1.7,
+    )  # fmt: skip
+
+    fa1 = NbaPlayer(
+        nba_person_id=963002, full_name="Better One Game", position="SG",
+        nba_team_id=team_internal_id_by_abbr["DEN"],
+    )  # fmt: skip
+    db_session.add(fa1)
+    db_session.flush()
+    db_session.add(
+        PlayerSeasonAverage(
+            nba_player_id=fa1.id, season=get_settings().current_season, games_played=70,
+            fgm=9.0, fga=16.0, ftm=5.0, fta=6.0, tpm=3.0, pts=26.0,
+            reb=7.0, ast=6.0, stl=1.5, blk=1.0, tov=2.0,
+        )
+    )  # fmt: skip
+
+    fa2 = NbaPlayer(
+        nba_person_id=963003, full_name="Weaker Four Game", position="SF",
+        nba_team_id=team_internal_id_by_abbr["MIA"],
+    )  # fmt: skip
+    db_session.add(fa2)
+    db_session.flush()
+    db_session.add(
+        PlayerSeasonAverage(
+            nba_player_id=fa2.id, season=get_settings().current_season, games_played=70,
+            fgm=3.6, fga=6.4, ftm=2.0, fta=2.4, tpm=1.2, pts=10.4,
+            reb=2.8, ast=2.4, stl=0.6, blk=0.4, tov=0.3,
+        )
+    )  # fmt: skip
+    db_session.flush()
+
+    stub = _StubYahooClient(
+        scoreboard_by_league={
+            LEAGUE_KEY: [
+                Matchup(
+                    week=MATCHUP_WEEK,
+                    teams=[MatchupTeam(team_key=TEAM_KEY, name="My Team", category_totals={})],
+                    week_start=MATCHUP_WEEK_START,
+                    week_end=MATCHUP_WEEK_END,
+                )
+            ]
+        }
+    )
+    return league, team, fa1, fa2, stub
+
+
+def test_adds_four_game_streamer_outranks_one_game_better_player(db_session):
+    user = _seed_user(db_session)
+    league, _team, fa1, fa2, stub = _seed_adds_stream_fixture(db_session, user)
+    client = _authed_client(db_session, user, stub)
+
+    response = client.get(
+        f"/api/leagues/{league.id}/adds", params={"as_of": MATCHUP_WEEK_START.isoformat()}
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["window_basis"] == "remaining"
+    player_keys = [c["player_key"] for c in body["candidates"]]
+    assert str(fa2.id) in player_keys
+    assert str(fa1.id) in player_keys
+    assert player_keys.index(str(fa2.id)) < player_keys.index(str(fa1.id)), (
+        "the 4-game streamer must outrank the 1-game better player"
+    )
+    top = body["candidates"][0]
+    assert top["player_key"] == str(fa2.id)
+    assert top["games_remaining"] == 4.0
+    assert "schedule_driven" in top["reasons"]
+
+
+def test_adds_window_basis_full_week_when_as_of_after_week_end(db_session):
+    user = _seed_user(db_session)
+    league, _team, _fa1, _fa2, stub = _seed_adds_stream_fixture(db_session, user)
+    client = _authed_client(db_session, user, stub)
+
+    response = client.get(f"/api/leagues/{league.id}/adds", params={"as_of": "2026-01-01"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["window_basis"] == "full_week"
+    assert body["candidates"], "a week entirely in the past must still produce a usable list"
+
+
+def test_adds_fan_plausibility_favors_blocks_need_over_zero_block_guard(db_session):
+    """Mandatory per the plan: a guard-heavy roster's most pressing category
+    weakness is blocks -- a strong-everywhere-but-blocks guard free agent
+    must never outrank a modest big who actually helps the real need."""
+    user = _seed_user(db_session)
+    league, _team, _rival, _stub = _seed_full_matchup(
+        db_session, user, week_start=MATCHUP_WEEK_START, week_end=MATCHUP_WEEK_END
+    )
+    team_internal_id_by_abbr = _seed_matchup_schedule(db_session)
+
+    big_add = NbaPlayer(
+        nba_person_id=964001, full_name="Big Add", position="C",
+        nba_team_id=team_internal_id_by_abbr["DAL"],
+    )  # fmt: skip
+    db_session.add(big_add)
+    db_session.flush()
+    db_session.add(
+        PlayerSeasonAverage(
+            nba_player_id=big_add.id, season=get_settings().current_season, games_played=70,
+            fgm=6.0, fga=10.0, ftm=2.0, fta=3.0, tpm=0.0, pts=14.0,
+            reb=8.0, ast=1.0, stl=0.5, blk=2.0, tov=1.4,
+        )
+    )  # fmt: skip
+
+    guard_no_d = NbaPlayer(
+        nba_person_id=964002, full_name="Guard No D", position="SG",
+        nba_team_id=team_internal_id_by_abbr["OKC"],
+    )  # fmt: skip
+    db_session.add(guard_no_d)
+    db_session.flush()
+    db_session.add(
+        PlayerSeasonAverage(
+            nba_player_id=guard_no_d.id, season=get_settings().current_season, games_played=70,
+            fgm=7.0, fga=15.0, ftm=3.0, fta=4.0, tpm=2.8, pts=20.0,
+            reb=2.5, ast=7.0, stl=1.1, blk=0.0, tov=1.0,
+        )
+    )  # fmt: skip
+    db_session.flush()
+
+    stub = _StubYahooClient(
+        scoreboard_by_league={
+            LEAGUE_KEY: [
+                Matchup(
+                    week=MATCHUP_WEEK,
+                    teams=[MatchupTeam(team_key=TEAM_KEY, name="My Team", category_totals={})],
+                    week_start=MATCHUP_WEEK_START,
+                    week_end=MATCHUP_WEEK_END,
+                )
+            ]
+        }
+    )
+    client = _authed_client(db_session, user, stub)
+
+    response = client.get(
+        f"/api/leagues/{league.id}/adds", params={"as_of": MATCHUP_WEEK_START.isoformat()}
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    candidates_by_key = {c["player_key"]: c for c in body["candidates"]}
+    assert str(big_add.id) in candidates_by_key
+    assert str(guard_no_d.id) in candidates_by_key
+    assert "blk" in candidates_by_key[str(big_add.id)]["categories_helped"]
+    assert "blk" not in candidates_by_key[str(guard_no_d.id)]["categories_helped"]
+    assert body["candidates"][0]["player_key"] == str(big_add.id), (
+        "a blocks-needy roster's top add must not be a guard who provides zero blocks"
+    )
+
+
+# --- GET /api/leagues/{league_id}/trades ---
+
+# fgm/fga/ftm/fta/pts/tov held IDENTICAL across every player in both groups
+# on purpose -- only tpm/ast/stl (guard identity) and reb/blk (big identity)
+# vary, so fg_pct/ft_pct/pts/tov stay "average" on both sides and can never
+# collide with roster_compare's collapse guard the way a fuller, more
+# "realistic" but uncontrolled stat line did in an earlier draft of this
+# fixture (verified empirically: this exact shape yields evaluated=25,
+# truncated=True, kept=25 with max_package=2 default)
+_TRADE_BASE_STATS = dict(fgm=6.0, fga=12.0, ftm=2.0, fta=2.5, pts=15.0, tov=1.5)
+_TRADE_GUARD_STATS = [
+    dict(_TRADE_BASE_STATS, tpm=2.60, ast=7.2, stl=1.35, reb=3.10, blk=0.10),
+    dict(_TRADE_BASE_STATS, tpm=2.55, ast=7.1, stl=1.33, reb=3.05, blk=0.11),
+    dict(_TRADE_BASE_STATS, tpm=2.50, ast=7.0, stl=1.30, reb=3.00, blk=0.12),
+    dict(_TRADE_BASE_STATS, tpm=2.45, ast=6.9, stl=1.28, reb=2.95, blk=0.13),
+    dict(_TRADE_BASE_STATS, tpm=2.40, ast=6.8, stl=1.25, reb=2.90, blk=0.14),
+]  # fmt: skip
+_TRADE_BIG_STATS = [
+    dict(_TRADE_BASE_STATS, tpm=0.0, ast=1.14, stl=0.43, reb=10.30, blk=2.15),
+    dict(_TRADE_BASE_STATS, tpm=0.0, ast=1.10, stl=0.42, reb=10.20, blk=2.10),
+    dict(_TRADE_BASE_STATS, tpm=0.0, ast=1.05, stl=0.41, reb=10.10, blk=2.05),
+    dict(_TRADE_BASE_STATS, tpm=0.0, ast=1.00, stl=0.40, reb=10.00, blk=2.00),
+    dict(_TRADE_BASE_STATS, tpm=0.0, ast=0.95, stl=0.39, reb=9.90, blk=1.95),
+]  # fmt: skip
+
+
+def _seed_trade_depth_rosters(db_session, user, *, user_is_guard: bool = True):
+    """5 guards (genuine ast/tpm/stl surplus, reb/blk deficit) vs 5 bigs (the
+    reverse) -- deep enough on both sides that a 1-for-1 or 2-for-2 swap
+    never collapses a strong category (roster_compare's fragility guard would
+    otherwise reject nearly every candidate on a 3-player roster, which is
+    too shallow for this fixture's purpose). fg_pct/ft_pct/pts/tov are held
+    near-identical across every player so those categories stay "average"
+    for both sides and never collide with the collapse guard. Assigns the
+    authed user's team via `user_is_guard`. Returns (league, my_team,
+    other_team, guard_ids, big_ids).
+    """
+    league, team_row, rival_row = _seed_league_with_team(db_session, user)
+    # team_row always hosts the guard roster and rival_row always hosts the
+    # big roster -- only WHICH physical row is claimed by the authed user
+    # changes, via user_id (a Team's roster is just its RosterSlot rows, so
+    # swapping the claim is independent of who gets which players)
+    guard_team, big_team = team_row, rival_row
+    if not user_is_guard:
+        # _seed_league_with_team always claims team_row (the guard roster
+        # here) for the authed user -- move the claim to rival_row (the big
+        # roster) so "mine" resolves to the big-heavy side instead
+        team_row.user_id = None
+        rival_row.user_id = user.id
+        db_session.flush()
+
+    guard_ids = []
+    for i, stats in enumerate(_TRADE_GUARD_STATS, start=1):
+        person_id = 970100 + i
+        p = NbaPlayer(nba_person_id=person_id, full_name=f"Guard {i}", position="PG")
+        db_session.add(p)
+        db_session.flush()
+        db_session.add(
+            PlayerSeasonAverage(
+                nba_player_id=p.id, season=get_settings().current_season, games_played=70, **stats
+            )
+        )
+        key = f"{LEAGUE_KEY}.p.{person_id}"
+        db_session.add(
+            PlayerIdMap(nba_player_id=p.id, yahoo_player_key=key, yahoo_name=p.full_name, match_method="exact")
+        )
+        db_session.add(
+            RosterSlot(
+                team_id=guard_team.id, yahoo_player_key=key, player_name=p.full_name,
+                position="PG", injury_status=None,
+            )
+        )
+        guard_ids.append(p.id)
+
+    big_ids = []
+    for i, stats in enumerate(_TRADE_BIG_STATS, start=1):
+        person_id = 970200 + i
+        p = NbaPlayer(nba_person_id=person_id, full_name=f"Big {i}", position="C")
+        db_session.add(p)
+        db_session.flush()
+        db_session.add(
+            PlayerSeasonAverage(
+                nba_player_id=p.id, season=get_settings().current_season, games_played=70, **stats
+            )
+        )
+        key = f"{LEAGUE_KEY}.p.{person_id}"
+        db_session.add(
+            PlayerIdMap(nba_player_id=p.id, yahoo_player_key=key, yahoo_name=p.full_name, match_method="exact")
+        )
+        db_session.add(
+            RosterSlot(
+                team_id=big_team.id, yahoo_player_key=key, player_name=p.full_name,
+                position="C", injury_status=None,
+            )
+        )
+        big_ids.append(p.id)
+    db_session.flush()
+
+    my_team = team_row if user_is_guard else rival_row
+    other_team = rival_row if user_is_guard else team_row
+    return league, my_team, other_team, guard_ids, big_ids
+
+
+def test_trades_404_for_foreign_league(db_session):
+    user = _seed_user(db_session, guid="guid-a", name="A")
+    other = _seed_user(db_session, guid="guid-b", name="B")
+    league, _team, _rival = _seed_league_with_team(db_session, other)
+
+    client = _authed_client(db_session, user)
+    response = client.get(f"/api/leagues/{league.id}/trades", params={"team_id": 1})
+
+    assert response.status_code == 404
+
+
+def test_trades_same_team_rejected(db_session):
+    user = _seed_user(db_session)
+    league, my_team, _other, _guard_ids, _big_ids = _seed_trade_depth_rosters(db_session, user)
+    client = _authed_client(db_session, user)
+
+    response = client.get(f"/api/leagues/{league.id}/trades", params={"team_id": my_team.id})
+
+    assert response.status_code == 400
+
+
+def test_trades_team_from_another_league_rejected(db_session):
+    user = _seed_user(db_session)
+    league, _my_team, _other, _guard_ids, _big_ids = _seed_trade_depth_rosters(db_session, user)
+
+    other_user = _seed_user(db_session, guid="guid-other-league", name="Other")
+    other_league = League(
+        yahoo_league_key="466.l.999", name="Another League", season=2026, num_teams=2,
+        scoring_type="head", settings_json={},
+    )
+    db_session.add(other_league)
+    db_session.flush()
+    foreign_team = Team(
+        league_id=other_league.id, yahoo_team_key="466.l.999.t.1", name="Foreign Team",
+        is_users_team=True, user_id=other_user.id,
+    )
+    db_session.add(foreign_team)
+    db_session.flush()
+
+    client = _authed_client(db_session, user)
+    # a real team_id, but scoped to a DIFFERENT league -- must never be
+    # comparable through this league's route, even though the row exists
+    response = client.get(f"/api/leagues/{league.id}/trades", params={"team_id": foreign_team.id})
+
+    assert response.status_code == 404
+
+
+def test_trades_shape_evaluated_truncated_and_downside(db_session):
+    user = _seed_user(db_session)
+    league, my_team, other_team, _guard_ids, _big_ids = _seed_trade_depth_rosters(db_session, user)
+    client = _authed_client(db_session, user)
+
+    response = client.get(f"/api/leagues/{league.id}/trades", params={"team_id": other_team.id})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert set(body.keys()) == {
+        "mine", "theirs", "players", "verdicts", "evaluated", "truncated", "value_basis", "stale", "synced_at",
+    }  # fmt: skip
+    assert body["value_basis"] == "category_impact_only"
+    assert set(body["mine"].keys()) == {"team_id", "categories", "surplus", "deficit"}
+    assert body["mine"]["team_id"] == my_team.id
+    assert body["theirs"]["team_id"] == other_team.id
+    assert set(body["mine"]["categories"].keys()) == NINE_CATEGORIES
+    strength = body["mine"]["categories"]["ast"]
+    assert set(strength.keys()) == {
+        "category", "total", "mean", "label", "depth", "fragile", "top_contributor", "top_share",
+    }  # fmt: skip
+    assert "ast" in body["mine"]["surplus"]
+    assert "reb" in body["mine"]["deficit"]
+    assert "reb" in body["theirs"]["surplus"]
+    assert "ast" in body["theirs"]["deficit"]
+
+    # a 5-deep roster on both sides with max_package=2 (default) generates
+    # well over the internal generation cap -- proves truncation is
+    # surfaced, per the plan's "never silently truncate" rule
+    assert body["evaluated"] > 0
+    assert body["truncated"] is True
+    assert len(body["verdicts"]) > 0
+
+    verdict = body["verdicts"][0]
+    assert set(verdict.keys()) == {"give", "get", "mine", "theirs", "net_value", "verdict", "reasons"}
+    assert set(verdict["mine"].keys()) == {"before", "after", "gained", "lost", "collapsed"}
+    assert set(verdict["mine"]["before"].keys()) == {"totals", "labels", "means"}
+    for key in [*verdict["give"], *verdict["get"]]:
+        assert key in body["players"]
+        assert set(body["players"][key].keys()) == {"name", "position", "nba_person_id", "headshot_url"}
+
+    # named downside, mandatory per plan T4: every real trade makes
+    # something worse -- giving up a top ast/tpm/stl contributor for a
+    # rebounder necessarily costs mine roster in the categories it gave up
+    assert any(r.startswith("lost:") for r in verdict["reasons"])
+
+
+def test_trades_never_proposes_a_center_deep_team_giving_up_a_guard(db_session):
+    """Mandatory per the plan: a team deep at center and thin at guard is
+    never told to give up a guard for a center. The authed user's team IS
+    the big-heavy roster here (user_is_guard=False) -- its give-eligible
+    pool can only ever be centers (there are no ast/tpm-surplus guards on
+    this roster to offer), so every verdict's give side must be centers."""
+    user = _seed_user(db_session)
+    league, _my_team, other_team, guard_ids, big_ids = _seed_trade_depth_rosters(
+        db_session, user, user_is_guard=False
+    )
+    client = _authed_client(db_session, user)
+
+    response = client.get(f"/api/leagues/{league.id}/trades", params={"team_id": other_team.id})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert "reb" in body["mine"]["surplus"]
+    assert "blk" in body["mine"]["surplus"]
+    assert "ast" in body["mine"]["deficit"]
+
+    guard_keys = {f"{LEAGUE_KEY}.p.{970100 + i}" for i in range(1, 6)}
+    big_keys = {f"{LEAGUE_KEY}.p.{970200 + i}" for i in range(1, 6)}
+    assert body["verdicts"], "expected real candidates from a genuinely deep-on-both-sides fixture"
+    for verdict in body["verdicts"]:
+        assert set(verdict["give"]) <= big_keys, "a center-deep team must never be offered up giving a guard"
+        assert set(verdict["get"]) <= guard_keys
