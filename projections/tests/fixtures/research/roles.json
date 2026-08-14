@@ -1,0 +1,21 @@
+{
+  "kind": "role",
+  "items": [
+    {
+      "player": "Test Star C",
+      "direction": "positive",
+      "minutes_delta": 3.5,
+      "usage_delta": 1.2,
+      "confidence": 0.7,
+      "rationale": "Starting five vacancy opened after Test Star D's offseason trade.",
+      "source": {
+        "source": "Test Analyst Blog",
+        "url": "https://example.com/analysis/star-c-role",
+        "retrieved": "2026-08-02",
+        "season_label": "2026-27",
+        "quality_tier": "medium_high",
+        "type": "projection"
+      }
+    }
+  ]
+}

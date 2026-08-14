@@ -1,0 +1,1205 @@
+{
+  "kind": "transaction",
+  "items": [
+    {
+      "player": "Giannis Antetokounmpo",
+      "from_team": "MIL",
+      "to_team": "MIA",
+      "kind": "trade",
+      "date": "2026-07-06",
+      "note": "Agreed in principle 2026-06-22, official when the new league year opened 2026-07-06. Heat sent Tyler Herro, Kel'el Ware, Jaime Jaquez Jr., Kasparas Jakucionis, unprotected 2031/2033 firsts, the No. 13 pick in 2026, a 2030 swap and a 2033 second. Cross-verified by ESPN, Yahoo, CNN and NBA.com.",
+      "source": {
+        "source": "ESPN - Bucks trading Giannis Antetokounmpo and Bobby Portis to Heat",
+        "url": "https://www.espn.com/nba/story/_/id/49149967/bucks-trading-giannis-antetokounmpo-bobby-portis-heat-tyler-herro-kelel-ware-jaime-jaquez-jr-kasparas-jakucionis-picks",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Bobby Portis",
+      "from_team": "MIL",
+      "to_team": "MIA",
+      "kind": "trade",
+      "date": "2026-07-06",
+      "note": "Secondary piece in the Giannis Antetokounmpo trade.",
+      "source": {
+        "source": "ESPN - Bucks trading Giannis Antetokounmpo and Bobby Portis to Heat",
+        "url": "https://www.espn.com/nba/story/_/id/49149967/bucks-trading-giannis-antetokounmpo-bobby-portis-heat-tyler-herro-kelel-ware-jaime-jaquez-jr-kasparas-jakucionis-picks",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Tyler Herro",
+      "from_team": "MIA",
+      "to_team": "MIL",
+      "kind": "trade",
+      "date": "2026-07-06",
+      "note": "Return piece in the Giannis Antetokounmpo trade.",
+      "source": {
+        "source": "ESPN - Bucks trading Giannis Antetokounmpo and Bobby Portis to Heat",
+        "url": "https://www.espn.com/nba/story/_/id/49149967/bucks-trading-giannis-antetokounmpo-bobby-portis-heat-tyler-herro-kelel-ware-jaime-jaquez-jr-kasparas-jakucionis-picks",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Kel'el Ware",
+      "from_team": "MIA",
+      "to_team": "MIL",
+      "kind": "trade",
+      "date": "2026-07-06",
+      "note": "Return piece in the Giannis Antetokounmpo trade.",
+      "source": {
+        "source": "ESPN - Bucks trading Giannis Antetokounmpo and Bobby Portis to Heat",
+        "url": "https://www.espn.com/nba/story/_/id/49149967/bucks-trading-giannis-antetokounmpo-bobby-portis-heat-tyler-herro-kelel-ware-jaime-jaquez-jr-kasparas-jakucionis-picks",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Jaime Jaquez Jr.",
+      "from_team": "MIA",
+      "to_team": "MIL",
+      "kind": "trade",
+      "date": "2026-07-06",
+      "note": "Return piece in the Giannis Antetokounmpo trade.",
+      "source": {
+        "source": "ESPN - Bucks trading Giannis Antetokounmpo and Bobby Portis to Heat",
+        "url": "https://www.espn.com/nba/story/_/id/49149967/bucks-trading-giannis-antetokounmpo-bobby-portis-heat-tyler-herro-kelel-ware-jaime-jaquez-jr-kasparas-jakucionis-picks",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Kasparas Jakucionis",
+      "from_team": "MIA",
+      "to_team": "MIL",
+      "kind": "trade",
+      "date": "2026-07-06",
+      "note": "Return piece in the Giannis Antetokounmpo trade.",
+      "source": {
+        "source": "ESPN - Bucks trading Giannis Antetokounmpo and Bobby Portis to Heat",
+        "url": "https://www.espn.com/nba/story/_/id/49149967/bucks-trading-giannis-antetokounmpo-bobby-portis-heat-tyler-herro-kelel-ware-jaime-jaquez-jr-kasparas-jakucionis-picks",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Jaylen Brown",
+      "from_team": "BOS",
+      "to_team": "PHI",
+      "kind": "trade",
+      "date": "2026-07-06",
+      "note": "First reported 2026-07-01, official 2026-07-06. Celtics received Paul George plus 2028 and 2031 firsts and two seconds (2028, 2030). Cross-verified by ESPN, Washington Post and NBA.com.",
+      "source": {
+        "source": "ESPN - Celtics sending Brown to 76ers for George and picks",
+        "url": "https://www.espn.com/nba/story/_/id/49241843/sources-celtics-sending-brown-76ers-george-picks",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Paul George",
+      "from_team": "PHI",
+      "to_team": "BOS",
+      "kind": "trade",
+      "date": "2026-07-06",
+      "note": "Return piece in the Jaylen Brown trade.",
+      "source": {
+        "source": "ESPN - Celtics sending Brown to 76ers for George and picks",
+        "url": "https://www.espn.com/nba/story/_/id/49241843/sources-celtics-sending-brown-76ers-george-picks",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "LeBron James",
+      "from_team": "LAL",
+      "to_team": "PHI",
+      "kind": "signing",
+      "date": "2026-07-24",
+      "note": "Free-agent signing (not a trade). 2 years / $8M with a year-two player option and a 15% trade kicker; reported in the ~2026-07-24 window, exact official date not pinned in reporting. Cross-verified by ESPN, NBA.com and Yahoo.",
+      "source": {
+        "source": "ESPN - LeBron chooses 76ers, signs 2-year, $8 million contract",
+        "url": "https://www.espn.com/nba/story/_/id/49440164/lebron-chooses-76ers-sign-2-year-8-million-contract",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Walker Kessler",
+      "from_team": "UTA",
+      "to_team": "LAL",
+      "kind": "trade",
+      "date": "2026-07-01",
+      "note": "Sign-and-trade; Kessler signed 4 years / $130M with a year-four player option. Lakers sent unprotected 2031 and 2033 firsts plus 2028 and 2030 swaps. Cross-verified by ESPN, NBA.com and Deseret News.",
+      "source": {
+        "source": "ESPN - Lakers trading for Jazz center Walker Kessler",
+        "url": "https://www.espn.com/nba/story/_/id/49237403/lakers-trading-jazz-center-walker-kessler-sources-say",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Khris Middleton",
+      "from_team": null,
+      "to_team": "WAS",
+      "kind": "signing",
+      "date": "2026-07-07",
+      "note": "Sign-and-trade, 3 years / $17.6M, inside a six-team deal (WAS/MIL/MEM/DAL/DET/LAC). Cross-verified by ESPN, Bleacher Report and Hoops Rumors. Secondary pieces reported in the same deal (John Collins, Gary Harris, Taurean Prince, Isaiah Stewart, Santi Aldama, Caris LeVert) were only search-summary sourced in R3 and are deliberately NOT encoded here.",
+      "source": {
+        "source": "ESPN - Khris Middleton back to Wizards in six-team sign-and-trade",
+        "url": "https://www.espn.com/nba/story/_/id/49301627/khris-middleton-back-wizards-2nd-stint-6-team-sign-trade-deal",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "D'Angelo Russell",
+      "from_team": "WAS",
+      "to_team": "MEM",
+      "kind": "trade",
+      "date": "2026-07-07",
+      "note": "Moved to Memphis in the six-team Middleton deal along with a future second and a second-round swap. Bleacher Report reported Russell never reported to Washington and was not expected to be part of the 2026-27 plans there even after exercising his $5.97M option.",
+      "source": {
+        "source": "ESPN - Khris Middleton back to Wizards in six-team sign-and-trade",
+        "url": "https://www.espn.com/nba/story/_/id/49301627/khris-middleton-back-wizards-2nd-stint-6-team-sign-trade-deal",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Kawhi Leonard",
+      "from_team": "LAC",
+      "to_team": null,
+      "kind": "trade",
+      "date": "2026-06",
+      "note": "PENDING / ON HOLD as of 2026-08-12. Terms agreed in principle in late June 2026 (Raptors would receive Leonard; Clippers would receive Brandon Ingram, Gradey Dick, unprotected 2031/2033 firsts, a 2027 swap and two seconds), but the trade is frozen pending an NBA investigation into alleged Clippers cap circumvention. Leonard remains officially a Clipper; to_team left null because the destination is unresolved. Leonard 'expects trade to Raptors to go through before camp' per Hoops Rumors.",
+      "source": {
+        "source": "NBA.com - Raptors-Clippers Kawhi Leonard trade on hold",
+        "url": "https://www.nba.com/news/raptors-clippers-kawhi-leonard-trade-on-hold",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Brandon Ingram",
+      "from_team": "TOR",
+      "to_team": null,
+      "kind": "trade",
+      "date": "2026-06",
+      "note": "PENDING / ON HOLD as of 2026-08-12. Ingram is the headline outbound piece in the frozen Kawhi Leonard trade; he remains a Raptor unless/until the deal clears the NBA cap-circumvention investigation. to_team null = unresolved.",
+      "source": {
+        "source": "NBA.com - Raptors-Clippers Kawhi Leonard trade on hold",
+        "url": "https://www.nba.com/news/raptors-clippers-kawhi-leonard-trade-on-hold",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Trae Young",
+      "from_team": "ATL",
+      "to_team": "WAS",
+      "kind": "trade",
+      "date": "2026-01-07",
+      "note": "Mid-season (mid-game) trade; Hawks received CJ McCollum and Corey Kispert. Cross-verified by NBA.com and R4 injury reporting.",
+      "source": {
+        "source": "NBA.com - Hawks trade Trae Young to Wizards for CJ McCollum, Corey Kispert",
+        "url": "https://www.nba.com/news/hawks-trade-trae-young-to-wizards-for-cj-mccollum-corey-kispert",
+        "retrieved": "2026-08-12",
+        "season_label": "2025-26",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "CJ McCollum",
+      "from_team": "WAS",
+      "to_team": "ATL",
+      "kind": "trade",
+      "date": "2026-01-07",
+      "note": "Return piece in the Trae Young trade.",
+      "source": {
+        "source": "NBA.com - Hawks trade Trae Young to Wizards for CJ McCollum, Corey Kispert",
+        "url": "https://www.nba.com/news/hawks-trade-trae-young-to-wizards-for-cj-mccollum-corey-kispert",
+        "retrieved": "2026-08-12",
+        "season_label": "2025-26",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Corey Kispert",
+      "from_team": "WAS",
+      "to_team": "ATL",
+      "kind": "trade",
+      "date": "2026-01-07",
+      "note": "Return piece in the Trae Young trade.",
+      "source": {
+        "source": "NBA.com - Hawks trade Trae Young to Wizards for CJ McCollum, Corey Kispert",
+        "url": "https://www.nba.com/news/hawks-trade-trae-young-to-wizards-for-cj-mccollum-corey-kispert",
+        "retrieved": "2026-08-12",
+        "season_label": "2025-26",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Trae Young",
+      "from_team": "WAS",
+      "to_team": "WAS",
+      "kind": "signing",
+      "date": "2026",
+      "note": "RESOLVED by R3's follow-up pass -- the apparent R2/R4 contradiction was a two-step sequence, not a conflict. Young declined his ~$48.97M player option in roughly June 2026 (ESPN) and became an unrestricted free agent, then re-signed with Washington on a straight free-agent deal (not a sign-and-trade) worth about $212M over 4 years with a player option in year four. ESPN, NBA.com, Bleacher Report and CBS Sports all agree on both steps. Exact signing date not stated in the reporting.",
+      "source": {
+        "source": "NBA.com - Wizards, Trae Young free agency 2026",
+        "url": "https://www.nba.com/news/wizards-trae-young-free-agency-2026",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Anthony Davis",
+      "from_team": "DAL",
+      "to_team": "WAS",
+      "kind": "trade",
+      "date": "2026-02-04",
+      "note": "Eight-player deal. Davis was shut down for the rest of 2025-26 by Washington after the trade to protect his 2026-27 availability.",
+      "source": {
+        "source": "Yahoo Sports - Wizards' Anthony Davis to miss remainder of season",
+        "url": "https://sports.yahoo.com/articles/wizards-anthony-davis-miss-remainder-050210940.html",
+        "retrieved": "2026-08-12",
+        "season_label": "2025-26",
+        "quality_tier": "medium_high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Kristaps Porzingis",
+      "from_team": "ATL",
+      "to_team": "GSW",
+      "kind": "trade",
+      "date": "2026-02",
+      "note": "Early-February 2026 trade; Atlanta received Jonathan Kuminga and Buddy Hield. Exact day not stated in the retrieved reporting.",
+      "source": {
+        "source": "ClutchPoints - Steve Kerr encouraging Kristaps Porzingis injury update",
+        "url": "https://clutchpoints.com/nba/golden-state-warriors/warriors-news-steve-kerr-encouraging-kristaps-porzingis-injury-update-all-star-break",
+        "retrieved": "2026-08-12",
+        "season_label": "2025-26",
+        "quality_tier": "medium",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Jonathan Kuminga",
+      "from_team": "GSW",
+      "to_team": "ATL",
+      "kind": "trade",
+      "date": "2026-02",
+      "note": "Outbound piece in the Porzingis trade per R4. R3 asserted Kuminga's prior team was Golden State and explicitly disregarded a snippet calling him 'formerly Atlanta Hawks'; R4's Porzingis trade reporting and R2's follow-up Slamdex capture (which lists Kuminga as SF-ATL, ADP 136.1) both support the Atlanta stop, so the Golden-State-to-Atlanta leg is now the better-supported reading.",
+      "source": {
+        "source": "ClutchPoints - Steve Kerr encouraging Kristaps Porzingis injury update",
+        "url": "https://clutchpoints.com/nba/golden-state-warriors/warriors-news-steve-kerr-encouraging-kristaps-porzingis-injury-update-all-star-break",
+        "retrieved": "2026-08-12",
+        "season_label": "2025-26",
+        "quality_tier": "medium",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Buddy Hield",
+      "from_team": "GSW",
+      "to_team": "ATL",
+      "kind": "trade",
+      "date": "2026-02",
+      "note": "Outbound piece in the Porzingis trade.",
+      "source": {
+        "source": "ClutchPoints - Steve Kerr encouraging Kristaps Porzingis injury update",
+        "url": "https://clutchpoints.com/nba/golden-state-warriors/warriors-news-steve-kerr-encouraging-kristaps-porzingis-injury-update-all-star-break",
+        "retrieved": "2026-08-12",
+        "season_label": "2025-26",
+        "quality_tier": "medium",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Rui Hachimura",
+      "from_team": "LAL",
+      "to_team": "LAC",
+      "kind": "signing",
+      "date": "2026-07-06",
+      "note": "2 years / $28M. Two independent trackers (ESPN offseason buzz, Bleacher Report) agree on team pair and terms; both reads are tracker-sourced rather than a directly fetched primary story.",
+      "source": {
+        "source": "ESPN - 2026 NBA offseason buzz tracker",
+        "url": "https://www.espn.com/nba/story/_/id/48377855/2026-nba-buzz-latest-live-updates-news-intel-nba-draft-offseason",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Donovan Mitchell",
+      "from_team": "CLE",
+      "to_team": "CLE",
+      "kind": "signing",
+      "date": "2026-07-07",
+      "note": "Max extension. CONFLICT on the dollar figure: ESPN's buzz tracker reports 4 years / $273M with a 2030-31 player option, Bleacher Report's tracker reports 4 years / $237M. Date, player and team agree across both; the figure is unresolved and fantasy-irrelevant, recorded here for provenance only.",
+      "source": {
+        "source": "ESPN - 2026 NBA offseason buzz tracker",
+        "url": "https://www.espn.com/nba/story/_/id/48377855/2026-nba-buzz-latest-live-updates-news-intel-nba-draft-offseason",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium",
+        "type": "news"
+      }
+    },
+    {
+      "player": "James Harden",
+      "from_team": "CLE",
+      "to_team": null,
+      "kind": "signing",
+      "date": "2026-08-12",
+      "note": "unsigned as of 2026-08-12. Declined his $42.3M player option with Cleveland; reporting says he is 'on track to re-sign with the Cavaliers on a two- or three-year contract' but nothing is signed. Team conflict: R4's mid-March 2026 injury item lists Harden with the LA Clippers, while R1/R2/R3 all place him on Cleveland -- unresolved.",
+      "source": {
+        "source": "NBC Sports - Top seven NBA free agents still available",
+        "url": "https://www.nbcsports.com/nba/news/top-seven-nba-free-agents-still-available-where-things-stand-with-peyton-watson-jonathan-kuminga-more",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium_high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Jonathan Kuminga",
+      "from_team": "ATL",
+      "to_team": null,
+      "kind": "signing",
+      "date": "2026-08-12",
+      "note": "unsigned as of 2026-08-12. Reported suitors are Cleveland and the Lakers; no agreement. from_team reflects R4's Porzingis-trade reporting (Golden State -> Atlanta, Feb 2026), which R3 disputes -- see the paired trade item.",
+      "source": {
+        "source": "NBC Sports - Top seven NBA free agents still available",
+        "url": "https://www.nbcsports.com/nba/news/top-seven-nba-free-agents-still-available-where-things-stand-with-peyton-watson-jonathan-kuminga-more",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium_high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "DeMar DeRozan",
+      "from_team": "SAC",
+      "to_team": null,
+      "kind": "signing",
+      "date": "2026-08-12",
+      "note": "unsigned as of 2026-08-12. Waived by Sacramento around 2026-07-06; August reporting narrows interest to Miami, Denver and Cleveland. No destination decided -- do not assign a team. Corroborated by R2's follow-up Slamdex capture, which carries DeRozan with an explicit 'FA' team tag (ADP 56.1).",
+      "source": {
+        "source": "NBC Sports - Top seven NBA free agents still available (DeRozan, Kuminga)",
+        "url": "https://www.nbcsports.com/nba/news/top-seven-nba-free-agents-still-available-where-things-stand-with-demar-derozan-jonathan-kuminga-more",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium_high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Karl-Anthony Towns",
+      "from_team": "NYK",
+      "to_team": null,
+      "kind": "signing",
+      "date": "2026-08-12",
+      "note": "unsigned as of 2026-08-12. Knicks extension talks reported ongoing but unresolved; Brian Windhorst flagged concern that a max extension would hamper New York's ability to keep the roster together. Search-summary sourced only (low confidence on status detail).",
+      "source": {
+        "source": "ESPN - 2026 NBA offseason buzz tracker",
+        "url": "https://www.espn.com/nba/story/_/id/48377855/2026-nba-buzz-latest-live-updates-news-intel-nba-draft-offseason",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "low_medium",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Peyton Watson",
+      "from_team": "DEN",
+      "to_team": null,
+      "kind": "signing",
+      "date": "2026-08-12",
+      "note": "unsigned as of 2026-08-12. Restricted free agent; Atlanta, the Clippers, Milwaukee and Cleveland reportedly circling, and Denver's asking price reportedly dropped from two firsts plus two swaps to one high-level player plus a first. Still in flux.",
+      "source": {
+        "source": "NBC Sports - Top seven NBA free agents still available",
+        "url": "https://www.nbcsports.com/nba/news/top-seven-nba-free-agents-still-available-where-things-stand-with-peyton-watson-jonathan-kuminga-more",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium_high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Jalen Duren",
+      "from_team": "DET",
+      "to_team": null,
+      "kind": "signing",
+      "date": "2026-08-12",
+      "note": "unsigned as of 2026-08-12. Restricted free agent; contract talks reported at a standstill and could run into late August 2026. Search-summary sourced only.",
+      "source": {
+        "source": "ESPN - 2026 NBA offseason buzz tracker",
+        "url": "https://www.espn.com/nba/story/_/id/48377855/2026-nba-buzz-latest-live-updates-news-intel-nba-draft-offseason",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "low_medium",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Chris Paul",
+      "from_team": "TOR",
+      "to_team": null,
+      "kind": "retirement",
+      "date": "2026-02-13",
+      "note": "Announced retirement after being waived by Toronto following a deadline-era deal from the Clippers. Predates the June-August offseason window but removes him from 2026-27 rosters.",
+      "source": {
+        "source": "NBA.com - Chris Paul announces NBA retirement",
+        "url": "https://www.nba.com/news/chris-paul-announces-nba-retirement",
+        "retrieved": "2026-08-12",
+        "season_label": "2025-26",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Kyle Lowry",
+      "from_team": null,
+      "to_team": null,
+      "kind": "retirement",
+      "date": "2026",
+      "note": "Retired via a ceremonial one-day contract with Toronto after 20 NBA seasons. Exact date not stated in the retrieved reporting.",
+      "source": {
+        "source": "ESPN - Kyle Lowry retires, signing one-day contract with Raptors",
+        "url": "https://www.espn.com/nba/story/_/id/49295320/kyle-lowry-retires-signing-one-day-contract-raptors",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Jason Kidd",
+      "from_team": "DAL",
+      "to_team": null,
+      "kind": "coaching_change",
+      "date": "2026-05",
+      "note": "Fired May 2026 after five seasons, following a 26-56 year. Cross-verified by CBS Sports, ESPN and On3.",
+      "source": {
+        "source": "CBS Sports - Mavericks hire Michigan coach Dusty May to replace Jason Kidd",
+        "url": "https://www.cbssports.com/nba/news/dallas-mavericks-hire-michigan-coach-dusty-may-to-replace-jason-kidd/",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Dusty May",
+      "from_team": null,
+      "to_team": "DAL",
+      "kind": "coaching_change",
+      "date": "2026-05",
+      "note": "Hired from Michigan after the 2026 NCAA title (37-3, outright Big Ten). Reported as tasked with building around 2026 Rookie of the Year Cooper Flagg. R3's remaining coaching changes (Bulls, Pelicans, Magic, Blazers) were search-summary only or had no URL and are still not encoded.",
+      "source": {
+        "source": "CBS Sports - Mavericks hire Michigan coach Dusty May to replace Jason Kidd",
+        "url": "https://www.cbssports.com/nba/news/dallas-mavericks-hire-michigan-coach-dusty-may-to-replace-jason-kidd/",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Taylor Jenkins",
+      "from_team": null,
+      "to_team": "MIL",
+      "kind": "coaching_change",
+      "date": "2026-04-30",
+      "note": "Hire announced 2026-04-30 (ESPN), formally introduced 2026-05-06 at the Milwaukee Art Museum. Long-term deal reported at well over $10M annually. Former Bucks assistant under Mike Budenholzer; went 250-214 in Memphis with three playoff trips before being fired in March 2025. 2026-27 staff finalized with Darvin Ham retained and T.J. Ford added. Cross-verified by ESPN, NBA.com/Bucks, WPR and Urban Milwaukee. Doc Rivers' departure was only search-summary sourced and is still not encoded.",
+      "source": {
+        "source": "ESPN - Bucks finalizing deal to hire Taylor Jenkins",
+        "url": "https://www.espn.com/nba/story/_/id/48572946/bucks-finalizing-deal-hire-taylor-jenkins",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Deandre Ayton",
+      "from_team": "LAL",
+      "to_team": "WAS",
+      "kind": "trade",
+      "date": "2026-07-03",
+      "note": "Previously excluded as search-summary only; now encoded because R2's follow-up Slamdex ADP capture independently lists Ayton on Washington (C-WAS, ADP 78.2), corroborating the destination. Lakers received Jaden Hardy plus two future seconds. The earlier claim that Ayton opted into his $8.1M option before the trade remains uncorroborated.",
+      "source": {
+        "source": "ESPN - 2026 NBA offseason buzz tracker",
+        "url": "https://www.espn.com/nba/story/_/id/48377855/2026-nba-buzz-latest-live-updates-news-intel-nba-draft-offseason",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Lu Dort",
+      "from_team": "OKC",
+      "to_team": "ATL",
+      "kind": "trade",
+      "date": "2026-07-19",
+      "note": "Three-team deal (OKC/Atlanta/Dallas). Previously excluded as single-source; now encoded because R2's follow-up Slamdex capture lists Dort on Atlanta (SG-ATL, ADP 165.6), corroborating the destination. The separately reported Ryan Nembhard leg of this trade is still uncorroborated and not encoded.",
+      "source": {
+        "source": "ESPN - 2026 NBA offseason buzz tracker",
+        "url": "https://www.espn.com/nba/story/_/id/48377855/2026-nba-buzz-latest-live-updates-news-intel-nba-draft-offseason",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Zaccharie Risacher",
+      "from_team": "ATL",
+      "to_team": "DAL",
+      "kind": "trade",
+      "date": "2026-07-19",
+      "note": "Other side of the OKC/Atlanta/Dallas three-team deal; OKC received three seconds. Corroborated by R2's follow-up Slamdex capture listing Risacher on Dallas (SG-DAL, ADP 137.3).",
+      "source": {
+        "source": "ESPN - 2026 NBA offseason buzz tracker",
+        "url": "https://www.espn.com/nba/story/_/id/48377855/2026-nba-buzz-latest-live-updates-news-intel-nba-draft-offseason",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium",
+        "type": "news"
+      }
+    },
+    {
+      "player": "John Collins",
+      "from_team": null,
+      "to_team": "DET",
+      "kind": "trade",
+      "date": "2026-07-07",
+      "note": "Secondary piece in the six-team Khris Middleton deal, previously excluded as search-summary only; now encoded because R2's follow-up Slamdex capture lists Collins on Detroit (C-DET, ADP 94.9). from_team left null -- the reporting never pinned his outbound team.",
+      "source": {
+        "source": "ESPN - Khris Middleton back to Wizards in six-team sign-and-trade",
+        "url": "https://www.espn.com/nba/story/_/id/49301627/khris-middleton-back-wizards-2nd-stint-6-team-sign-trade-deal",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Santi Aldama",
+      "from_team": "MEM",
+      "to_team": "DAL",
+      "kind": "trade",
+      "date": "2026-07-07",
+      "note": "Secondary piece in the six-team Khris Middleton deal, previously excluded as search-summary only; now encoded because R2's follow-up Slamdex capture lists Aldama on Dallas (PF-DAL, ADP 114.0).",
+      "source": {
+        "source": "ESPN - Khris Middleton back to Wizards in six-team sign-and-trade",
+        "url": "https://www.espn.com/nba/story/_/id/49301627/khris-middleton-back-wizards-2nd-stint-6-team-sign-trade-deal",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Tobias Harris",
+      "from_team": "DET",
+      "to_team": "SAS",
+      "kind": "signing",
+      "date": "2026-07",
+      "note": "2 years / $31M per the Bleacher Report tracker; previously excluded as search-summary only, now encoded because R2's follow-up Slamdex capture lists Harris on San Antonio (PF-SAS, ADP 108.7). Exact day not reported.",
+      "source": {
+        "source": "ESPN - 2026 NBA offseason buzz tracker",
+        "url": "https://www.espn.com/nba/story/_/id/48377855/2026-nba-buzz-latest-live-updates-news-intel-nba-draft-offseason",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Quentin Grimes",
+      "from_team": "PHI",
+      "to_team": "LAL",
+      "kind": "signing",
+      "date": "2026-07",
+      "note": "4 years / $60M per the Bleacher Report tracker; previously excluded as search-summary only, now encoded because R2's follow-up Slamdex capture lists Grimes on the Lakers (PG-LAL, ADP 139.0). Exact day not reported.",
+      "source": {
+        "source": "ESPN - 2026 NBA offseason buzz tracker",
+        "url": "https://www.espn.com/nba/story/_/id/48377855/2026-nba-buzz-latest-live-updates-news-intel-nba-draft-offseason",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium",
+        "type": "news"
+      }
+    },
+    {
+      "player": "AJ Dybantsa",
+      "from_team": null,
+      "to_team": "WAS",
+      "kind": "draft",
+      "date": "2026-06-23",
+      "note": "2026 NBA Draft, round 1 pick 1 (BYU, F). Top-4 order independently confirmed by CBS Sports and NBC News.",
+      "source": {
+        "source": "NBC Sports - 2026 NBA Draft complete list of every pick",
+        "url": "https://www.nbcsports.com/nba/news/2026-nba-draft-complete-list-of-every-pick-from-round-1-and-round-2",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Darryn Peterson",
+      "from_team": null,
+      "to_team": "UTA",
+      "kind": "draft",
+      "date": "2026-06-23",
+      "note": "2026 NBA Draft, round 1 pick 2 (Kansas, G).",
+      "source": {
+        "source": "NBC Sports - 2026 NBA Draft complete list of every pick",
+        "url": "https://www.nbcsports.com/nba/news/2026-nba-draft-complete-list-of-every-pick-from-round-1-and-round-2",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Cameron Boozer",
+      "from_team": null,
+      "to_team": "MEM",
+      "kind": "draft",
+      "date": "2026-06-23",
+      "note": "2026 NBA Draft, round 1 pick 3 (Duke, F).",
+      "source": {
+        "source": "NBC Sports - 2026 NBA Draft complete list of every pick",
+        "url": "https://www.nbcsports.com/nba/news/2026-nba-draft-complete-list-of-every-pick-from-round-1-and-round-2",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Caleb Wilson",
+      "from_team": null,
+      "to_team": "CHI",
+      "kind": "draft",
+      "date": "2026-06-23",
+      "note": "2026 NBA Draft, round 1 pick 4 (North Carolina, F).",
+      "source": {
+        "source": "NBC Sports - 2026 NBA Draft complete list of every pick",
+        "url": "https://www.nbcsports.com/nba/news/2026-nba-draft-complete-list-of-every-pick-from-round-1-and-round-2",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Keaton Wagler",
+      "from_team": null,
+      "to_team": "LAC",
+      "kind": "draft",
+      "date": "2026-06-23",
+      "note": "2026 NBA Draft, round 1 pick 5 (Illinois, G); pick acquired from Indiana.",
+      "source": {
+        "source": "NBC Sports - 2026 NBA Draft complete list of every pick",
+        "url": "https://www.nbcsports.com/nba/news/2026-nba-draft-complete-list-of-every-pick-from-round-1-and-round-2",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Mikel Brown Jr.",
+      "from_team": null,
+      "to_team": "BKN",
+      "kind": "draft",
+      "date": "2026-06-23",
+      "note": "2026 NBA Draft, round 1 pick 6 (Louisville, G).",
+      "source": {
+        "source": "NBC Sports - 2026 NBA Draft complete list of every pick",
+        "url": "https://www.nbcsports.com/nba/news/2026-nba-draft-complete-list-of-every-pick-from-round-1-and-round-2",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Darius Acuff Jr.",
+      "from_team": null,
+      "to_team": "SAC",
+      "kind": "draft",
+      "date": "2026-06-23",
+      "note": "2026 NBA Draft, round 1 pick 7 (Arkansas, G).",
+      "source": {
+        "source": "NBC Sports - 2026 NBA Draft complete list of every pick",
+        "url": "https://www.nbcsports.com/nba/news/2026-nba-draft-complete-list-of-every-pick-from-round-1-and-round-2",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Kingston Flemings",
+      "from_team": null,
+      "to_team": "ATL",
+      "kind": "draft",
+      "date": "2026-06-23",
+      "note": "2026 NBA Draft, round 1 pick 8 (Houston, G); pick acquired from New Orleans.",
+      "source": {
+        "source": "NBC Sports - 2026 NBA Draft complete list of every pick",
+        "url": "https://www.nbcsports.com/nba/news/2026-nba-draft-complete-list-of-every-pick-from-round-1-and-round-2",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Morez Johnson Jr.",
+      "from_team": null,
+      "to_team": "DAL",
+      "kind": "draft",
+      "date": "2026-06-23",
+      "note": "2026 NBA Draft, round 1 pick 9 (Michigan, F/C); reunites with new Mavericks head coach Dusty May.",
+      "source": {
+        "source": "NBC Sports - 2026 NBA Draft complete list of every pick",
+        "url": "https://www.nbcsports.com/nba/news/2026-nba-draft-complete-list-of-every-pick-from-round-1-and-round-2",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Brayden Burries",
+      "from_team": null,
+      "to_team": "MIL",
+      "kind": "draft",
+      "date": "2026-06-23",
+      "note": "2026 NBA Draft, round 1 pick 10 (Arizona, G).",
+      "source": {
+        "source": "NBC Sports - 2026 NBA Draft complete list of every pick",
+        "url": "https://www.nbcsports.com/nba/news/2026-nba-draft-complete-list-of-every-pick-from-round-1-and-round-2",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Yaxel Lendeborg",
+      "from_team": null,
+      "to_team": "GSW",
+      "kind": "draft",
+      "date": "2026-06-23",
+      "note": "2026 NBA Draft, round 1 pick 11 (Michigan, F).",
+      "source": {
+        "source": "NBC Sports - 2026 NBA Draft complete list of every pick",
+        "url": "https://www.nbcsports.com/nba/news/2026-nba-draft-complete-list-of-every-pick-from-round-1-and-round-2",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Aday Mara",
+      "from_team": null,
+      "to_team": "OKC",
+      "kind": "draft",
+      "date": "2026-06-23",
+      "note": "2026 NBA Draft, round 1 pick 12 (Michigan, C); pick acquired from the Clippers.",
+      "source": {
+        "source": "NBC Sports - 2026 NBA Draft complete list of every pick",
+        "url": "https://www.nbcsports.com/nba/news/2026-nba-draft-complete-list-of-every-pick-from-round-1-and-round-2",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Nate Ament",
+      "from_team": null,
+      "to_team": "MIL",
+      "kind": "draft",
+      "date": "2026-06-23",
+      "note": "2026 NBA Draft, round 1 pick 13 (Tennessee, F); Miami's original slot, acquired by Milwaukee in the Giannis trade. CONFLICT: a Wikipedia fetch listed the pick under the Miami Heat; NBC Sports' pick list plus Bucks Summer League roster coverage put Ament on Milwaukee. Milwaukee treated as operative.",
+      "source": {
+        "source": "NBC Sports - 2026 NBA Draft complete list of every pick",
+        "url": "https://www.nbcsports.com/nba/news/2026-nba-draft-complete-list-of-every-pick-from-round-1-and-round-2",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Hannes Steinbach",
+      "from_team": null,
+      "to_team": "CHA",
+      "kind": "draft",
+      "date": "2026-06-23",
+      "note": "2026 NBA Draft, round 1 pick 14 (Washington, F/C).",
+      "source": {
+        "source": "NBC Sports - 2026 NBA Draft complete list of every pick",
+        "url": "https://www.nbcsports.com/nba/news/2026-nba-draft-complete-list-of-every-pick-from-round-1-and-round-2",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Dailyn Swain",
+      "from_team": null,
+      "to_team": "CHI",
+      "kind": "draft",
+      "date": "2026-06-23",
+      "note": "2026 NBA Draft, round 1 pick 15 (Texas, G/F); pick acquired from Portland.",
+      "source": {
+        "source": "NBC Sports - 2026 NBA Draft complete list of every pick",
+        "url": "https://www.nbcsports.com/nba/news/2026-nba-draft-complete-list-of-every-pick-from-round-1-and-round-2",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Bennett Stirtz",
+      "from_team": null,
+      "to_team": "OKC",
+      "kind": "draft",
+      "date": "2026-06-23",
+      "note": "2026 NBA Draft, round 1 pick 16 (Iowa, G).",
+      "source": {
+        "source": "NBC Sports - 2026 NBA Draft complete list of every pick",
+        "url": "https://www.nbcsports.com/nba/news/2026-nba-draft-complete-list-of-every-pick-from-round-1-and-round-2",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Ebuka Okorie",
+      "from_team": null,
+      "to_team": "DET",
+      "kind": "draft",
+      "date": "2026-06-23",
+      "note": "2026 NBA Draft, round 1 pick 17 (Stanford, G).",
+      "source": {
+        "source": "NBC Sports - 2026 NBA Draft complete list of every pick",
+        "url": "https://www.nbcsports.com/nba/news/2026-nba-draft-complete-list-of-every-pick-from-round-1-and-round-2",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Christian Anderson Jr.",
+      "from_team": null,
+      "to_team": "CHA",
+      "kind": "draft",
+      "date": "2026-06-23",
+      "note": "2026 NBA Draft, round 1 pick 18 (Texas Tech, G); pick acquired from Orlando via Phoenix.",
+      "source": {
+        "source": "NBC Sports - 2026 NBA Draft complete list of every pick",
+        "url": "https://www.nbcsports.com/nba/news/2026-nba-draft-complete-list-of-every-pick-from-round-1-and-round-2",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Allen Graves",
+      "from_team": null,
+      "to_team": "TOR",
+      "kind": "draft",
+      "date": "2026-06-23",
+      "note": "2026 NBA Draft, round 1 pick 19 (Santa Clara, F).",
+      "source": {
+        "source": "NBC Sports - 2026 NBA Draft complete list of every pick",
+        "url": "https://www.nbcsports.com/nba/news/2026-nba-draft-complete-list-of-every-pick-from-round-1-and-round-2",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Jayden Quaintance",
+      "from_team": null,
+      "to_team": "SAS",
+      "kind": "draft",
+      "date": "2026-06-23",
+      "note": "2026 NBA Draft, round 1 pick 20 (Kentucky, C); slid from projected top-10 because of the Feb 2025 knee injury. See injuries.json.",
+      "source": {
+        "source": "NBC Sports - 2026 NBA Draft complete list of every pick",
+        "url": "https://www.nbcsports.com/nba/news/2026-nba-draft-complete-list-of-every-pick-from-round-1-and-round-2",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Karim Lopez",
+      "from_team": null,
+      "to_team": "MEM",
+      "kind": "draft",
+      "date": "2026-06-23",
+      "note": "2026 NBA Draft, round 1 pick 21 (New Zealand Breakers, F).",
+      "source": {
+        "source": "NBC Sports - 2026 NBA Draft complete list of every pick",
+        "url": "https://www.nbcsports.com/nba/news/2026-nba-draft-complete-list-of-every-pick-from-round-1-and-round-2",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Labaron Philon Jr.",
+      "from_team": null,
+      "to_team": "PHI",
+      "kind": "draft",
+      "date": "2026-06-23",
+      "note": "2026 NBA Draft, round 1 pick 22 (Alabama, G).",
+      "source": {
+        "source": "NBC Sports - 2026 NBA Draft complete list of every pick",
+        "url": "https://www.nbcsports.com/nba/news/2026-nba-draft-complete-list-of-every-pick-from-round-1-and-round-2",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Zuby Ejiofor",
+      "from_team": null,
+      "to_team": "ATL",
+      "kind": "draft",
+      "date": "2026-06-23",
+      "note": "2026 NBA Draft, round 1 pick 23 (St. John's, F/C); pick from Cleveland. Two-source (Wikipedia + Hoops Rumors) only -- not present in NBC Sports' table as captured, so medium-high confidence.",
+      "source": {
+        "source": "Hoops Rumors - 2026 NBA Draft results",
+        "url": "https://www.hoopsrumors.com/2026/06/2026-nba-draft-results.html",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium_high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Cameron Carr",
+      "from_team": null,
+      "to_team": "LAL",
+      "kind": "draft",
+      "date": "2026-06-23",
+      "note": "2026 NBA Draft, round 1 pick 24 (Baylor, G); pick from New York. Two-source (Wikipedia + Hoops Rumors) only.",
+      "source": {
+        "source": "Hoops Rumors - 2026 NBA Draft results",
+        "url": "https://www.hoopsrumors.com/2026/06/2026-nba-draft-results.html",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium_high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Sergio de Larrea",
+      "from_team": null,
+      "to_team": "DAL",
+      "kind": "draft",
+      "date": "2026-06-23",
+      "note": "2026 NBA Draft, round 1 pick 25 (Valencia, Spain, G); pick acquired from the Lakers via New York.",
+      "source": {
+        "source": "NBC Sports - 2026 NBA Draft complete list of every pick",
+        "url": "https://www.nbcsports.com/nba/news/2026-nba-draft-complete-list-of-every-pick-from-round-1-and-round-2",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Tarris Reed Jr.",
+      "from_team": null,
+      "to_team": "SAS",
+      "kind": "draft",
+      "date": "2026-06-23",
+      "note": "2026 NBA Draft, round 1 pick 26 (UConn, F/C); pick from Denver. Two-source (Wikipedia + Hoops Rumors) only.",
+      "source": {
+        "source": "Hoops Rumors - 2026 NBA Draft results",
+        "url": "https://www.hoopsrumors.com/2026/06/2026-nba-draft-results.html",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium_high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Chris Cenac Jr.",
+      "from_team": null,
+      "to_team": "BOS",
+      "kind": "draft",
+      "date": "2026-06-23",
+      "note": "2026 NBA Draft, round 1 pick 27 (Houston, F/C). Two-source (Wikipedia + Hoops Rumors) only.",
+      "source": {
+        "source": "Hoops Rumors - 2026 NBA Draft results",
+        "url": "https://www.hoopsrumors.com/2026/06/2026-nba-draft-results.html",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium_high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Joshua Jefferson",
+      "from_team": null,
+      "to_team": "BKN",
+      "kind": "draft",
+      "date": "2026-06-23",
+      "note": "2026 NBA Draft, round 1 pick 28 (Iowa State, F); pick from Detroit via Minnesota. Two-source (Wikipedia + Hoops Rumors) only.",
+      "source": {
+        "source": "Hoops Rumors - 2026 NBA Draft results",
+        "url": "https://www.hoopsrumors.com/2026/06/2026-nba-draft-results.html",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium_high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Alex Karaban",
+      "from_team": null,
+      "to_team": "SAC",
+      "kind": "draft",
+      "date": "2026-06-23",
+      "note": "2026 NBA Draft, round 1 pick 29 (UConn, F); pick from San Antonio via Cleveland. Two-source (Wikipedia + Hoops Rumors) only. R3 flagged that Karaban's draft-class eligibility should be spot-checked -- treat as provisional.",
+      "source": {
+        "source": "Hoops Rumors - 2026 NBA Draft results",
+        "url": "https://www.hoopsrumors.com/2026/06/2026-nba-draft-results.html",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium_high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Koa Peat",
+      "from_team": null,
+      "to_team": "PHX",
+      "kind": "draft",
+      "date": "2026-06-23",
+      "note": "2026 NBA Draft, round 1 pick 30 (Arizona, F); pick from OKC via Dallas.",
+      "source": {
+        "source": "NBC Sports - 2026 NBA Draft complete list of every pick",
+        "url": "https://www.nbcsports.com/nba/news/2026-nba-draft-complete-list-of-every-pick-from-round-1-and-round-2",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Bruce Thornton",
+      "from_team": null,
+      "to_team": "HOU",
+      "kind": "draft",
+      "date": "2026-06-24",
+      "note": "2026 NBA Draft, round 2 pick 31 (Ohio State, G). Round-2 data is provisional; encoded because R3 and R6 independently list the same pick/team.",
+      "source": {
+        "source": "NBC Sports - 2026 NBA Draft complete list of every pick",
+        "url": "https://www.nbcsports.com/nba/news/2026-nba-draft-complete-list-of-every-pick-from-round-1-and-round-2",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Isaiah Evans",
+      "from_team": null,
+      "to_team": "MIN",
+      "kind": "draft",
+      "date": "2026-06-24",
+      "note": "2026 NBA Draft, round 2 pick 33 (Duke, G); pick from Brooklyn. Round-2 data is provisional; R3 flagged that Evans' draft-class eligibility needs a primary-source spot-check.",
+      "source": {
+        "source": "NBC Sports - 2026 NBA Draft complete list of every pick",
+        "url": "https://www.nbcsports.com/nba/news/2026-nba-draft-complete-list-of-every-pick-from-round-1-and-round-2",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Braden Smith",
+      "from_team": null,
+      "to_team": "IND",
+      "kind": "draft",
+      "date": "2026-06-24",
+      "note": "2026 NBA Draft, round 2 pick 38 (Purdue, G). Listed only in R6's NBC Sports pick table; round-2 data is provisional.",
+      "source": {
+        "source": "NBC Sports - 2026 NBA Draft complete list of every pick",
+        "url": "https://www.nbcsports.com/nba/news/2026-nba-draft-complete-list-of-every-pick-from-round-1-and-round-2",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium",
+        "type": "news"
+      }
+    }
+  ]
+}

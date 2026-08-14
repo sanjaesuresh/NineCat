@@ -1,0 +1,21 @@
+{
+  "kind": "sentiment",
+  "items": [
+    {
+      "player": "Test Star E",
+      "stance": "breakout",
+      "strength": "recurring",
+      "thread_url": "https://example.com/forum/thread-star-e-breakout",
+      "thread_date": "2026-08-03",
+      "paraphrase": "Community consistently projecting a third-year leap in usage and efficiency.",
+      "source": {
+        "source": "Test Fan Forum",
+        "url": "https://example.com/forum/thread-star-e-breakout",
+        "retrieved": "2026-08-03",
+        "season_label": "2026-27",
+        "quality_tier": "low_medium",
+        "type": "community_rank"
+      }
+    }
+  ]
+}

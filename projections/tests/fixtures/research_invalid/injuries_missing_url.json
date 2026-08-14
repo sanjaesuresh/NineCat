@@ -1,0 +1,19 @@
+{
+  "kind": "injury",
+  "items": [
+    {
+      "player": "Test Star Z",
+      "status": "Out indefinitely with an undisclosed injury.",
+      "games_impact_estimate": 10,
+      "chronic": false,
+      "source": {
+        "source": "Test Medical Desk",
+        "retrieved": "2026-08-01",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      },
+      "note": null
+    }
+  ]
+}

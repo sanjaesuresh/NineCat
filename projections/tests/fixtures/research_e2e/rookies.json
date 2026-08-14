@@ -1,0 +1,35 @@
+{
+  "kind": "rookie",
+  "items": [
+    {
+      "player": "Test Rookie Q",
+      "draft_pick": 4,
+      "team": "Test Town Titans",
+      "position": "SG",
+      "expected_role": "Sixth man scoring guard with late-season starter upside.",
+      "minutes_range": [18.0, 26.0],
+      "comps": ["Test Comp Player One", "Test Comp Player Two"],
+      "per_minute_band": {
+        "fgm": 0.28,
+        "fga": 0.6,
+        "ftm": 0.12,
+        "fta": 0.15,
+        "tpm": 0.1,
+        "pts": 0.78,
+        "reb": 0.16,
+        "ast": 0.12,
+        "stl": 0.03,
+        "blk": 0.01,
+        "tov": 0.06
+      },
+      "source": {
+        "source": "Test Draft Guide",
+        "url": "https://example.com/draft/rookie-q",
+        "retrieved": "2026-06-28",
+        "season_label": "2026-27",
+        "quality_tier": "medium_high",
+        "type": "projection"
+      }
+    }
+  ]
+}

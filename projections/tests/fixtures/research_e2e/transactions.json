@@ -1,0 +1,37 @@
+{
+  "kind": "transaction",
+  "items": [
+    {
+      "player": "Test Star A",
+      "from_team": "Test City Tigers",
+      "to_team": "Test Town Titans",
+      "kind": "trade",
+      "date": "2026-07-05",
+      "source": {
+        "source": "Test Wire",
+        "url": "https://example.com/wire/trade-a",
+        "retrieved": "2026-07-05",
+        "season_label": "2026-27",
+        "quality_tier": "very_high",
+        "type": "news"
+      },
+      "note": "Headline trade of the offseason."
+    },
+    {
+      "player": "Test Star B",
+      "from_team": null,
+      "to_team": "Test Town Titans",
+      "kind": "signing",
+      "date": "2026-07-10",
+      "source": {
+        "source": "Test Wire",
+        "url": "https://example.com/wire/signing-b",
+        "retrieved": "2026-07-10",
+        "season_label": "2026-27",
+        "quality_tier": "medium",
+        "type": "news"
+      },
+      "note": null
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+[
+  {"game_date": "2027-02-17", "home_team_abbr": "AAA", "away_team_abbr": "BBB"},
+  {"game_date": "2027-02-20", "home_team_abbr": "CCC", "away_team_abbr": "AAA"},
+  {"game_date": "2027-02-21", "home_team_abbr": "AAA", "away_team_abbr": "BBB"},
+  {"game_date": "2027-02-22", "home_team_abbr": "CCC", "away_team_abbr": "AAA"},
+  {"game_date": "2027-02-24", "home_team_abbr": "AAA", "away_team_abbr": "BBB"},
+  {"game_date": "2027-02-28", "home_team_abbr": "CCC", "away_team_abbr": "AAA"},
+  {"game_date": "2027-03-01", "home_team_abbr": "AAA", "away_team_abbr": "BBB"},
+  {"game_date": "2027-03-04", "home_team_abbr": "CCC", "away_team_abbr": "AAA"},
+  {"game_date": "2027-03-07", "home_team_abbr": "AAA", "away_team_abbr": "BBB"},
+  {"game_date": "2027-03-08", "home_team_abbr": "CCC", "away_team_abbr": "AAA"},
+  {"game_date": "2027-03-11", "home_team_abbr": "AAA", "away_team_abbr": "BBB"},
+  {"game_date": "2027-03-14", "home_team_abbr": "CCC", "away_team_abbr": "AAA"},
+  {"game_date": "2027-03-15", "home_team_abbr": "AAA", "away_team_abbr": "BBB"},
+  {"game_date": "2027-03-18", "home_team_abbr": "CCC", "away_team_abbr": "AAA"}
+]

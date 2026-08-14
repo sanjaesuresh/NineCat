@@ -1,0 +1,102 @@
+{
+  "season": "2026-27",
+  "prior_seasons": ["2025-26", "2024-25", "2023-24"],
+  "composite_weights": {
+    "per_game": 0.40,
+    "availability_adjusted": 0.20,
+    "expected_games": 0.10,
+    "role_usage": 0.10,
+    "playoff_schedule": 0.05,
+    "consensus": 0.05,
+    "team_environment": 0.05,
+    "category_scarcity": 0.05
+  },
+  "value_split": {
+    "regular_season": 0.75,
+    "playoff": 0.25
+  },
+  "playoff_window": {
+    "start_week": 19,
+    "end_week": 21
+  },
+  "candidate_playoff_windows": [[17, 19], [18, 20], [19, 21], [20, 22], [21, 23], [22, 24]],
+  "fantasy_week1_start": "2026-10-19",
+  "consensus": {
+    "source_type_weights": {
+      "statistical_model": 0.30,
+      "expert_rank": 0.25,
+      "projection": 0.20,
+      "adp": 0.10,
+      "community_rank": 0.10,
+      "news": 0.05
+    },
+    "quality_tier_weights": {
+      "very_high": 1.0,
+      "high": 0.85,
+      "medium_high": 0.7,
+      "medium": 0.5,
+      "low_medium": 0.3,
+      "low": 0.15
+    },
+    "disagreement_rank_threshold": 15,
+    "high_variance_threshold": 144.0,
+    "imputation_penalty": 10
+  },
+  "baseline": {
+    "blend_weights": [5, 3, 1],
+    "regression_strength": 0.25,
+    "age_curve": {
+      "improve_until": 25,
+      "decline_after": 30,
+      "steep_decline_after": 34,
+      "young_bonus": 0.02,
+      "old_penalty": 0.015,
+      "steep_penalty": 0.035,
+      "multiplier_floor": 0.85,
+      "multiplier_ceiling": 1.10
+    },
+    "full_sample_minutes": 4500,
+    "min_rankable_minutes": 300
+  },
+  "adjustment_caps": {
+    "minutes_delta": 8.0,
+    "usage_delta": 5.0,
+    "pace_multiplier": 0.05
+  },
+  "availability": {
+    "risk_thresholds": {
+      "low": 0.25,
+      "moderate": 0.5
+    },
+    "league_median_games": 65,
+    "regression_games": 20,
+    "shrink_factor": 0.35,
+    "missed_share_weight": 0.6,
+    "chronic_penalty": 0.15,
+    "current_injury_risk_cap": 0.3,
+    "age_penalties": {
+      "under_28": 0.0,
+      "from_28_to_31": 0.05,
+      "from_32_to_34": 0.1,
+      "over_34": 0.2
+    }
+  },
+  "confidence_bands": {
+    "high": 75,
+    "medium": 55
+  },
+  "confidence_weights": {
+    "sample": 0.3,
+    "injury": 0.25,
+    "role": 0.25,
+    "source_agreement": 0.2
+  },
+  "cache": {
+    "ttl_hours": 24
+  },
+  "games_bounds": {
+    "min": 0,
+    "max": 82
+  },
+  "scarcity_z_threshold": 1.0
+}

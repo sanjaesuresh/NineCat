@@ -1,0 +1,426 @@
+import { useEffect, useRef, type ReactNode } from "react";
+import type { DisagreementFlag, Player } from "../lib/types";
+import { formatGrade, gradePlayoffSchedule } from "../lib/playoffGrade";
+import { ConfidenceChip, InjuryChip, RankDeltaMarker } from "./badges";
+import { AvailabilityChart } from "./charts/AvailabilityChart";
+import { CategoryProfile } from "./charts/CategoryProfile";
+import { PlayoffWeeks } from "./charts/PlayoffWeeks";
+import { RankCompare } from "./charts/RankCompare";
+import { weekRowTint } from "./charts/chartTheme";
+import { gradeColorClass } from "./columns";
+
+export interface PlayerDetailProps {
+  player: Player;
+  onClose: () => void;
+}
+
+function formatStat(value: number): string {
+  return value.toFixed(1);
+}
+
+/** Percentages render as ".584", not "0.584" -- the leading zero is dead
+ * weight in a dense stat grid and every 9cat site drops it the same way. */
+function formatPct(value: number): string {
+  const fixed = value.toFixed(3);
+  return fixed.startsWith("0.") ? fixed.slice(1) : fixed;
+}
+
+function formatValue(value: number | null): string {
+  return value === null ? "—" : value.toFixed(2);
+}
+
+function formatSigned(value: number, digits = 2): string {
+  return value > 0 ? `+${value.toFixed(digits)}` : value.toFixed(digits);
+}
+
+type ChipTone = "teal" | "rose" | "amber" | "slate";
+
+const CHIP_TONE_CLASSES: Record<ChipTone, string> = {
+  teal: "bg-teal-900 text-teal-200",
+  rose: "bg-rose-900 text-rose-200",
+  amber: "border border-amber-400/30 bg-amber-400/10 text-amber-300",
+  slate: "bg-slate-800 text-slate-300",
+};
+
+function Chip({ tone, children }: { tone: ChipTone; children: ReactNode }) {
+  return (
+    <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${CHIP_TONE_CLASSES[tone]}`}>
+      {children}
+    </span>
+  );
+}
+
+function Section({
+  title,
+  titleExtra,
+  children,
+}: {
+  title: string;
+  /** Optional badge rendered next to the title (e.g. the Schedule section's
+   * playoff-grade badge) -- normal-case/tracking-normal since it carries its
+   * own letters+digits, not a section label. */
+  titleExtra?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section className="mt-4 border-t border-slate-800 pt-3">
+      <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+        {title}
+        {titleExtra && <span className="normal-case tracking-normal">{titleExtra}</span>}
+      </h3>
+      <div className="mt-2">{children}</div>
+    </section>
+  );
+}
+
+const PROJECTION_ROW_LABELS = [
+  "GP",
+  "MPG",
+  "PTS",
+  "REB",
+  "AST",
+  "ST",
+  "BLK",
+  "3PM",
+  "FG%",
+  "FT%",
+  "TO",
+] as const;
+
+const ROLE_DIRECTION_LABEL = { positive: "Increasing", negative: "Decreasing", neutral: "Stable" } as const;
+const ROLE_DIRECTION_TONE: Record<string, ChipTone> = { positive: "teal", negative: "rose", neutral: "slate" };
+
+const FLAG_META: Partial<Record<DisagreementFlag, { label: string; tone: ChipTone }>> = {
+  model_loves: { label: "Model favors", tone: "teal" },
+  model_fades: { label: "Model fades", tone: "rose" },
+  high_uncertainty: { label: "High uncertainty", tone: "amber" },
+};
+
+const WEEK_TINT_TONE = { favorable: "teal", unfavorable: "rose", neutral: "slate" } as const;
+
+/**
+ * Full player detail panel (Task 17). Renders as a plain <aside> alongside
+ * the table on all viewports rather than switching to a true modal dialog on
+ * mobile -- the existing flex-col/lg:flex-row layout (T16) already stacks it
+ * below the table with no horizontal overflow at 360px, and adding a second
+ * CSS-breakpoint-conditional accessibility tree (role=dialog + focus trap on
+ * mobile only) would need a JS media-query check to test reliably, which is
+ * out of scope for this task. Focus still moves in on open and back to the
+ * triggering row on close, and Escape still closes -- just without the
+ * modal's "block interaction with the rest of the page" semantics.
+ */
+export function PlayerDetail({ player, onClose }: PlayerDetailProps) {
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const previouslyFocused = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    // capture whatever had focus (the table row that opened this panel)
+    // before moving focus in, so it can be restored on close/unmount
+    previouslyFocused.current = document.activeElement as HTMLElement | null;
+    headingRef.current?.focus();
+    return () => {
+      previouslyFocused.current?.focus();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [player.player_id]);
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  const isRookie = player.player_id.startsWith("rookie-");
+  const { projection, fantasy, availability, role, schedule, consensus, model, analysis, sources } = player;
+
+  const projectionValues = [
+    formatStat(projection.games),
+    formatStat(projection.minutes),
+    formatStat(projection.points),
+    formatStat(projection.rebounds),
+    formatStat(projection.assists),
+    formatStat(projection.steals),
+    formatStat(projection.blocks),
+    formatStat(projection.three_pm),
+    formatPct(projection.fg_pct),
+    formatPct(projection.ft_pct),
+    formatStat(projection.turnovers),
+  ];
+
+  const fantasyRows: { label: string; value: string }[] = [
+    { label: "Per-game value", value: formatValue(fantasy.per_game_value) },
+    { label: "Availability-adjusted", value: formatValue(fantasy.availability_adjusted_value) },
+    { label: "Regular-season value", value: formatValue(fantasy.regular_season_value) },
+    { label: "Playoff value", value: formatValue(fantasy.playoff_value) },
+    { label: "Combined value", value: formatValue(fantasy.combined_value) },
+    { label: "Final score", value: formatValue(fantasy.final_score) },
+  ];
+
+  const flagMeta = FLAG_META[consensus.flag];
+  const sortedSources = Object.entries(consensus.per_source).sort(([a], [b]) => a.localeCompare(b));
+  const weekEntries = schedule.week_games
+    ? Object.entries(schedule.week_games)
+        .map(([week, games]) => ({ week: Number(week), games }))
+        .sort((a, b) => a.week - b.week)
+    : null;
+  // same grade the Playoff Sched table column shows, computed off the
+  // currently-selected window's week_games (App.tsx's applyWindow already
+  // swapped it in) so the badge here always matches the table
+  const scheduleGrade = gradePlayoffSchedule(schedule.week_games);
+
+  return (
+    <aside
+      className="w-full rounded-lg border border-slate-800 bg-slate-900 p-4 lg:w-80 lg:shrink-0"
+      aria-label={`${player.name} player detail`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h2
+            ref={headingRef}
+            tabIndex={-1}
+            className="text-lg font-semibold text-slate-100 outline-none"
+          >
+            {player.name}
+            {isRookie && (
+              <span className="ml-2 align-middle">
+                <Chip tone="amber">Rookie</Chip>
+              </span>
+            )}
+          </h2>
+          <p className="mt-0.5 text-sm text-slate-400">
+            {player.team} &middot; {player.positions.join(" · ")} &middot; Age {player.age ?? "—"}
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center rounded bg-amber-400/10 px-2 py-0.5 text-sm font-semibold tabular-nums text-amber-300">
+              #{model.final_rank}
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded bg-slate-800 px-2 py-1 text-sm">
+              <span className="tabular-nums font-semibold text-slate-100">{model.confidence}</span>
+              <ConfidenceChip band={model.confidence_band} />
+            </span>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={`Close ${player.name} detail`}
+          className="min-h-[24px] min-w-[24px] shrink-0 rounded text-slate-400 hover:text-amber-300 focus:outline-none focus-visible:ring-1 focus-visible:ring-amber-400"
+        >
+          &times;
+        </button>
+      </div>
+
+      <Section title="Projection">
+        <dl className="grid grid-cols-4 gap-x-3 gap-y-2 sm:grid-cols-6">
+          {PROJECTION_ROW_LABELS.map((label, i) => (
+            <div key={label}>
+              <dt className="text-[11px] uppercase text-slate-500">{label}</dt>
+              <dd className="tabular-nums text-slate-100">{projectionValues[i]}</dd>
+            </div>
+          ))}
+        </dl>
+      </Section>
+
+      <Section title="Fantasy value">
+        <dl className="divide-y divide-slate-800/60">
+          {fantasyRows.map((row) => (
+            <div key={row.label} className="flex items-center justify-between py-1 text-sm">
+              <dt className="text-slate-400">{row.label}</dt>
+              <dd className="tabular-nums text-slate-100">{row.value}</dd>
+            </div>
+          ))}
+        </dl>
+        <div className="mt-3">
+          <CategoryProfile zScores={fantasy.per_game_zscores} />
+        </div>
+      </Section>
+
+      <Section title="Context">
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <InjuryChip label={availability.injury_risk_label} />
+          <span className="text-slate-400">
+            risk score <span className="tabular-nums text-slate-200">{availability.injury_risk_score.toFixed(2)}</span>
+          </span>
+        </div>
+        <p className="mt-1 text-sm text-slate-400">
+          Raw <span className="tabular-nums text-slate-200">{formatStat(availability.raw_projected_games)}</span>{" "}
+          &rarr; Adjusted{" "}
+          <span className="tabular-nums text-slate-200">{formatStat(availability.injury_adjusted_games)}</span> games
+        </p>
+        <div className="mt-3">
+          <AvailabilityChart
+            rawProjectedGames={availability.raw_projected_games}
+            injuryAdjustedGames={availability.injury_adjusted_games}
+          />
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-slate-400">Role trend</span>
+          <Chip tone={ROLE_DIRECTION_TONE[role.direction]}>{ROLE_DIRECTION_LABEL[role.direction]}</Chip>
+          <span className="tabular-nums text-slate-400">({formatSigned(role.role_change_score)})</span>
+          {role.team_changed && <Chip tone="amber">Team changed</Chip>}
+        </div>
+        {role.minutes_delta !== 0 && (
+          <p className="mt-1 text-sm text-slate-400">
+            Minutes &Delta; <span className="tabular-nums text-slate-200">{formatSigned(role.minutes_delta, 1)}</span>
+          </p>
+        )}
+        {role.usage_delta !== 0 && (
+          <p className="mt-1 text-sm text-slate-400">
+            Usage &Delta; <span className="tabular-nums text-slate-200">{formatSigned(role.usage_delta, 3)}</span>
+          </p>
+        )}
+        {role.pace_multiplier !== 1 && (
+          <p className="mt-1 text-sm text-slate-400">
+            Pace multiplier <span className="tabular-nums text-slate-200">{role.pace_multiplier.toFixed(2)}&times;</span>
+          </p>
+        )}
+      </Section>
+
+      <Section
+        title="Schedule"
+        titleExtra={
+          scheduleGrade && (
+            <span className={`font-semibold ${gradeColorClass(scheduleGrade.grade[0])}`}>
+              {formatGrade(scheduleGrade)}
+            </span>
+          )
+        }
+      >
+        {weekEntries === null ? (
+          <p className="text-sm text-slate-400">2026-27 schedule pending</p>
+        ) : (
+          <>
+            <div className="flex flex-col gap-0.5">
+              {weekEntries.map(({ week, games }) => {
+                const tint = weekRowTint(games);
+                return (
+                  <div key={week} className="flex items-center justify-between text-sm">
+                    <span className="text-slate-300">Week {week}</span>
+                    <Chip tone={WEEK_TINT_TONE[tint]}>{games} games</Chip>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="mt-2 text-sm text-slate-400">
+              Playoff games{" "}
+              <span className="tabular-nums text-slate-200">{schedule.playoff_games ?? "—"}</span>
+              {schedule.expected_playoff_games !== null && (
+                <>
+                  {" "}
+                  (expected <span className="tabular-nums text-slate-200">{schedule.expected_playoff_games.toFixed(1)}</span>)
+                </>
+              )}
+            </p>
+            <p className="text-sm text-slate-400">
+              Back-to-backs <span className="tabular-nums text-slate-200">{schedule.playoff_b2bs ?? "—"}</span>
+            </p>
+            <div className="mt-3">
+              <PlayoffWeeks weekGames={schedule.week_games} />
+            </div>
+          </>
+        )}
+      </Section>
+
+      <Section title="Consensus">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+          <span className="text-slate-400">
+            Our Rank <span className="tabular-nums font-medium text-slate-100">#{model.final_rank}</span>
+          </span>
+          <span className="text-slate-400">
+            Model Rank <span className="tabular-nums font-medium text-slate-100">#{model.model_rank}</span>
+          </span>
+          <span className="text-slate-400">
+            Consensus{" "}
+            <span className="tabular-nums font-medium text-slate-100">
+              {/* consensus_rank is a weighted blend across sources, so it lands
+               * on values like 2.9999999999999996 in the real dataset --
+               * round for display (matches columns.tsx's Consensus column) */}
+              {consensus.consensus_rank === null ? "—" : `#${Math.round(consensus.consensus_rank)}`}
+            </span>
+            <RankDeltaMarker rankDifference={consensus.rank_difference} />
+          </span>
+          {flagMeta && <Chip tone={flagMeta.tone}>{flagMeta.label}</Chip>}
+        </div>
+
+        {sortedSources.length > 0 && (
+          <ul className="mt-2 flex flex-col gap-0.5">
+            {sortedSources.map(([source, info]) => (
+              <li key={source} className="flex items-center justify-between text-sm">
+                <span className="text-slate-300">{source}</span>
+                <span className="flex items-center gap-1.5">
+                  <span className="tabular-nums text-slate-100">#{info.rank}</span>
+                  {info.imputed && <Chip tone="slate">Imputed</Chip>}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <div className="mt-3">
+          <RankCompare
+            modelRank={model.model_rank}
+            finalRank={model.final_rank}
+            consensusRank={consensus.consensus_rank}
+            perSource={consensus.per_source}
+          />
+        </div>
+      </Section>
+
+      <Section title="Why ranked here">
+        {analysis.explanation ? (
+          <p className="text-sm text-slate-300">{analysis.explanation}</p>
+        ) : (
+          <p className="text-sm text-slate-500">No analysis available.</p>
+        )}
+        {analysis.strengths.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {analysis.strengths.map((s) => (
+              <Chip key={s} tone="teal">
+                {s}
+              </Chip>
+            ))}
+          </div>
+        )}
+        {analysis.risks.length > 0 && (
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {analysis.risks.map((r) => (
+              <Chip key={r} tone="rose">
+                {r}
+              </Chip>
+            ))}
+          </div>
+        )}
+      </Section>
+
+      <Section title="Sources">
+        {sources.length === 0 ? (
+          <p className="text-sm text-slate-500">No sources listed.</p>
+        ) : (
+          <details>
+            <summary className="cursor-pointer rounded text-sm font-medium text-slate-300 hover:text-amber-300 focus:outline-none focus-visible:ring-1 focus-visible:ring-amber-400">
+              {sources.length} source{sources.length === 1 ? "" : "s"}
+            </summary>
+            <ul className="mt-2 flex flex-col gap-1.5">
+              {sources.map((s) => (
+                <li key={`${s.source}-${s.url}`} className="text-sm text-slate-400">
+                  <a
+                    href={s.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded text-amber-300 underline decoration-amber-300/40 underline-offset-2 hover:text-amber-200 focus:outline-none focus-visible:ring-1 focus-visible:ring-amber-400"
+                  >
+                    {s.source}
+                  </a>
+                  <span className="ml-1 text-slate-500">&middot; retrieved {s.retrieved}</span>
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
+      </Section>
+    </aside>
+  );
+}

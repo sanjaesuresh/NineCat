@@ -1,0 +1,380 @@
+{
+  "generated": "2026-08-14T22:02:23.590909+00:00",
+  "status": "pass",
+  "checks": [
+    {
+      "check": "json_parses",
+      "status": "pass",
+      "detail": "dataset JSON parsed successfully"
+    },
+    {
+      "check": "player_count",
+      "status": "pass",
+      "detail": "200 players (expected 200)"
+    },
+    {
+      "check": "rank_contiguity",
+      "status": "pass",
+      "detail": "ranks unique+contiguous 1..200: True"
+    },
+    {
+      "check": "unique_player_id",
+      "status": "pass",
+      "detail": "duplicate player_ids: []"
+    },
+    {
+      "check": "unique_name",
+      "status": "pass",
+      "detail": "duplicate names: []"
+    },
+    {
+      "check": "pct_bounds",
+      "status": "pass",
+      "detail": "fg_pct/ft_pct outside [0,1]: []"
+    },
+    {
+      "check": "games_bounds",
+      "status": "pass",
+      "detail": "games outside [0,82]: []"
+    },
+    {
+      "check": "minutes_bounds",
+      "status": "pass",
+      "detail": "minutes outside [0,48]: []"
+    },
+    {
+      "check": "stat_non_negative_finite",
+      "status": "pass",
+      "detail": "negative/non-finite raw stat values (z-scores/values excluded): []"
+    },
+    {
+      "check": "sources_have_urls",
+      "status": "pass",
+      "detail": "players with a non-http(s) source url: []"
+    },
+    {
+      "check": "windows_games_bounds",
+      "status": "pass",
+      "detail": "players/windows with playoff_games out of [0, window_weeks*7]: []"
+    },
+    {
+      "check": "windows_score_range",
+      "status": "pass",
+      "detail": "players/windows with playoff_schedule_score outside [0,1]: []"
+    },
+    {
+      "check": "playoff_window_coverage",
+      "status": "pass",
+      "detail": "playoff window has real league-wide games, or no schedule was fetched at all"
+    },
+    {
+      "check": "consensus_top50_in_pool",
+      "status": "pass",
+      "detail": "top-50 consensus names missing from the pipeline pool: []"
+    }
+  ],
+  "analysis": {
+    "top_rank_disagreements": [
+      {
+        "name": "RJ Barrett",
+        "rank_difference": -130.20408163265307
+      },
+      {
+        "name": "Zach Edey",
+        "rank_difference": -126.16326530612245
+      },
+      {
+        "name": "Jalen Green",
+        "rank_difference": -106.61224489795919
+      },
+      {
+        "name": "Stephon Castle",
+        "rank_difference": -103.75510204081633
+      },
+      {
+        "name": "Ty Jerome",
+        "rank_difference": -92.9183673469388
+      },
+      {
+        "name": "Paolo Banchero",
+        "rank_difference": -91.40816326530613
+      },
+      {
+        "name": "Anthony Black",
+        "rank_difference": -89.02040816326532
+      },
+      {
+        "name": "Davion Mitchell",
+        "rank_difference": -86.6122448979592
+      },
+      {
+        "name": "Darryn Peterson",
+        "rank_difference": -79.28571428571429
+      },
+      {
+        "name": "Aaron Gordon",
+        "rank_difference": -74.71428571428572
+      }
+    ],
+    "missing_consensus": [
+      "Jimmy Butler III",
+      "Julian Champagnie",
+      "Zach LaVine",
+      "Luke Kornet",
+      "Wendell Carter Jr.",
+      "Royce O'Neale",
+      "Kris Dunn",
+      "Max Christie",
+      "Keon Ellis",
+      "Goga Bitadze",
+      "Isaiah Joe",
+      "Cam Spencer",
+      "Bez Mbeng",
+      "Duncan Robinson",
+      "Dylan Cardwell",
+      "Justin Champagnie",
+      "Robert Williams III",
+      "Sam Hauser",
+      "Kevin Huerter",
+      "Jonas Valanciunas",
+      "Luke Kennard",
+      "Derrick Jones Jr.",
+      "Moses Moody",
+      "Harrison Barnes",
+      "Dereck Lively II",
+      "De'Andre Hunter",
+      "D'Angelo Russell"
+    ],
+    "confidence_low": [
+      "Bez Mbeng",
+      "Dylan Cardwell"
+    ],
+    "injury_high": [
+      "Kawhi Leonard",
+      "Anthony Davis",
+      "Joel Embiid",
+      "Damian Lillard",
+      "Kyrie Irving",
+      "Kristaps Porzi\u0146\u0123is",
+      "Jimmy Butler III"
+    ],
+    "consensus_pool_diff": {
+      "projected_players_in_no_list": [
+        "Jimmy Butler III",
+        "Julian Champagnie",
+        "Zach LaVine",
+        "Luke Kornet",
+        "Wendell Carter Jr.",
+        "Royce O'Neale",
+        "Kris Dunn",
+        "Max Christie",
+        "Keon Ellis",
+        "Goga Bitadze",
+        "Isaiah Joe",
+        "Cam Spencer",
+        "Bez Mbeng",
+        "Duncan Robinson",
+        "Dylan Cardwell",
+        "Justin Champagnie",
+        "Robert Williams III",
+        "Sam Hauser",
+        "Kevin Huerter",
+        "Jonas Valanciunas",
+        "Luke Kennard",
+        "Derrick Jones Jr.",
+        "Moses Moody",
+        "Harrison Barnes",
+        "Dereck Lively II",
+        "De'Andre Hunter",
+        "D'Angelo Russell"
+      ],
+      "unmatched_consensus_names": [
+        {
+          "name": "Scoot Henderson",
+          "source": "ESPN Way-Too-Early 2026-27 Points-League Rankings (Apr 14, 2026)"
+        },
+        {
+          "name": "Egor Demin",
+          "source": "ESPN Way-Too-Early 2026-27 Points-League Rankings (Apr 14, 2026)"
+        },
+        {
+          "name": "Isaiah Collier",
+          "source": "ESPN Way-Too-Early 2026-27 Points-League Rankings (Apr 14, 2026)"
+        },
+        {
+          "name": "Donte DiVincenzo",
+          "source": "ESPN Way-Too-Early 2026-27 Points-League Rankings (Apr 14, 2026)"
+        },
+        {
+          "name": "Dennis Schroder",
+          "source": "ESPN Way-Too-Early 2026-27 Points-League Rankings (Apr 14, 2026)"
+        },
+        {
+          "name": "Jusuf Nurkic",
+          "source": "ESPN Way-Too-Early 2026-27 Points-League Rankings (Apr 14, 2026)"
+        },
+        {
+          "name": "Kyle Kuzma",
+          "source": "ESPN Way-Too-Early 2026-27 Points-League Rankings (Apr 14, 2026)"
+        },
+        {
+          "name": "Caleb Wilson",
+          "source": "RotoWire Fantasy Basketball Outlook Rankings (Roto/Points)"
+        },
+        {
+          "name": "AJ Dybantsa",
+          "source": "RotoWire Fantasy Basketball Outlook Rankings (Roto/Points)"
+        },
+        {
+          "name": "Darius Acuff",
+          "source": "RotoWire Fantasy Basketball Outlook Rankings (Roto/Points)"
+        },
+        {
+          "name": "Day'Ron Sharpe",
+          "source": "RotoWire Fantasy Basketball Outlook Rankings (Roto/Points)"
+        },
+        {
+          "name": "Keaton Wagler",
+          "source": "RotoWire Fantasy Basketball Outlook Rankings (Roto/Points)"
+        },
+        {
+          "name": "Kyle Kuzma",
+          "source": "RotoWire Fantasy Basketball Outlook Rankings (Roto/Points)"
+        },
+        {
+          "name": "Yaxel Lendeborg",
+          "source": "RotoWire Fantasy Basketball Outlook Rankings (Roto/Points)"
+        },
+        {
+          "name": "Mikel Brown",
+          "source": "RotoWire Fantasy Basketball Outlook Rankings (Roto/Points)"
+        },
+        {
+          "name": "Jusuf Nurkic",
+          "source": "RotoWire Fantasy Basketball Outlook Rankings (Roto/Points)"
+        },
+        {
+          "name": "Egor Demin",
+          "source": "RotoWire Fantasy Basketball Outlook Rankings (Roto/Points)"
+        },
+        {
+          "name": "Jaylen Wells",
+          "source": "RotoWire Fantasy Basketball Outlook Rankings (Roto/Points)"
+        },
+        {
+          "name": "Aaron Wiggins",
+          "source": "RotoWire Fantasy Basketball Outlook Rankings (Roto/Points)"
+        },
+        {
+          "name": "Scotty Pippen",
+          "source": "RotoWire Fantasy Basketball Outlook Rankings (Roto/Points)"
+        },
+        {
+          "name": "Kasparas Jakucionis",
+          "source": "RotoWire Fantasy Basketball Outlook Rankings (Roto/Points)"
+        },
+        {
+          "name": "Brayden Burries",
+          "source": "RotoWire Fantasy Basketball Outlook Rankings (Roto/Points)"
+        },
+        {
+          "name": "Cam Thomas",
+          "source": "Slamdex NBA Fantasy ADP 2026-27 (Yahoo/ESPN/Fantrax aggregate)"
+        },
+        {
+          "name": "Cam Johnson",
+          "source": "Slamdex NBA Fantasy ADP 2026-27 (Yahoo/ESPN/Fantrax aggregate)"
+        },
+        {
+          "name": "Donte DiVincenzo",
+          "source": "Slamdex NBA Fantasy ADP 2026-27 (Yahoo/ESPN/Fantrax aggregate)"
+        },
+        {
+          "name": "Klay Thompson",
+          "source": "Slamdex NBA Fantasy ADP 2026-27 (Yahoo/ESPN/Fantrax aggregate)"
+        },
+        {
+          "name": "Jonathan Kuminga",
+          "source": "Slamdex NBA Fantasy ADP 2026-27 (Yahoo/ESPN/Fantrax aggregate)"
+        },
+        {
+          "name": "Dennis Schroder",
+          "source": "Slamdex NBA Fantasy ADP 2026-27 (Yahoo/ESPN/Fantrax aggregate)"
+        },
+        {
+          "name": "Kyle Kuzma",
+          "source": "Slamdex NBA Fantasy ADP 2026-27 (Yahoo/ESPN/Fantrax aggregate)"
+        },
+        {
+          "name": "Zaccharie Risacher",
+          "source": "Slamdex NBA Fantasy ADP 2026-27 (Yahoo/ESPN/Fantrax aggregate)"
+        },
+        {
+          "name": "Isaiah Collier",
+          "source": "Slamdex NBA Fantasy ADP 2026-27 (Yahoo/ESPN/Fantrax aggregate)"
+        },
+        {
+          "name": "Cam Whitmore",
+          "source": "Slamdex NBA Fantasy ADP 2026-27 (Yahoo/ESPN/Fantrax aggregate)"
+        },
+        {
+          "name": "Scotty Pippen Jr.",
+          "source": "Slamdex NBA Fantasy ADP 2026-27 (Yahoo/ESPN/Fantrax aggregate)"
+        },
+        {
+          "name": "T.J. McConnell",
+          "source": "Slamdex NBA Fantasy ADP 2026-27 (Yahoo/ESPN/Fantrax aggregate)"
+        },
+        {
+          "name": "Obi Toppin",
+          "source": "Slamdex NBA Fantasy ADP 2026-27 (Yahoo/ESPN/Fantrax aggregate)"
+        },
+        {
+          "name": "Adem Bona",
+          "source": "Slamdex NBA Fantasy ADP 2026-27 (Yahoo/ESPN/Fantrax aggregate)"
+        },
+        {
+          "name": "Rui Hachimura",
+          "source": "Slamdex NBA Fantasy ADP 2026-27 (Yahoo/ESPN/Fantrax aggregate)"
+        },
+        {
+          "name": "Al Horford",
+          "source": "Slamdex NBA Fantasy ADP 2026-27 (Yahoo/ESPN/Fantrax aggregate)"
+        },
+        {
+          "name": "Taylor Hendricks",
+          "source": "Slamdex NBA Fantasy ADP 2026-27 (Yahoo/ESPN/Fantrax aggregate)"
+        },
+        {
+          "name": "Jared McCain",
+          "source": "Slamdex NBA Fantasy ADP 2026-27 (Yahoo/ESPN/Fantrax aggregate)"
+        },
+        {
+          "name": "Alex Caruso",
+          "source": "Slamdex NBA Fantasy ADP 2026-27 (Yahoo/ESPN/Fantrax aggregate)"
+        },
+        {
+          "name": "Gradey Dick",
+          "source": "Slamdex NBA Fantasy ADP 2026-27 (Yahoo/ESPN/Fantrax aggregate)"
+        },
+        {
+          "name": "Lu Dort",
+          "source": "Slamdex NBA Fantasy ADP 2026-27 (Yahoo/ESPN/Fantrax aggregate)"
+        },
+        {
+          "name": "Yang Hansen",
+          "source": "Slamdex NBA Fantasy ADP 2026-27 (Yahoo/ESPN/Fantrax aggregate)"
+        },
+        {
+          "name": "Russell Westbrook",
+          "source": "Slamdex NBA Fantasy ADP 2026-27 (Yahoo/ESPN/Fantrax aggregate)"
+        },
+        {
+          "name": "Buddy Hield",
+          "source": "Slamdex NBA Fantasy ADP 2026-27 (Yahoo/ESPN/Fantrax aggregate)"
+        }
+      ],
+      "note": "covers both directions: store was provided to validate_dataset."
+    }
+  }
+}

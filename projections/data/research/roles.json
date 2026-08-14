@@ -1,0 +1,485 @@
+{
+  "kind": "role",
+  "items": [
+    {
+      "player": "Bam Adebayo",
+      "direction": "negative",
+      "minutes_delta": 0.0,
+      "usage_delta": -2.5,
+      "confidence": 0.6,
+      "rationale": "Miami acquired Giannis Antetokounmpo (official 2026-07-06, ESPN). Adebayo is the incumbent high-usage Heat big and now shares the frontcourt and the offensive hub role with a former MVP; standard incumbent-usage compression, no minutes change assumed since he remains the starting center.",
+      "source": {
+        "source": "ESPN - Bucks trading Giannis Antetokounmpo and Bobby Portis to Heat",
+        "url": "https://www.espn.com/nba/story/_/id/49149967/bucks-trading-giannis-antetokounmpo-bobby-portis-heat-tyler-herro-kelel-ware-jaime-jaquez-jr-kasparas-jakucionis-picks",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Giannis Antetokounmpo",
+      "direction": "negative",
+      "minutes_delta": 0.0,
+      "usage_delta": -1.0,
+      "confidence": 0.4,
+      "rationale": "Traded from Milwaukee, where he was the sole offensive hub, to Miami alongside established high-usage center Bam Adebayo (ESPN, 2026-07-06). Small usage give-back only; no coach quote exists on how Miami will split touches, hence low confidence.",
+      "source": {
+        "source": "ESPN - Bucks trading Giannis Antetokounmpo and Bobby Portis to Heat",
+        "url": "https://www.espn.com/nba/story/_/id/49149967/bucks-trading-giannis-antetokounmpo-bobby-portis-heat-tyler-herro-kelel-ware-jaime-jaquez-jr-kasparas-jakucionis-picks",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Tyler Herro",
+      "direction": "positive",
+      "minutes_delta": 2.0,
+      "usage_delta": 2.0,
+      "confidence": 0.5,
+      "rationale": "Headline return piece sent from Miami to Milwaukee in the Giannis Antetokounmpo trade (ESPN, 2026-07-06), landing on a roster that just lost its entire offensive hub. SI/OnSI's post-trade Bucks roster ranking says Herro 'may be the best player available on the Bucks' roster... if he's not traded before the season, he should become the Bucks' primary scoring option and should be able to put up impressive numbers with higher usage and activity'. TWO CAVEATS cap this at 0.5: that quote is from an OnSI fan-network aggregator, not a top-tier newsroom, and the same piece flags Herro's expiring $31M deal as making him a pre-season trade candidate, so the role itself may not survive to opening night.",
+      "source": {
+        "source": "SI/OnSI - Ranking everyone on the Bucks roster post-Giannis trade",
+        "url": "https://www.si.com/nba/bucks/onsi/ranking-everyone-on-the-bucks-roster-post-giannis-trade-01kwc8sjxgbw",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium",
+        "type": "projection"
+      }
+    },
+    {
+      "player": "Kel'el Ware",
+      "direction": "positive",
+      "minutes_delta": 4.0,
+      "usage_delta": 1.0,
+      "confidence": 0.45,
+      "rationale": "Moved from Miami, where he sat behind Bam Adebayo in a crowded frontcourt, to Milwaukee in the Giannis Antetokounmpo trade (ESPN, 2026-07-06). Classic crowded-to-vacated frontcourt move; minutes gain outpaces the usage gain because Milwaukee's offense will run through the guards it acquired. CAVEAT: R3's follow-up pass found NO direct-sourced quote on Ware's specific role or usage -- reporting confirms only that he is 'part of the rebuild' -- so confidence is dropped below 0.5.",
+      "source": {
+        "source": "ESPN - Bucks trading Giannis Antetokounmpo and Bobby Portis to Heat",
+        "url": "https://www.espn.com/nba/story/_/id/49149967/bucks-trading-giannis-antetokounmpo-bobby-portis-heat-tyler-herro-kelel-ware-jaime-jaquez-jr-kasparas-jakucionis-picks",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Jaime Jaquez Jr.",
+      "direction": "positive",
+      "minutes_delta": 3.0,
+      "usage_delta": 1.0,
+      "confidence": 0.5,
+      "rationale": "Sent from Miami to Milwaukee in the Giannis Antetokounmpo trade (ESPN, 2026-07-06). SI/OnSI's post-trade Bucks roster ranking reports he was a 2025-26 Sixth Man of the Year finalist, that 'Milwaukee was adamant about getting him back in the trade for Giannis', and that he is expected to get a carved-out wing role given the Bucks' thin wing depth. Capped at 0.5 because that is a single OnSI aggregator source, not a beat-writer or coach quote.",
+      "source": {
+        "source": "SI/OnSI - Ranking everyone on the Bucks roster post-Giannis trade",
+        "url": "https://www.si.com/nba/bucks/onsi/ranking-everyone-on-the-bucks-roster-post-giannis-trade-01kwc8sjxgbw",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium",
+        "type": "projection"
+      }
+    },
+    {
+      "player": "Kasparas Jakucionis",
+      "direction": "positive",
+      "minutes_delta": 3.0,
+      "usage_delta": 1.0,
+      "confidence": 0.4,
+      "rationale": "Sent from Miami to Milwaukee in the Giannis Antetokounmpo trade (ESPN, 2026-07-06); a young guard landing on a rebuilding roster that just shipped out its franchise player. R3's follow-up pass found no direct-sourced quote on his role beyond 'part of the rebuild', and SI/OnSI's roster piece points the primary scoring role at Tyler Herro, so this stays speculative and pinned at the confidence floor.",
+      "source": {
+        "source": "ESPN - Bucks trading Giannis Antetokounmpo and Bobby Portis to Heat",
+        "url": "https://www.espn.com/nba/story/_/id/49149967/bucks-trading-giannis-antetokounmpo-bobby-portis-heat-tyler-herro-kelel-ware-jaime-jaquez-jr-kasparas-jakucionis-picks",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Joel Embiid",
+      "direction": "negative",
+      "minutes_delta": 0.0,
+      "usage_delta": -3.0,
+      "confidence": 0.6,
+      "rationale": "Philadelphia added Jaylen Brown by trade (ESPN, 2026-07-06) and then signed LeBron James in free agency (ESPN, ~2026-07-24); R3 describes the result as a 'massive change to 76ers' offensive hierarchy' with LeBron paired alongside Embiid, Maxey, Brown and Edgecombe. Two high-usage additions justify the largest incumbent give-back in this file, still inside the -3 conservative bound.",
+      "source": {
+        "source": "ESPN - LeBron chooses 76ers, signs 2-year, $8 million contract",
+        "url": "https://www.espn.com/nba/story/_/id/49440164/lebron-chooses-76ers-sign-2-year-8-million-contract",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Tyrese Maxey",
+      "direction": "negative",
+      "minutes_delta": 0.0,
+      "usage_delta": -3.0,
+      "confidence": 0.6,
+      "rationale": "Same Philadelphia hierarchy change: Jaylen Brown in by trade (ESPN, 2026-07-06) and LeBron James signed (ESPN, ~2026-07-24), with R3 explicitly naming Maxey among the players LeBron is now paired with. Maxey was the primary on-ball creator and now shares that job with LeBron.",
+      "source": {
+        "source": "ESPN - LeBron chooses 76ers, signs 2-year, $8 million contract",
+        "url": "https://www.espn.com/nba/story/_/id/49440164/lebron-chooses-76ers-sign-2-year-8-million-contract",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "VJ Edgecombe",
+      "direction": "negative",
+      "minutes_delta": -2.0,
+      "usage_delta": -2.0,
+      "confidence": 0.5,
+      "rationale": "Named by R3 among the 76ers now sharing the floor with LeBron James (ESPN signing, ~2026-07-24) and Jaylen Brown (ESPN trade, 2026-07-06). As the least established of that group he absorbs both a minutes and a touches squeeze.",
+      "source": {
+        "source": "ESPN - LeBron chooses 76ers, signs 2-year, $8 million contract",
+        "url": "https://www.espn.com/nba/story/_/id/49440164/lebron-chooses-76ers-sign-2-year-8-million-contract",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Jaylen Brown",
+      "direction": "negative",
+      "minutes_delta": 0.0,
+      "usage_delta": -2.0,
+      "confidence": 0.5,
+      "rationale": "Traded from Boston, where he was a co-number-one option, to Philadelphia (ESPN, 2026-07-06), which then also signed LeBron James (ESPN, ~2026-07-24). He joins the deepest offensive hierarchy of any team in this offseason's moves.",
+      "source": {
+        "source": "ESPN - Celtics sending Brown to 76ers for George and picks",
+        "url": "https://www.espn.com/nba/story/_/id/49241843/sources-celtics-sending-brown-76ers-george-picks",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "LeBron James",
+      "direction": "negative",
+      "minutes_delta": -2.0,
+      "usage_delta": -3.0,
+      "confidence": 0.55,
+      "rationale": "Signed with Philadelphia on a 2-year, $8M deal (ESPN, ~2026-07-24), leaving a Lakers team he ran to a 76ers roster where R3 places him fourth in a hierarchy with Embiid, Maxey, Brown and Edgecombe. Age is corroborating context: he turns 41 in his 24th season (R4).",
+      "source": {
+        "source": "ESPN - LeBron chooses 76ers, signs 2-year, $8 million contract",
+        "url": "https://www.espn.com/nba/story/_/id/49440164/lebron-chooses-76ers-sign-2-year-8-million-contract",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Jayson Tatum",
+      "direction": "positive",
+      "minutes_delta": 0.0,
+      "usage_delta": 2.0,
+      "confidence": 0.6,
+      "rationale": "Jaylen Brown was traded to Philadelphia (ESPN, 2026-07-06); R4's Tatum entry states he enters 2026-27 'with expanded offensive role after Jaylen Brown's departure from Boston'. Usage only -- minutes are held flat because he is also in his first full season back from a 2025 Achilles rupture.",
+      "source": {
+        "source": "ESPN - Celtics sending Brown to 76ers for George and picks",
+        "url": "https://www.espn.com/nba/story/_/id/49241843/sources-celtics-sending-brown-76ers-george-picks",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Paul George",
+      "direction": "positive",
+      "minutes_delta": 2.0,
+      "usage_delta": 2.0,
+      "confidence": 0.45,
+      "rationale": "Traded from Philadelphia to Boston in the Jaylen Brown deal (ESPN, 2026-07-06), moving off a roster that then added LeBron James onto a Celtics team R3 describes as rebuilding 'around George plus picks'. Age and injury history keep confidence below 0.5.",
+      "source": {
+        "source": "ESPN - Celtics sending Brown to 76ers for George and picks",
+        "url": "https://www.espn.com/nba/story/_/id/49241843/sources-celtics-sending-brown-76ers-george-picks",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Luka Doncic",
+      "direction": "positive",
+      "minutes_delta": 0.0,
+      "usage_delta": 2.0,
+      "confidence": 0.6,
+      "rationale": "LeBron James left the Lakers for Philadelphia in free agency (ESPN, ~2026-07-24); R3 calls the move a change to the 'Lakers' backcourt/frontcourt usage'. Doncic is the remaining primary creator and absorbs vacated on-ball possessions. Minutes flat -- he was already at a starter's load.",
+      "source": {
+        "source": "ESPN - LeBron chooses 76ers, signs 2-year, $8 million contract",
+        "url": "https://www.espn.com/nba/story/_/id/49440164/lebron-chooses-76ers-sign-2-year-8-million-contract",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Austin Reaves",
+      "direction": "positive",
+      "minutes_delta": 2.0,
+      "usage_delta": 2.0,
+      "confidence": 0.45,
+      "rationale": "Second-order effect of LeBron James signing with Philadelphia (ESPN, ~2026-07-24), which R3 describes as reshaping Lakers backcourt usage. Reaves is the other returning Lakers guard creator per RotoWire's roster tagging; because no beat report names him specifically, confidence is held below 0.5.",
+      "source": {
+        "source": "ESPN - LeBron chooses 76ers, signs 2-year, $8 million contract",
+        "url": "https://www.espn.com/nba/story/_/id/49440164/lebron-chooses-76ers-sign-2-year-8-million-contract",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Walker Kessler",
+      "direction": "positive",
+      "minutes_delta": 2.0,
+      "usage_delta": 1.0,
+      "confidence": 0.55,
+      "rationale": "Sign-and-traded from Utah to the Lakers on 2026-07-01 for two unprotected firsts and two swaps, signing 4 years / $130M (ESPN); R3 describes him as the Lakers' new starting/rotation center. That acquisition cost and contract imply a locked starting role, so a modest minutes bump with only a small usage change for a play-finishing big.",
+      "source": {
+        "source": "ESPN - Lakers trading for Jazz center Walker Kessler",
+        "url": "https://www.espn.com/nba/story/_/id/49237403/lakers-trading-jazz-center-walker-kessler-sources-say",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Kyle Filipowski",
+      "direction": "positive",
+      "minutes_delta": 4.0,
+      "usage_delta": 1.0,
+      "confidence": 0.4,
+      "rationale": "Walker Kessler was sign-and-traded out of Utah on 2026-07-01 (ESPN), vacating the Jazz starting-center minutes. CAVEAT: Filipowski's placement on Utah's depth chart comes from RotoWire's ranking list, not a Jazz beat report, and Utah also drafted no center in round one -- confidence pinned at the 0.4 floor for that reason.",
+      "source": {
+        "source": "ESPN - Lakers trading for Jazz center Walker Kessler",
+        "url": "https://www.espn.com/nba/story/_/id/49237403/lakers-trading-jazz-center-walker-kessler-sources-say",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Jalen Johnson",
+      "direction": "positive",
+      "minutes_delta": 0.0,
+      "usage_delta": 2.0,
+      "confidence": 0.6,
+      "rationale": "Trae Young was traded from Atlanta to Washington on 2026-01-07 (NBA.com), removing the Hawks' dominant on-ball creator. Johnson is the highest-ranked remaining Atlanta creator across both the RotoWire and ESPN 2026-27 lists and absorbs vacated usage.",
+      "source": {
+        "source": "NBA.com - Hawks trade Trae Young to Wizards for CJ McCollum, Corey Kispert",
+        "url": "https://www.nba.com/news/hawks-trade-trae-young-to-wizards-for-cj-mccollum-corey-kispert",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Dyson Daniels",
+      "direction": "positive",
+      "minutes_delta": 2.0,
+      "usage_delta": 2.0,
+      "confidence": 0.45,
+      "rationale": "Same vacated-creator effect from the Trae Young trade to Washington (NBA.com, 2026-01-07). Daniels is the other Atlanta guard carried in the 2026-27 ranking lists and takes on more primary ball-handling. No beat quote names him, so confidence is below 0.5.",
+      "source": {
+        "source": "NBA.com - Hawks trade Trae Young to Wizards for CJ McCollum, Corey Kispert",
+        "url": "https://www.nba.com/news/hawks-trade-trae-young-to-wizards-for-cj-mccollum-corey-kispert",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "CJ McCollum",
+      "direction": "positive",
+      "minutes_delta": 2.0,
+      "usage_delta": 1.0,
+      "confidence": 0.4,
+      "rationale": "Traded from Washington to Atlanta as the return in the Trae Young deal (NBA.com, 2026-01-07), landing in a backcourt that just lost its lead guard. Age keeps both the deltas and the confidence at the conservative floor.",
+      "source": {
+        "source": "NBA.com - Hawks trade Trae Young to Wizards for CJ McCollum, Corey Kispert",
+        "url": "https://www.nba.com/news/hawks-trade-trae-young-to-wizards-for-cj-mccollum-corey-kispert",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Anthony Davis",
+      "direction": "negative",
+      "minutes_delta": 0.0,
+      "usage_delta": -1.0,
+      "confidence": 0.45,
+      "rationale": "Traded to Washington on 2026-02-04 (Yahoo). R6's Wizards lineup projection puts him in a starting five with Trae Young, Kyshawn George, No. 1 pick AJ Dybantsa and Alex Sarr -- more mouths to feed than his prior situations, hence a small usage give-back. Minutes are held flat because his availability, not his role, is the live question.",
+      "source": {
+        "source": "Yahoo/FanSided - AJ Dybantsa lineup projection, Wizards",
+        "url": "https://sports.yahoo.com/articles/aj-dybantsa-lineup-projection-wizards-001421693.html",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium",
+        "type": "projection"
+      }
+    },
+    {
+      "player": "Alex Sarr",
+      "direction": "negative",
+      "minutes_delta": -2.0,
+      "usage_delta": -1.0,
+      "confidence": 0.45,
+      "rationale": "R6's Washington lineup projection keeps Sarr starting but alongside Anthony Davis (acquired 2026-02-04) and No. 1 pick AJ Dybantsa. A full-season healthy Davis is a direct frontcourt-minutes and touch competitor. Analyst projection, not a coach announcement, so confidence stays below 0.5.",
+      "source": {
+        "source": "Yahoo/FanSided - AJ Dybantsa lineup projection, Wizards",
+        "url": "https://sports.yahoo.com/articles/aj-dybantsa-lineup-projection-wizards-001421693.html",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium",
+        "type": "projection"
+      }
+    },
+    {
+      "player": "Kyshawn George",
+      "direction": "positive",
+      "minutes_delta": 3.0,
+      "usage_delta": 1.0,
+      "confidence": 0.45,
+      "rationale": "R6's Washington lineup projection names George in the opening-night starting five (Trae Young, George, AJ Dybantsa, Anthony Davis, Alex Sarr). A projected starting spot is a minutes positive; usage stays small given the four higher-priority scorers around him. Analyst projection, not a coach announcement.",
+      "source": {
+        "source": "Yahoo/FanSided - AJ Dybantsa lineup projection, Wizards",
+        "url": "https://sports.yahoo.com/articles/aj-dybantsa-lineup-projection-wizards-001421693.html",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium",
+        "type": "projection"
+      }
+    },
+    {
+      "player": "Bilal Coulibaly",
+      "direction": "negative",
+      "minutes_delta": -3.0,
+      "usage_delta": -1.0,
+      "confidence": 0.45,
+      "rationale": "R6's Washington depth-chart projection has AJ Dybantsa as 'the undisputed starter at small forward' with Will Riley the backup and Coulibaly used as a flex wing -- i.e. Coulibaly is pushed off a defined starting wing spot by the No. 1 pick. Analyst projection, not official.",
+      "source": {
+        "source": "Yahoo/FanSided - AJ Dybantsa lineup projection, Wizards",
+        "url": "https://sports.yahoo.com/articles/aj-dybantsa-lineup-projection-wizards-001421693.html",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium",
+        "type": "projection"
+      }
+    },
+    {
+      "player": "D'Angelo Russell",
+      "direction": "positive",
+      "minutes_delta": 3.0,
+      "usage_delta": 1.0,
+      "confidence": 0.4,
+      "rationale": "Traded from Washington to Memphis in the six-team Khris Middleton deal on 2026-07-07 (ESPN). Bleacher Report reported he never reported to the Wizards and was not expected to be part of their 2026-27 plans, so any real rotation role in Memphis is a minutes gain from a near-zero baseline. Highly uncertain, held at the confidence floor.",
+      "source": {
+        "source": "ESPN - Khris Middleton back to Wizards in six-team sign-and-trade",
+        "url": "https://www.espn.com/nba/story/_/id/49301627/khris-middleton-back-wizards-2nd-stint-6-team-sign-trade-deal",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Zach Edey",
+      "direction": "negative",
+      "minutes_delta": -2.0,
+      "usage_delta": -1.0,
+      "confidence": 0.45,
+      "rationale": "Memphis drafted Cameron Boozer third overall; R6's Grizzlies lineup projection pairs Boozer with Edey in the starting frontcourt and says Boozer 'is going to have a premier offensive role immediately'. Edey keeps a starting spot but cedes frontcourt touches and some minutes. Analyst projection, not a coach announcement.",
+      "source": {
+        "source": "Yahoo/FanSided - Projecting Grizzlies starting lineup and rotation",
+        "url": "https://sports.yahoo.com/articles/projecting-grizzlies-starting-lineup-rotation-002520681.html",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium",
+        "type": "projection"
+      }
+    },
+    {
+      "player": "Cedric Coward",
+      "direction": "positive",
+      "minutes_delta": 2.0,
+      "usage_delta": 0.0,
+      "confidence": 0.4,
+      "rationale": "R6's Grizzlies lineup projection names Coward in the projected 2026-27 starting five (Scotty Pippen Jr., Coward, Jerami Grant, Cameron Boozer, Zach Edey). A projected starting spot is a minutes positive only; usage is held flat because the same source assigns the premier offensive role to rookie Boozer. Analyst projection, floor confidence.",
+      "source": {
+        "source": "Yahoo/FanSided - Projecting Grizzlies starting lineup and rotation",
+        "url": "https://sports.yahoo.com/articles/projecting-grizzlies-starting-lineup-rotation-002520681.html",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium",
+        "type": "projection"
+      }
+    },
+    {
+      "player": "Domantas Sabonis",
+      "direction": "positive",
+      "minutes_delta": 0.0,
+      "usage_delta": 1.0,
+      "confidence": 0.45,
+      "rationale": "Sacramento waived DeMar DeRozan around 2026-07-06 and he remains unsigned (NBC Sports, 2026-08), removing a high-volume scorer from the Kings' offense. Sabonis is the highest-ranked remaining Kings option in the 2026-27 lists and picks up a small share of vacated usage; minutes flat, he was already at a starter's load.",
+      "source": {
+        "source": "NBC Sports - Top seven NBA free agents still available (DeRozan, Kuminga)",
+        "url": "https://www.nbcsports.com/nba/news/top-seven-nba-free-agents-still-available-where-things-stand-with-demar-derozan-jonathan-kuminga-more",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium_high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Keegan Murray",
+      "direction": "positive",
+      "minutes_delta": 3.0,
+      "usage_delta": 1.0,
+      "confidence": 0.4,
+      "rationale": "Same vacated-wing effect from Sacramento waiving DeMar DeRozan (NBC Sports, 2026-08); Murray is the Kings' other rostered forward carried in the 2026-27 ranking lists. No Kings beat report confirms the rotation, so confidence sits at the floor.",
+      "source": {
+        "source": "NBC Sports - Top seven NBA free agents still available (DeRozan, Kuminga)",
+        "url": "https://www.nbcsports.com/nba/news/top-seven-nba-free-agents-still-available-where-things-stand-with-demar-derozan-jonathan-kuminga-more",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium_high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Cooper Flagg",
+      "direction": "positive",
+      "minutes_delta": 1.0,
+      "usage_delta": 1.0,
+      "confidence": 0.45,
+      "rationale": "Dallas fired Jason Kidd and hired Dusty May in May 2026, with CBS Sports reporting May is tasked with building around 2026 Rookie of the Year Cooper Flagg. Deltas are deliberately small because the same offseason also has Kyrie Irving medically cleared and expected back for the opener (R4), which pulls Flagg's on-ball share the other way -- the two effects partly cancel.",
+      "source": {
+        "source": "CBS Sports - Mavericks hire Michigan coach Dusty May to replace Jason Kidd",
+        "url": "https://www.cbssports.com/nba/news/dallas-mavericks-hire-michigan-coach-dusty-may-to-replace-jason-kidd/",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    }
+  ]
+}

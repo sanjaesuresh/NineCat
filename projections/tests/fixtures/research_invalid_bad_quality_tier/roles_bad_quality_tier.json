@@ -1,0 +1,21 @@
+{
+  "kind": "role",
+  "items": [
+    {
+      "player": "Test Star Q",
+      "direction": "positive",
+      "minutes_delta": 2.0,
+      "usage_delta": 1.0,
+      "confidence": 0.7,
+      "rationale": "Deliberately invalid quality_tier to exercise the negative Literal path.",
+      "source": {
+        "source": "Test Wire",
+        "url": "https://example.com/wire/x",
+        "retrieved": "2026-08-01",
+        "season_label": "2026-27",
+        "quality_tier": "extremely_high",
+        "type": "news"
+      }
+    }
+  ]
+}

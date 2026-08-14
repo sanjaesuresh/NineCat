@@ -1,0 +1,819 @@
+{
+  "generated": "2026-08-14",
+  "store_path": "data/research",
+  "note": "Provenance index for the 2026-27 research evidence store. Every source below backs at least one SourceRef in data/research/**, except the two trailing sections: 'corroborating_sources' were used to cross-check or caveat a claim without being the encoded SourceRef, and 'access_failures' record sources that could NOT be read, so the coverage gap is documented rather than silently absent.",
+  "sources": [
+    {
+      "name": "RotoWire Fantasy Basketball Outlook Rankings (Roto/Points)",
+      "url": "https://www.rotowire.com/basketball/rankings-outlooks.php?leagueType=rotoPts",
+      "type": "expert_rank",
+      "quality_tier": "high",
+      "retrieved": "2026-08-12",
+      "provided": "The only full ordered top-150 ranking captured anywhere in this sweep. Season label is 'mixed': the page header still reads 2025-26 but the roster content reflects the July 2026 Giannis trade and 2025 draft rookies as established players. Team abbreviations on the page are medium confidence; rank order and player identity are the usable signal.",
+      "used_in": [
+        "consensus/rotowire.json"
+      ]
+    },
+    {
+      "name": "ESPN Way-Too-Early 2026-27 Points-League Rankings (Apr 14, 2026)",
+      "url": "https://www.espn.com/fantasy/basketball/story/_/id/48484688/fantasy-basketball-way-too-early-points-league-rankings-next-season-2026-27",
+      "type": "expert_rank",
+      "quality_tier": "medium_high",
+      "retrieved": "2026-08-12",
+      "provided": "Full ordered 1-150, re-fetched and confirmed byte-identical to the first fetch (same order, same team tags), so extraction is reproducible. Explicitly labeled 2026-27, H2H points format. Down-tiered from high to medium_high for staleness: the April publication predates the Giannis-to-Miami trade and still lists him on Milwaukee, and its Miami entries (Herro, Powell, Wiggins, Jaquez, Ware, Davion Mitchell) reflect the pre-trade Heat roster. Rank order is the usable signal; team tags are not current.",
+      "used_in": [
+        "consensus/espn.json"
+      ]
+    },
+    {
+      "name": "Sports Illustrated (OnSI) Way-Too-Early Top 50 2026-27 Rankings (Jun 4, 2026)",
+      "url": "https://www.si.com/onsi/fantasy/rankings/fantasy-basketball-rankings-way-too-early-nba-2026-2027",
+      "type": "expert_rank",
+      "quality_tier": "medium_high",
+      "retrieved": "2026-08-12",
+      "provided": "Full ordered 1-50, re-fetched and confirmed identical to the first fetch. Explicitly labeled 2026-27. IMPORTANT: the page carries NO team tags at all -- the ~15 team labels that appeared in the first capture (e.g. 'Trae Young - Atlanta Hawks') were supplied by the extraction model's own background knowledge, not read off the page. Names only are encoded; no team information from this source is used anywhere in the store.",
+      "used_in": [
+        "consensus/si.json"
+      ]
+    },
+    {
+      "name": "Slamdex NBA Fantasy ADP 2026-27 (Yahoo/ESPN/Fantrax aggregate)",
+      "url": "https://slamdex.com/tools/adp/",
+      "type": "adp",
+      "quality_tier": "medium",
+      "retrieved": "2026-08-12",
+      "provided": "The only 2026-27 ADP found anywhere. 150 deduplicated player/ADP pairs encoded, spanning ADP 1.7 to 168.9. Daily-updated third-party aggregator whose rosters are current, which makes it the store's best corroborator for July 2026 moves -- it independently confirms Ayton on WAS, Dort on ATL, Risacher on DAL, Tobias Harris on SAS, Aldama on DAL, John Collins on DET, Grimes on LAL, Hachimura on LAC, Kuminga and Hield on ATL, and carries DeRozan and Cam Thomas with an explicit 'FA' tag. Medium tier because the per-platform numbers are scraped, not primary. TWO ENCODING CAVEATS, recorded here because ConsensusList has no note field: (1) the page's own rank labels are NOT trustworthy -- a second fetch re-numbered the same first ~130 players (Stephen Curry was labeled rank 11 in one pass and rank 111 in the other, both times at ADP 16.2). The encoded ordering is therefore rebuilt from the ADP VALUES, which were consistent across both fetches, not from either fetch's rank labels. (2) The research file records most entries in surname-only or initialled form ('Jokic', 'A.Thompson', 'Mi.Bridges'); each was expanded to a full name by resolving the source's own position+team tag against the ESPN 150 and RotoWire 150 already in the store, since abbreviated forms would not survive name normalization. Two entries ('Cam Thomas', 'Cam Johnson') were left in the source's own form rather than guessed at. One page fetch claimed 343 total entries; that could not be corroborated and nothing past ADP 168.9 was ever surfaced, so the encoded depth is the confirmed depth.",
+      "used_in": [
+        "consensus/slamdex_adp.json"
+      ]
+    },
+    {
+      "name": "ESPN - Bucks trading Giannis Antetokounmpo and Bobby Portis to Heat",
+      "url": "https://www.espn.com/nba/story/_/id/49149967/bucks-trading-giannis-antetokounmpo-bobby-portis-heat-tyler-herro-kelel-ware-jaime-jaquez-jr-kasparas-jakucionis-picks",
+      "type": "news",
+      "quality_tier": "high",
+      "retrieved": "2026-08-12",
+      "provided": "The offseason's headline trade, cross-verified by ESPN, Yahoo, CNN and NBA.com: six player transactions plus the role consequences for Miami's and Milwaukee's rotations.",
+      "used_in": [
+        "transactions.json",
+        "roles.json"
+      ]
+    },
+    {
+      "name": "ESPN - Celtics sending Brown to 76ers for George and picks",
+      "url": "https://www.espn.com/nba/story/_/id/49241843/sources-celtics-sending-brown-76ers-george-picks",
+      "type": "news",
+      "quality_tier": "high",
+      "retrieved": "2026-08-12",
+      "provided": "Jaylen Brown / Paul George swap, cross-verified by ESPN, Washington Post, Boston Globe and NBA.com. Backs the Boston and Philadelphia role notes.",
+      "used_in": [
+        "transactions.json",
+        "roles.json"
+      ]
+    },
+    {
+      "name": "ESPN - LeBron chooses 76ers, signs 2-year, $8 million contract",
+      "url": "https://www.espn.com/nba/story/_/id/49440164/lebron-chooses-76ers-sign-2-year-8-million-contract",
+      "type": "news",
+      "quality_tier": "high",
+      "retrieved": "2026-08-12",
+      "provided": "LeBron's free-agent signing with Philadelphia (cross-verified by ESPN, NBA.com and Yahoo), plus the 76ers hierarchy and Lakers usage consequences that drive six role notes.",
+      "used_in": [
+        "transactions.json",
+        "roles.json"
+      ]
+    },
+    {
+      "name": "ESPN - Lakers trading for Jazz center Walker Kessler",
+      "url": "https://www.espn.com/nba/story/_/id/49237403/lakers-trading-jazz-center-walker-kessler-sources-say",
+      "type": "news",
+      "quality_tier": "high",
+      "retrieved": "2026-08-12",
+      "provided": "Kessler sign-and-trade to the Lakers with terms, cross-verified by ESPN, NBA.com and Deseret News. Backs the Kessler and vacated-Utah-center role notes.",
+      "used_in": [
+        "transactions.json",
+        "roles.json"
+      ]
+    },
+    {
+      "name": "ESPN - Khris Middleton back to Wizards in six-team sign-and-trade",
+      "url": "https://www.espn.com/nba/story/_/id/49301627/khris-middleton-back-wizards-2nd-stint-6-team-sign-trade-deal",
+      "type": "news",
+      "quality_tier": "high",
+      "retrieved": "2026-08-12",
+      "provided": "Middleton to Washington and D'Angelo Russell to Memphis, the two high-confidence legs of the six-team deal (ESPN, Bleacher Report and Hoops Rumors agree). Secondary pieces in the same deal were search-summary only and were NOT encoded.",
+      "used_in": [
+        "transactions.json",
+        "roles.json"
+      ]
+    },
+    {
+      "name": "NBA.com - Raptors-Clippers Kawhi Leonard trade on hold",
+      "url": "https://www.nba.com/news/raptors-clippers-kawhi-leonard-trade-on-hold",
+      "type": "news",
+      "quality_tier": "high",
+      "retrieved": "2026-08-12",
+      "provided": "Status of the frozen Kawhi Leonard / Brandon Ingram trade pending the NBA cap-circumvention investigation. Encoded with to_team null on both players; no role notes were derived from an unconfirmed trade.",
+      "used_in": [
+        "transactions.json"
+      ]
+    },
+    {
+      "name": "NBA.com - Hawks trade Trae Young to Wizards for CJ McCollum, Corey Kispert",
+      "url": "https://www.nba.com/news/hawks-trade-trae-young-to-wizards-for-cj-mccollum-corey-kispert",
+      "type": "news",
+      "quality_tier": "high",
+      "retrieved": "2026-08-12",
+      "provided": "The January 2026 Trae Young trade and its two return pieces; also the sourcing anchor for the vacated-Atlanta-usage role notes and for recording the unresolved Young contract conflict.",
+      "used_in": [
+        "transactions.json",
+        "roles.json"
+      ]
+    },
+    {
+      "name": "Yahoo Sports - Wizards' Anthony Davis to miss remainder of season",
+      "url": "https://sports.yahoo.com/articles/wizards-anthony-davis-miss-remainder-050210940.html",
+      "type": "news",
+      "quality_tier": "medium_high",
+      "retrieved": "2026-08-12",
+      "provided": "Anthony Davis' February 2026 trade to Washington and his season shutdown.",
+      "used_in": [
+        "transactions.json"
+      ]
+    },
+    {
+      "name": "ClutchPoints - Steve Kerr encouraging Kristaps Porzingis injury update",
+      "url": "https://clutchpoints.com/nba/golden-state-warriors/warriors-news-steve-kerr-encouraging-kristaps-porzingis-injury-update-all-star-break",
+      "type": "news",
+      "quality_tier": "medium",
+      "retrieved": "2026-08-12",
+      "provided": "Porzingis' Warriors-era status and the February 2026 Atlanta-to-Golden State trade that also sent Jonathan Kuminga and Buddy Hield to Atlanta. Also the evidence that creates the recorded Kuminga prior-team conflict with R3.",
+      "used_in": [
+        "transactions.json",
+        "injuries.json"
+      ]
+    },
+    {
+      "name": "ESPN - 2026 NBA offseason buzz tracker",
+      "url": "https://www.espn.com/nba/story/_/id/48377855/2026-nba-buzz-latest-live-updates-news-intel-nba-draft-offseason",
+      "type": "news",
+      "quality_tier": "medium",
+      "retrieved": "2026-08-12",
+      "provided": "Live offseason tracker. Only three items from it are encoded (Rui Hachimura's move, the Donovan Mitchell extension with its unresolved dollar conflict, and the unresolved Towns/Duren free-agent statuses). Everything else R3 pulled from this page was AI-search-summary sourced and was deliberately excluded. Encoded at medium / low_medium tier accordingly.",
+      "used_in": [
+        "transactions.json"
+      ]
+    },
+    {
+      "name": "NBC Sports - Top seven NBA free agents still available (Watson, Kuminga)",
+      "url": "https://www.nbcsports.com/nba/news/top-seven-nba-free-agents-still-available-where-things-stand-with-peyton-watson-jonathan-kuminga-more",
+      "type": "news",
+      "quality_tier": "medium_high",
+      "retrieved": "2026-08-12",
+      "provided": "Unsigned-free-agent status as of August 2026 for James Harden, Jonathan Kuminga and Peyton Watson.",
+      "used_in": [
+        "transactions.json"
+      ]
+    },
+    {
+      "name": "NBC Sports - Top seven NBA free agents still available (DeRozan, Kuminga)",
+      "url": "https://www.nbcsports.com/nba/news/top-seven-nba-free-agents-still-available-where-things-stand-with-demar-derozan-jonathan-kuminga-more",
+      "type": "news",
+      "quality_tier": "medium_high",
+      "retrieved": "2026-08-12",
+      "provided": "DeMar DeRozan's waiver by Sacramento and his still-unsigned status; also the basis for the vacated-Kings-usage role notes.",
+      "used_in": [
+        "transactions.json",
+        "roles.json"
+      ]
+    },
+    {
+      "name": "NBA.com - Chris Paul announces NBA retirement",
+      "url": "https://www.nba.com/news/chris-paul-announces-nba-retirement",
+      "type": "news",
+      "quality_tier": "high",
+      "retrieved": "2026-08-12",
+      "provided": "Chris Paul's February 2026 retirement.",
+      "used_in": [
+        "transactions.json"
+      ]
+    },
+    {
+      "name": "ESPN - Kyle Lowry retires, signing one-day contract with Raptors",
+      "url": "https://www.espn.com/nba/story/_/id/49295320/kyle-lowry-retires-signing-one-day-contract-raptors",
+      "type": "news",
+      "quality_tier": "high",
+      "retrieved": "2026-08-12",
+      "provided": "Kyle Lowry's retirement via a ceremonial Toronto contract.",
+      "used_in": [
+        "transactions.json"
+      ]
+    },
+    {
+      "name": "CBS Sports - Mavericks hire Michigan coach Dusty May to replace Jason Kidd",
+      "url": "https://www.cbssports.com/nba/news/dallas-mavericks-hire-michigan-coach-dusty-may-to-replace-jason-kidd/",
+      "type": "news",
+      "quality_tier": "high",
+      "retrieved": "2026-08-12",
+      "provided": "Multi-outlet cross-verified (CBS, ESPN, On3). Backs both Dallas coaching_change events and the Cooper Flagg role note. R3's four remaining coaching changes (Bulls, Pelicans, Magic, Blazers) were search-summary only or had no URL and are still not encoded.",
+      "used_in": [
+        "transactions.json",
+        "roles.json"
+      ]
+    },
+    {
+      "name": "ESPN - Bucks finalizing deal to hire Taylor Jenkins",
+      "url": "https://www.espn.com/nba/story/_/id/48572946/bucks-finalizing-deal-hire-taylor-jenkins",
+      "type": "news",
+      "quality_tier": "high",
+      "retrieved": "2026-08-12",
+      "provided": "Added in the follow-up pass, closing the store's biggest known coaching gap. The 2026-04-30 Jenkins hire with dates, contract framing and 2026-27 staff, cross-verified by ESPN, NBA.com/Bucks, WPR and Urban Milwaukee. Doc Rivers' departure is still search-summary only and remains unencoded.",
+      "used_in": [
+        "transactions.json"
+      ]
+    },
+    {
+      "name": "NBA.com - Wizards, Trae Young free agency 2026",
+      "url": "https://www.nba.com/news/wizards-trae-young-free-agency-2026",
+      "type": "news",
+      "quality_tier": "high",
+      "retrieved": "2026-08-12",
+      "provided": "Added in the follow-up pass. Resolves what looked like an R2/R4 contradiction into a confirmed two-step sequence: Young declined his ~$48.97M player option and then re-signed with Washington on a straight free-agent deal worth about $212M over four years with a year-four player option. ESPN, NBA.com, Bleacher Report and CBS Sports all agree, so his signing now carries a real to_team instead of null.",
+      "used_in": [
+        "transactions.json"
+      ]
+    },
+    {
+      "name": "SI/OnSI - Ranking everyone on the Bucks roster post-Giannis trade",
+      "url": "https://www.si.com/nba/bucks/onsi/ranking-everyone-on-the-bucks-roster-post-giannis-trade-01kwc8sjxgbw",
+      "type": "projection",
+      "quality_tier": "medium",
+      "retrieved": "2026-08-12",
+      "provided": "Added in the follow-up pass as the only sourced role commentary on post-Giannis Milwaukee: Herro as presumptive primary scoring option with higher usage, and Jaime Jaquez Jr. (a 2025-26 Sixth Man of the Year finalist Milwaukee was 'adamant' about acquiring) getting a carved-out wing role. Deliberately capped at medium tier and confidence 0.5 -- this is an OnSI fan-network aggregator, not a newsroom, and the same piece flags Herro's expiring $31M deal as making him a pre-season trade candidate. It offers nothing on Ware or Jakucionis beyond 'part of the rebuild', which is why those two notes were down-weighted.",
+      "used_in": [
+        "roles.json"
+      ]
+    },
+    {
+      "name": "NBC Sports - 2026 NBA Draft complete list of every pick",
+      "url": "https://www.nbcsports.com/nba/news/2026-nba-draft-complete-list-of-every-pick-from-round-1-and-round-2",
+      "type": "news",
+      "quality_tier": "high",
+      "retrieved": "2026-08-12",
+      "provided": "The primary draft board: 24 of the 30 encoded first-round picks plus three provisional second-rounders, cross-checked against Wikipedia and (for picks 1-4) CBS Sports and NBC News. Also resolves the pick-13 Miami-vs-Milwaukee conflict in Milwaukee's favor.",
+      "used_in": [
+        "transactions.json",
+        "rookies.json"
+      ]
+    },
+    {
+      "name": "Hoops Rumors - 2026 NBA Draft results",
+      "url": "https://www.hoopsrumors.com/2026/06/2026-nba-draft-results.html",
+      "type": "news",
+      "quality_tier": "medium_high",
+      "retrieved": "2026-08-12",
+      "provided": "Picks 23, 24 and 26-29, which were present in the Wikipedia/Hoops Rumors pair but not in the captured NBC Sports table. Encoded one tier lower with a note saying so.",
+      "used_in": [
+        "transactions.json"
+      ]
+    },
+    {
+      "name": "Boston.com - Jayson Tatum recovery timeline, Achilles injury",
+      "url": "https://www.boston.com/sports/boston-celtics/2026/03/05/jayson-tatum-recovery-timeline-achilles-injury-celtics-comments/",
+      "type": "news",
+      "quality_tier": "medium_high",
+      "retrieved": "2026-08-12",
+      "provided": "Tatum's March 2026 return from the ruptured Achilles and his post-return production.",
+      "used_in": [
+        "injuries.json"
+      ]
+    },
+    {
+      "name": "CBS Sports - Tyrese Haliburton to miss entire 2025-26 season with torn Achilles",
+      "url": "https://www.cbssports.com/nba/news/tyrese-haliburton-to-miss-entire-2025-26-nba-season-with-torn-achilles-tendon-pacers-confirm",
+      "type": "news",
+      "quality_tier": "medium_high",
+      "retrieved": "2026-08-12",
+      "provided": "Haliburton's full-season 2025-26 absence. No 2026-27 clearance exists in any retrieved source, which is why no games estimate is set.",
+      "used_in": [
+        "injuries.json"
+      ]
+    },
+    {
+      "name": "IBTimes AU - Damian Lillard NBA return recovery journey",
+      "url": "https://www.ibtimes.com.au/damian-lillard-nba-return-recovery-journey-1872796",
+      "type": "news",
+      "quality_tier": "low_medium",
+      "retrieved": "2026-08-12",
+      "provided": "August 2026 'on track for a full return' update on Lillard's Achilles rehab. Low-medium tier: aggregator piece with no in-article date.",
+      "used_in": [
+        "injuries.json"
+      ]
+    },
+    {
+      "name": "ESPN - Kyrie Irving to miss rest of season, eyes 2026-27 return",
+      "url": "https://www.espn.com/nba/story/_/id/47964482/kyrie-irving-miss-rest-season-eyes-return-2026-27",
+      "type": "news",
+      "quality_tier": "high",
+      "retrieved": "2026-08-12",
+      "provided": "Irving's ACL timeline and expected 2026-27 opener availability; also the counterweight in the Cooper Flagg role note.",
+      "used_in": [
+        "injuries.json"
+      ]
+    },
+    {
+      "name": "ESPN - Spurs' Victor Wembanyama cleared to return from blood clot",
+      "url": "https://www.espn.com/nba/story/_/id/45740391/spurs-victor-wembanyama-cleared-return-blood-clot",
+      "type": "news",
+      "quality_tier": "high",
+      "retrieved": "2026-08-12",
+      "provided": "Wembanyama's DVT clearance. Encoded as a resolved historical case so the store documents the absence of a current flag.",
+      "used_in": [
+        "injuries.json"
+      ]
+    },
+    {
+      "name": "Yahoo Sports - Ja Morant injury, Grizzlies star",
+      "url": "https://sports.yahoo.com/articles/ja-morant-injury-grizzlies-star-031659787.html",
+      "type": "news",
+      "quality_tier": "medium",
+      "retrieved": "2026-08-12",
+      "provided": "Morant's elbow UCL shutdown and expected full 2026-27 training camp, plus the games-played durability record recorded in the note field.",
+      "used_in": [
+        "injuries.json"
+      ]
+    },
+    {
+      "name": "ESPN - Jimmy Butler shares update on ACL recovery, future with Warriors",
+      "url": "https://www.espn.com/nba/story/_/id/49198925/jimmy-butler-shares-update-acl-recovery-future-warriors",
+      "type": "news",
+      "quality_tier": "high",
+      "retrieved": "2026-08-12",
+      "provided": "Butler's ACL surgery date and mid-season return expectation. The only games_impact_estimate in the store derived from a genuinely disputed timeline (Christmas 2026 vs February 2027); encoded as the conservative floor with the disagreement in the note.",
+      "used_in": [
+        "injuries.json"
+      ]
+    },
+    {
+      "name": "BasketNews - Jalen Brunson injury update, surgery and recovery timeline",
+      "url": "https://basketnews.com/news-251550-jalen-brunson-injury-update-surgery-and-recovery-timeline-revealed-after-knicks-title.html",
+      "type": "news",
+      "quality_tier": "medium",
+      "retrieved": "2026-08-12",
+      "provided": "Brunson's July 2026 forearm/wrist surgery and ~2-month recovery estimate ahead of camp.",
+      "used_in": [
+        "injuries.json"
+      ]
+    },
+    {
+      "name": "NBA.com - Raptors' Brandon Ingram undergoes right heel surgery",
+      "url": "https://www.nba.com/news/raptors-brandon-ingram-surgery-right-heel",
+      "type": "news",
+      "quality_tier": "high",
+      "retrieved": "2026-08-12",
+      "provided": "Ingram's May 2026 heel-spur surgery and expected training-camp return.",
+      "used_in": [
+        "injuries.json"
+      ]
+    },
+    {
+      "name": "Bleacher Report - Anthony Davis injury update, Wizards rehab timeline",
+      "url": "https://bleacherreport.com/articles/25403373-anthony-davis-injury-update-given-wizards-latest-stars-rehab-recovery-timeline",
+      "type": "news",
+      "quality_tier": "medium",
+      "retrieved": "2026-08-12",
+      "provided": "Davis' 2025-26 calf and hand injuries and the Wizards' decision to shut him down. Backs a chronic=true flag.",
+      "used_in": [
+        "injuries.json"
+      ]
+    },
+    {
+      "name": "Yahoo Sports - Trae Young out indefinitely with quad, back injuries",
+      "url": "https://sports.yahoo.com/nba/breaking-news/article/trae-young-out-indefinitely-with-quad-back-injuries-but-wont-need-surgery-for-either-wizards-say-153208150.html",
+      "type": "news",
+      "quality_tier": "medium_high",
+      "retrieved": "2026-08-12",
+      "provided": "Young's MCL, quad and back issues and the Wizards' no-surgery statement.",
+      "used_in": [
+        "injuries.json"
+      ]
+    },
+    {
+      "name": "NBA.com - LeBron James to miss start of season",
+      "url": "https://www.nba.com/news/lebron-james-to-miss-start-of-season",
+      "type": "news",
+      "quality_tier": "high",
+      "retrieved": "2026-08-12",
+      "provided": "LeBron's 14-game sciatica absence to open 2025-26. Historical only; no 2026-27 timeline exists, so no games estimate.",
+      "used_in": [
+        "injuries.json"
+      ]
+    },
+    {
+      "name": "NBA.com - Clippers' Kawhi Leonard returns",
+      "url": "https://www.nba.com/news/clippers-kawhi-leonard-returns",
+      "type": "news",
+      "quality_tier": "high",
+      "retrieved": "2026-08-12",
+      "provided": "Leonard's repeated 2025-26 knee and ankle absences. Backs a chronic=true flag.",
+      "used_in": [
+        "injuries.json"
+      ]
+    },
+    {
+      "name": "NBA.com - Joel Embiid expected ready for training camp",
+      "url": "https://www.nba.com/news/joel-embiid-expected-ready-training-camp",
+      "type": "news",
+      "quality_tier": "high",
+      "retrieved": "2026-08-12",
+      "provided": "Embiid's 38-game 2025-26, his May 2026 comments on the knee, and the no-scheduled-surgery framing. Backs a chronic=true flag.",
+      "used_in": [
+        "injuries.json"
+      ]
+    },
+    {
+      "name": "Yardbarker - LaMelo Ball's ankle injuries continue",
+      "url": "https://www.yardbarker.com/nba/articles/lamelo_balls_ankle_injuries_continue_status_vs_minnesota_is_in_question/s1_16808_42997734",
+      "type": "news",
+      "quality_tier": "low_medium",
+      "retrieved": "2026-08-12",
+      "provided": "Ball's recurring ankle history across 2024-25 and 2025-26. Low-medium tier (aggregator), but the recurrence pattern is explicitly reported, so chronic=true.",
+      "used_in": [
+        "injuries.json"
+      ]
+    },
+    {
+      "name": "CBS Sports - Paolo Banchero out indefinitely with torn oblique",
+      "url": "https://www.cbssports.com/nba/news/paolo-banchero-injury-update-magic-star-out-indefinitely-with-torn-oblique-bringing-a-halt-to-torrid-start",
+      "type": "news",
+      "quality_tier": "medium_high",
+      "retrieved": "2026-08-12",
+      "provided": "Banchero's torn-oblique absence. The competing 'groin issue' account had no citable URL, so only this side is encoded and the conflict is preserved in the note rather than adjudicated.",
+      "used_in": [
+        "injuries.json"
+      ]
+    },
+    {
+      "name": "Sports Illustrated - Spurs rule out De'Aaron Fox for preseason opener",
+      "url": "https://www.si.com/nba/spurs/onsi/news/spurs-rule-out-deaaron-fox-multiple-key-players-for-preseason-opener",
+      "type": "news",
+      "quality_tier": "medium",
+      "retrieved": "2026-08-12",
+      "provided": "Fox's hamstring absence. This is a fall-2025 item; no 2026-27 update was found, which is recorded as an open gap.",
+      "used_in": [
+        "injuries.json"
+      ]
+    },
+    {
+      "name": "ESPN - Pistons' Cunningham out at least another week with collapsed lung",
+      "url": "https://www.espn.com/nba/story/_/id/48378921/pistons-cunningham-collapsed-lung-least-another-week",
+      "type": "news",
+      "quality_tier": "high",
+      "retrieved": "2026-08-12",
+      "provided": "Cunningham's March 2026 pneumothorax and weekly re-evaluation. No 2026-27 readiness statement exists.",
+      "used_in": [
+        "injuries.json"
+      ]
+    },
+    {
+      "name": "NBA official injury report, 2026-03-15",
+      "url": "https://ak-static.cms.nba.com/referee/injury/Injury-Report_2026-03-15_06_00PM.pdf",
+      "type": "news",
+      "quality_tier": "high",
+      "retrieved": "2026-08-12",
+      "provided": "Primary-source injury report showing Klay Thompson doubtful for rest. The only official league document in the store.",
+      "used_in": [
+        "injuries.json"
+      ]
+    },
+    {
+      "name": "FOX Sports - James Harden player injuries",
+      "url": "https://www.foxsports.com/nba/james-harden-player-injuries",
+      "type": "news",
+      "quality_tier": "medium",
+      "retrieved": "2026-08-12",
+      "provided": "Harden's thumb fracture with an 'available' designation. Also the source of an unresolved team conflict (Clippers here vs Cleveland everywhere else).",
+      "used_in": [
+        "injuries.json"
+      ]
+    },
+    {
+      "name": "ESPN - Pelicans' Zion Williamson tweaks ankle in win over Jazz",
+      "url": "https://www.espn.com/nba/story/_/id/48069733/pelicans-zion-williamson-tweaks-ankle-in-win-over-jazz",
+      "type": "news",
+      "quality_tier": "high",
+      "retrieved": "2026-08-12",
+      "provided": "Williamson's minor in-season ankle tweak and the absence of any acute 2026-27 concern.",
+      "used_in": [
+        "injuries.json"
+      ]
+    },
+    {
+      "name": "ESPN NBA injuries table",
+      "url": "https://www.espn.com/nba/injuries",
+      "type": "news",
+      "quality_tier": "high",
+      "retrieved": "2026-08-12",
+      "provided": "Live league-wide table (page dated late July 2026). Source of the only three date-target games estimates in the store: Moses Moody (~Dec 1), Johnny Furphy (~Jan 1), Donte DiVincenzo (~Apr 1), plus day-to-day flags on Mouhamed Gueye and Brandon Miller. CAUTION: the same table attached an uncorroborated 'trade' note to Jayson Tatum that R4 judged a rendering artifact -- not encoded as fact.",
+      "used_in": [
+        "injuries.json"
+      ]
+    },
+    {
+      "name": "Pounding The Rock - Jayden Quaintance to miss the start of 2026-27",
+      "url": "https://www.poundingtherock.com/spurs-draft-rumors-news-analysis/105632/jayden-quaintance-expects-to-undergo-knee-procedure-miss-the-start-of-the-2026-27-season",
+      "type": "news",
+      "quality_tier": "medium_high",
+      "retrieved": "2026-08-12",
+      "provided": "Quaintance's post-draft knee surgery and the Spurs' expectation of no return until sometime in 2027. Consistent across three team-focused outlets. Drives both his injury estimate and his rookie note.",
+      "used_in": [
+        "injuries.json",
+        "rookies.json"
+      ]
+    },
+    {
+      "name": "Yahoo/FanSided - AJ Dybantsa lineup projection, Wizards",
+      "url": "https://sports.yahoo.com/articles/aj-dybantsa-lineup-projection-wizards-001421693.html",
+      "type": "projection",
+      "quality_tier": "medium",
+      "retrieved": "2026-08-12",
+      "provided": "Analyst projection (not a coach announcement) of Washington's opening-night five and wing depth chart. Backs Dybantsa's rookie note and four Wizards role notes.",
+      "used_in": [
+        "roles.json",
+        "rookies.json"
+      ]
+    },
+    {
+      "name": "Yahoo/FanSided - Projecting Grizzlies starting lineup and rotation",
+      "url": "https://sports.yahoo.com/articles/projecting-grizzlies-starting-lineup-rotation-002520681.html",
+      "type": "projection",
+      "quality_tier": "medium",
+      "retrieved": "2026-08-12",
+      "provided": "Analyst projection of Memphis' 2026-27 starting five and the claim that Cameron Boozer gets a premier offensive role immediately. Backs Boozer's rookie note and the Edey and Coward role notes.",
+      "used_in": [
+        "roles.json",
+        "rookies.json"
+      ]
+    },
+    {
+      "name": "Yahoo Sports - Rookies to watch, early fantasy outlook",
+      "url": "https://sports.yahoo.com/articles/rookies-watch-early-fantasy-outlook-185325359.html",
+      "type": "projection",
+      "quality_tier": "medium",
+      "retrieved": "2026-08-12",
+      "provided": "Analyst/market opinion on Darryn Peterson: highest upside in the class, 20 PPG potential, top-50 fantasy prospect, shortest Rookie of the Year odds. Basis for his opinion-derived minutes range and damped per-minute band.",
+      "used_in": [
+        "rookies.json"
+      ]
+    },
+    {
+      "name": "NBA.com - Caleb Wilson, throwback rookie, Bulls future",
+      "url": "https://www.nba.com/news/caleb-wilson-throwback-rookie-bulls-future",
+      "type": "news",
+      "quality_tier": "medium_high",
+      "retrieved": "2026-08-12",
+      "provided": "Beat characterization of Wilson after a Summer League in which he led all players in total points. Sentiment, not a role commitment -- so he gets a minutes range but no per-minute band.",
+      "used_in": [
+        "rookies.json"
+      ]
+    },
+    {
+      "name": "NBC Sports Bay Area - Warriors rookie Yaxel Lendeborg named Summer League MVP",
+      "url": "https://www.nbcsports.com/nba/news/warriors-rookie-yaxel-lendeborg-named-summer-league-mvp-all-summer-league-teams-announced",
+      "type": "news",
+      "quality_tier": "medium_high",
+      "retrieved": "2026-08-12",
+      "provided": "Lendeborg's Summer League MVP award and multi-event averages. Production evidence only; no rotation commitment, so minutes_range is null.",
+      "used_in": [
+        "rookies.json"
+      ]
+    },
+    {
+      "name": "Fox News - NBA Summer League recap, Mavericks 81 Bucks 64",
+      "url": "https://www.foxnews.com/sports/nba-summer-league-recap-mavericks-81-bucks-64",
+      "type": "news",
+      "quality_tier": "low_medium",
+      "retrieved": "2026-08-12",
+      "provided": "Single Summer League box line for Morez Johnson Jr. Low-medium tier: one-game snippet, no averages.",
+      "used_in": [
+        "rookies.json"
+      ]
+    }
+  ],
+  "corroborating_sources": [
+    {
+      "name": "CBS Sports - NBA load management, the 49 star players subject to the participation policy",
+      "url": "https://www.cbssports.com/nba/news/nba-load-management-the-49-star-players-who-are-subject-to-new-player-participation-policy/",
+      "type": "news",
+      "quality_tier": "medium",
+      "retrieved": "2026-08-12",
+      "provided": "The games-played percentages quoted inside the chronic injury notes: Kawhi Leonard ~52.1%, Anthony Davis ~62.9%, Joel Embiid 230 of 410 (~56%). Publication date and denominators were not independently verified, so it backs note text rather than serving as an encoded SourceRef."
+    },
+    {
+      "name": "Wikipedia - 2026 NBA draft",
+      "url": "https://en.wikipedia.org/wiki/2026_NBA_draft",
+      "type": "news",
+      "quality_tier": "medium",
+      "retrieved": "2026-08-12",
+      "provided": "Second source for the first-round board. Used only to cross-check; not encoded as a SourceRef because its pick-13 entry conflicts with two better sources (it lists Miami rather than Milwaukee, apparently reflecting the pick's original owner)."
+    },
+    {
+      "name": "CNN - Giannis Antetokounmpo traded to Miami Heat",
+      "url": "https://www.cnn.com/2026/06/23/sport/giannis-antetokounmpo-traded-miami-heat",
+      "type": "news",
+      "quality_tier": "high",
+      "retrieved": "2026-08-12",
+      "provided": "Independent confirmation of the Giannis trade, used to validate that RotoWire's ranking page reflects post-trade rosters despite its stale season label."
+    },
+    {
+      "name": "NBA.com - Reports: Heat acquire Giannis Antetokounmpo",
+      "url": "https://www.nba.com/news/reports-heat-acquire-giannis-antetokounmpo-in-blockbuster-deal",
+      "type": "news",
+      "quality_tier": "high",
+      "retrieved": "2026-08-12",
+      "provided": "Third-outlet confirmation of the Giannis trade."
+    },
+    {
+      "name": "Bleacher Report - AJ Dybantsa and Darryn Peterson Summer League box scores",
+      "url": "https://bleacherreport.com/articles/25452978-aj-dybantsa-darryn-petersons-final-box-score-stats-highlights-wizards-vs-jazz-summer-league",
+      "type": "news",
+      "quality_tier": "medium",
+      "retrieved": "2026-08-12",
+      "provided": "Summer League box-score detail quoted inside the Dybantsa and Peterson rookie notes."
+    },
+    {
+      "name": "SI.com - NBA Draft scouting report, BYU's AJ Dybantsa",
+      "url": "https://www.si.com/nba/draft/newsfeed/nba-draft-scouting-report-byu-s-aj-dybantsa",
+      "type": "news",
+      "quality_tier": "medium",
+      "retrieved": "2026-08-12",
+      "provided": "The only explicit player comps captured for any 2026 rookie (a young Paul George and Jayson Tatum), which is what makes Dybantsa's per-minute band comp-derived rather than guessed."
+    },
+    {
+      "name": "Athlon Sports - 2026 NBA Draft fantasy impact: Dybantsa, Peterson",
+      "url": "https://athlonsports.com/fantasy/2026-nba-draft-fantasy-impact-dybantsa-peterson",
+      "type": "projection",
+      "quality_tier": "low_medium",
+      "retrieved": "2026-08-12",
+      "provided": "The '20 PPG from opening tip' analyst opinion on Dybantsa quoted in his expected_role text."
+    },
+    {
+      "name": "Athlon Sports - Fantasy basketball rookie watch 2026",
+      "url": "https://athlonsports.com/fantasy/fantasy-basketball-rookie-watch-2026-aj-dybantsa-incoming-stars",
+      "type": "projection",
+      "quality_tier": "low_medium",
+      "retrieved": "2026-08-12",
+      "provided": "The 18.0 points / 9.0 rebounds rookie expectation for Cameron Boozer that his per-minute band is damped down from."
+    },
+    {
+      "name": "NBA.com (Bucks) - Taylor Jenkins finalizes coaching staff for 2026-27",
+      "url": "https://www.nba.com/bucks/news/milwaukee-bucks-head-coach-taylor-jenkins-finalizes-coaching-staff-for-2026-27-season",
+      "type": "news",
+      "quality_tier": "high",
+      "retrieved": "2026-08-12",
+      "provided": "Team-site confirmation of the Jenkins hire and the 2026-27 staff (Darvin Ham retained, T.J. Ford added), one of four outlets agreeing."
+    },
+    {
+      "name": "WPR - Milwaukee Bucks introduce new head coach Taylor Jenkins",
+      "url": "https://www.wpr.org/news/milwaukee-bucks-introduce-new-head-coach-taylor-jenkins",
+      "type": "news",
+      "quality_tier": "medium_high",
+      "retrieved": "2026-08-12",
+      "provided": "Independent confirmation of the 2026-05-06 introductory press conference."
+    },
+    {
+      "name": "Urban Milwaukee - Bucks introduce new head coach Taylor Jenkins",
+      "url": "https://urbanmilwaukee.com/2026/05/07/milwaukee-bucks-introduce-new-head-coach-taylor-jenkins/",
+      "type": "news",
+      "quality_tier": "medium",
+      "retrieved": "2026-08-12",
+      "provided": "Fourth-outlet confirmation of the Jenkins hire and introduction."
+    },
+    {
+      "name": "ESPN - Wizards' Trae Young to decline option, become free agent",
+      "url": "https://www.espn.com/nba/story/_/id/49103130/sources-wizards-trae-young-decline-option-free-agent",
+      "type": "news",
+      "quality_tier": "high",
+      "retrieved": "2026-08-12",
+      "provided": "The first step of the Young sequence: declining the ~$48.97M player option in roughly June 2026. This is the report R4 had seen in isolation, which is why it originally looked like a contradiction."
+    },
+    {
+      "name": "Bleacher Report - Trae Young, Wizards agree to new contract after opt-out",
+      "url": "https://bleacherreport.com/articles/25442215-trae-young-wizards-reportedly-agree-new-contract-after-opt-out-updated-nba-salary-cap",
+      "type": "news",
+      "quality_tier": "medium",
+      "retrieved": "2026-08-12",
+      "provided": "Third-outlet confirmation of the Young re-signing with Washington."
+    },
+    {
+      "name": "CBS Sports - Trae Young free agency, Wizards player option",
+      "url": "https://www.cbssports.com/nba/news/trae-young-free-agency-wizards-player-option/",
+      "type": "news",
+      "quality_tier": "medium_high",
+      "retrieved": "2026-08-12",
+      "provided": "Fourth-outlet confirmation of the Young opt-out-then-re-sign sequence."
+    },
+    {
+      "name": "NBA.com - Bucks' Tyler Herro begins new chapter with hometown team",
+      "url": "https://www.nba.com/news/bucks-tyler-herro-begins-new-chapter-with-hometown-team",
+      "type": "news",
+      "quality_tier": "high",
+      "retrieved": "2026-08-12",
+      "provided": "Confirms the Giannis-trade return package (Herro, Jaquez, Ware, Jakucionis plus the pick that became Nate Ament). Corroborates the transaction rows; the role framing itself comes from the OnSI piece, not this one."
+    },
+    {
+      "name": "Brew Hoop - Bucks trade Giannis Antetokounmpo to Miami Heat",
+      "url": "https://www.brewhoop.com/nba-free-agency/67986/milwaukee-bucks-trade-giannis-antetokounmpo-miami-heat-tyler-herro-kelel-ware-jamie-jaquez-jr",
+      "type": "news",
+      "quality_tier": "medium",
+      "retrieved": "2026-08-12",
+      "provided": "Team-blog corroboration of the Giannis trade return package."
+    }
+  ],
+  "access_failures": [
+    {
+      "name": "Hashtag Basketball fantasy rankings",
+      "url": "https://hashtagbasketball.com/fantasy-basketball-rankings",
+      "type": "expert_rank",
+      "attempted": "2026-08-12",
+      "failure": "HTTP 403 Forbidden on direct fetch, twice. Bot protection; the archive.org fallback was also unavailable to the fetch tool.",
+      "impact": "No ordered list captured. Google's indexed page title still reads 2025-26, so it is unknown whether a 2026-27 list even exists yet. This is the single largest missing 9-cat-native ranking source in the store."
+    },
+    {
+      "name": "Basketball Monster projections",
+      "url": "https://basketballmonster.com/",
+      "type": "statistical_model",
+      "attempted": "2026-08-12",
+      "failure": "Paywalled. The members menu confirmed a 'Projections 26-27' product exists and the homepage countdown was consistent with an October 2026 start, but no ranked list is visible without a login.",
+      "impact": "No statistical_model source is present anywhere in the store. Every consensus list encoded is expert_rank or adp, so the source_type_weights entry for statistical_model currently has nothing to weight."
+    },
+    {
+      "name": "FantasyPros overall rankings",
+      "url": "https://www.fantasypros.com/nba/rankings/overall.php",
+      "type": "expert_rank",
+      "attempted": "2026-08-12",
+      "failure": "Page loads (no 403) but the ranking table is client-side rendered; two fetch attempts returned only navigation chrome, no player rows. Page title also read 2025-26.",
+      "impact": "No FantasyPros consensus list captured, and no confirmation that a 2026-27 FantasyPros list has been published."
+    },
+    {
+      "name": "r/fantasybball community threads",
+      "url": "https://www.reddit.com/r/fantasybball/",
+      "type": "community_rank",
+      "attempted": "2026-08-12",
+      "failure": "Platform-level crawler block. Domain-scoped search returned an explicit 400 naming reddit.com as inaccessible to the user agent; direct fetches of www.reddit.com and old.reddit.com failed; Redlib/Libreddit mirrors returned 403 or DNS failures; a DuckDuckGo index fallback surfaced only 2019-2024 threads.",
+      "impact": "sentiment.json is deliberately empty. No stance meets the thread-URL-plus-date evidence bar, and inventing community consensus was not acceptable. Resolving this needs an authenticated Reddit path (API/PRAW credentials or a Reddit MCP tool)."
+    },
+    {
+      "name": "Yahoo Fantasy official ADP",
+      "url": "https://basketball.fantasysports.yahoo.com/nba/draftanalysis",
+      "type": "adp",
+      "attempted": "2026-08-12",
+      "failure": "Page loads but is empty of content: 'The 2026 Fantasy Basketball season has not started yet.'",
+      "impact": "No primary-platform ADP exists yet. Slamdex's aggregate is the only ADP in the store, and its Yahoo component is scraped rather than verified against Yahoo's own UI."
+    },
+    {
+      "name": "CBS Sports fantasy basketball rankings",
+      "url": "https://www.cbssports.com/fantasy/basketball/rankings/",
+      "type": "expert_rank",
+      "attempted": "2026-08-12",
+      "failure": "Accessible but unusable: no season label anywhere on the page, and the captured view was a guard-only positional table rather than an overall list.",
+      "impact": "Not encoded. Cannot tell whether it reflects 2026-27 or carried-over 2025-26 data."
+    },
+    {
+      "name": "NBA.com 2026 coaching tracker",
+      "url": "https://www.nba.com/news/2026-coaching-tracker",
+      "type": "news",
+      "attempted": "2026-08-12",
+      "failure": "Repeated WebFetch timeouts; only an AI search summary of the page was obtained.",
+      "impact": "PARTIALLY RESOLVED. The Bucks hire of Taylor Jenkins -- the one role-relevant item here -- was confirmed in the follow-up pass through four direct sources and is now encoded. Four coaching changes (Bulls, Pelicans, Magic, Blazers) remain unencoded, as does Doc Rivers' departure from Milwaukee."
+    },
+    {
+      "name": "NBA.com 2026 offseason deals tracker",
+      "url": "https://www.nba.com/news/nba-offseason-deals-2026",
+      "type": "news",
+      "attempted": "2026-08-12",
+      "failure": "Repeated WebFetch timeouts; facts were only available via AI search summaries of the page.",
+      "impact": "PARTIALLY MITIGATED. Seven of these (Ayton to WAS, Dort to ATL, Risacher to DAL, Tobias Harris to SAS, Aldama to DAL, John Collins to DET, Grimes to LAL) gained independent corroboration from the follow-up Slamdex roster tags and are now encoded at medium tier with that dual sourcing stated in each note. Still excluded for lack of any second source: Dorian Finney-Smith to CHA, Caris LeVert to MIL, the Quinten Post offer-sheet outcome, Isaiah Stewart, Gary Harris, Taurean Prince, and most same-team extensions."
+    }
+  ],
+  "nba_stats_endpoints": [
+    {
+      "source": "NBA Stats (stats.nba.com via nba_api)",
+      "endpoint": "leaguedashplayerstats",
+      "season": "2025-26",
+      "retrieved": "2026-08-12"
+    },
+    {
+      "source": "NBA Stats (stats.nba.com via nba_api)",
+      "endpoint": "leaguedashplayerstats",
+      "season": "2024-25",
+      "retrieved": "2026-08-12"
+    },
+    {
+      "source": "NBA Stats (stats.nba.com via nba_api)",
+      "endpoint": "leaguedashplayerstats",
+      "season": "2023-24",
+      "retrieved": "2026-08-13"
+    }
+  ]
+}

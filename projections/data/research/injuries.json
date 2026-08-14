@@ -1,0 +1,425 @@
+{
+  "kind": "injury",
+  "items": [
+    {
+      "player": "Jayson Tatum",
+      "status": "Returned 2026-03-06 from a ruptured right Achilles (May 2025); played 16 games post-return at 21.8p/10.0r/5.3a/1.6 stocks. ESPN's live table still carried a day-to-day knee note at retrieval.",
+      "games_impact_estimate": null,
+      "chronic": false,
+      "note": "No 2026-27 timeline stated, so no games estimate. UNRESOLVED: ESPN's live injury table attached a 'trade' context note to Tatum that R4 could not corroborate anywhere else and flagged as a likely page-rendering artifact -- do not treat Tatum as having left Boston on this evidence.",
+      "source": {
+        "source": "Boston.com - Jayson Tatum recovery timeline, Achilles injury",
+        "url": "https://www.boston.com/sports/boston-celtics/2026/03/05/jayson-tatum-recovery-timeline-achilles-injury-celtics-comments/",
+        "retrieved": "2026-08-12",
+        "season_label": "2025-26",
+        "quality_tier": "medium_high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Tyrese Haliburton",
+      "status": "Torn Achilles (2025); ruled out for the entire 2025-26 season. Also dealt with shingles during rehab.",
+      "games_impact_estimate": null,
+      "chronic": false,
+      "note": "No 2026-27 return or opening-night clearance was confirmed in any retrieved source, so no games estimate is assigned. This is a known gap, not a clean bill of health.",
+      "source": {
+        "source": "CBS Sports - Tyrese Haliburton to miss entire 2025-26 season with torn Achilles",
+        "url": "https://www.cbssports.com/nba/news/tyrese-haliburton-to-miss-entire-2025-26-nba-season-with-torn-achilles-tendon-pacers-confirm",
+        "retrieved": "2026-08-12",
+        "season_label": "2025-26",
+        "quality_tier": "medium_high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Damian Lillard",
+      "status": "Surgically repaired torn Achilles (suffered 2025 playoffs); an August 2026 update has him 'on track' for a full return by the 2026-27 opener. Turns 36.",
+      "games_impact_estimate": null,
+      "chronic": false,
+      "note": "Reported on track for the opener, so no games missed are projected. Source is an aggregator piece with no in-article date -- medium confidence.",
+      "source": {
+        "source": "IBTimes AU - Damian Lillard NBA return recovery journey",
+        "url": "https://www.ibtimes.com.au/damian-lillard-nba-return-recovery-journey-1872796",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "low_medium",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Kyrie Irving",
+      "status": "Torn left ACL, surgery March 2025; missed all of 2025-26. Reported '100% fully recovered', medically cleared, expected ready for the 2026-27 opener.",
+      "games_impact_estimate": null,
+      "chronic": false,
+      "note": "Cleared for the opener, so no games estimate.",
+      "source": {
+        "source": "ESPN - Kyrie Irving to miss rest of season, eyes 2026-27 return",
+        "url": "https://www.espn.com/nba/story/_/id/47964482/kyrie-irving-miss-rest-season-eyes-return-2026-27",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Victor Wembanyama",
+      "status": "Deep vein thrombosis in the right shoulder ended 2024-25 early; medically cleared July 2025 and back in action from October 2025. No new availability concern surfaced for 2026-27.",
+      "games_impact_estimate": null,
+      "chronic": false,
+      "note": "Historical case only; retained for provenance so the absence of a current flag is documented rather than assumed.",
+      "source": {
+        "source": "ESPN - Spurs' Victor Wembanyama cleared to return from blood clot",
+        "url": "https://www.espn.com/nba/story/_/id/45740391/spurs-victor-wembanyama-cleared-return-blood-clot",
+        "retrieved": "2026-08-12",
+        "season_label": "2025-26",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Ja Morant",
+      "status": "Right calf strain then a left elbow UCL sprain (out from 2026-01-21, PRP injection, shut down for 2025-26). Reports have him fully recovered and on track for a full 2026-27 training camp.",
+      "games_impact_estimate": null,
+      "chronic": false,
+      "note": "DURABILITY PATTERN: R4 records that Morant appeared in only 79 of possible games over the past three seasons (~32%) across suspension, shoulder and elbow issues, and calls it a chronic durability concern rather than a single injury. chronic left false because the task scoped that flag to the explicitly reported load-management set (Leonard, Davis, Embiid, Ball, Porzingis); treat this note as the durability signal for Morant.",
+      "source": {
+        "source": "Yahoo Sports - Ja Morant injury, Grizzlies star",
+        "url": "https://sports.yahoo.com/articles/ja-morant-injury-grizzlies-star-031659787.html",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Jimmy Butler",
+      "status": "Torn ACL 2026-01-19, surgery 2026-02-09. Warriors are preparing to start 2026-27 without him and expect a mid-season return.",
+      "games_impact_estimate": 28,
+      "chronic": false,
+      "note": "UNRESOLVED OUTLET DISAGREEMENT: insider targets range from Christmas Day 2026 (~11-month recovery) to early February 2027 (12-month, using De'Anthony Melton's ACL comp); ESPN's live table lists 'Out (Dec 1)'. No official Warriors timeline exists. 28 games is the conservative conversion of the EARLIEST credible return (late December) from a ~Oct 20 season start -- the February scenario would be roughly 50, so this estimate is a floor, not a consensus.",
+      "source": {
+        "source": "ESPN - Jimmy Butler shares update on ACL recovery, future with Warriors",
+        "url": "https://www.espn.com/nba/story/_/id/49198925/jimmy-butler-shares-update-acl-recovery-future-warriors",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Jalen Brunson",
+      "status": "Surgery 2026-07-07 on a forearm/wrist tendon issue in his shooting hand, originating in the 2026 East Finals. Initial recovery estimate ~2 months; Knicks expect full clearance by training camp.",
+      "games_impact_estimate": null,
+      "chronic": false,
+      "note": "Timeline is described as tight but plausible for the opener, so no games are projected missed. Worth re-checking at camp.",
+      "source": {
+        "source": "BasketNews - Jalen Brunson injury update, surgery and recovery timeline",
+        "url": "https://basketnews.com/news-251550-jalen-brunson-injury-update-surgery-and-recovery-timeline-revealed-after-knicks-title.html",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Brandon Ingram",
+      "status": "Right heel spur removed surgically in May 2026 after late-season inflammation. Team expects him back for training camp with close to a full offseason of training.",
+      "games_impact_estimate": null,
+      "chronic": false,
+      "note": "Expected available for camp, so no games estimate. Separately, Ingram's 2026-27 team is unresolved -- he is the main outbound piece in the frozen Kawhi Leonard trade (see transactions.json).",
+      "source": {
+        "source": "NBA.com - Raptors' Brandon Ingram undergoes right heel surgery",
+        "url": "https://www.nba.com/news/raptors-brandon-ingram-surgery-right-heel",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Anthony Davis",
+      "status": "2025-26 was wrecked by a left calf strain (15 of Dallas' first 31 games) and a left hand volar-plate ligament injury (2026-01-08). Cleared for light contact by early April 2026 but Washington shut him down for the rest of the season to protect 2026-27.",
+      "games_impact_estimate": null,
+      "chronic": true,
+      "note": "Chronic load/availability risk: CBS Sports' player-participation-policy piece puts Davis at roughly 62.9% of possible games played in the cited window. No stated 2026-27 timeline, so no games estimate.",
+      "source": {
+        "source": "Bleacher Report - Anthony Davis injury update, Wizards rehab timeline",
+        "url": "https://bleacherreport.com/articles/25403373-anthony-davis-injury-update-given-wizards-latest-stars-rehab-recovery-timeline",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Trae Young",
+      "status": "Sprained right MCL cost him 22 games in fall 2025 (only 10 games with Atlanta pre-trade); after the January trade to Washington he was ruled 'out indefinitely' with quad and back issues, with the Wizards saying neither needs surgery.",
+      "games_impact_estimate": null,
+      "chronic": false,
+      "note": "No stated 2026-27 timeline, so no games estimate. His contract situation, previously flagged here as a conflict, is now RESOLVED: he declined the ~$48.97M option and then re-signed with Washington on a 4-year / ~$212M deal (four outlets agree) -- see transactions.json.",
+      "source": {
+        "source": "Yahoo Sports - Trae Young out indefinitely with quad, back injuries",
+        "url": "https://sports.yahoo.com/nba/breaking-news/article/trae-young-out-indefinitely-with-quad-back-injuries-but-wont-need-surgery-for-either-wizards-say-153208150.html",
+        "retrieved": "2026-08-12",
+        "season_label": "2025-26",
+        "quality_tier": "medium_high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Kristaps Porzingis",
+      "status": "Achilles issue kept him out over a month (last played 2026-01-07) plus illness; after the February trade to Golden State he practiced with encouraging signs per Steve Kerr, then suffered a back issue in late March 2026, exiting after 11 minutes. No firm return timetable given.",
+      "games_impact_estimate": null,
+      "chronic": true,
+      "note": "R4 flags a long-standing durability history with multiple seasons cut short. Caveat: one CBS Sports URL for this player carries a stale 'Celtics' headline while covering his Warriors tenure -- team attribution in that specific link is unreliable, Warriors confirmed via separate trade reporting.",
+      "source": {
+        "source": "ClutchPoints - Steve Kerr encouraging Kristaps Porzingis injury update",
+        "url": "https://clutchpoints.com/nba/golden-state-warriors/warriors-news-steve-kerr-encouraging-kristaps-porzingis-injury-update-all-star-break",
+        "retrieved": "2026-08-12",
+        "season_label": "2025-26",
+        "quality_tier": "medium",
+        "type": "news"
+      }
+    },
+    {
+      "player": "LeBron James",
+      "status": "Missed the first 14 games of 2025-26 with right-side sciatica diagnosed in early October 2025; debuted in a mid/late-November return. No new offseason 2026 injury surfaced.",
+      "games_impact_estimate": null,
+      "chronic": false,
+      "note": "Historical, not a 2026-27 timeline, so no games estimate. Age is the standing risk: he turns 41 during 2026-27, his 24th season, and has changed teams to Philadelphia.",
+      "source": {
+        "source": "NBA.com - LeBron James to miss start of season",
+        "url": "https://www.nba.com/news/lebron-james-to-miss-start-of-season",
+        "retrieved": "2026-08-12",
+        "season_label": "2025-26",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Kawhi Leonard",
+      "status": "2025 offseason knee clean-up, then missed the first ~10 weeks of 2025-26 with right knee inflammation, a November 2025 ankle sprain, and a January 2026 left knee contusion (3-game absence).",
+      "games_impact_estimate": null,
+      "chronic": true,
+      "note": "Chronic load-management case: CBS Sports' player-participation-policy piece puts Leonard at roughly 52.1% of possible games played in the cited window. No 2026-27 timeline stated. His 2026-27 team is also unresolved (frozen Raptors trade).",
+      "source": {
+        "source": "NBA.com - Clippers' Kawhi Leonard returns",
+        "url": "https://www.nba.com/news/clippers-kawhi-leonard-returns",
+        "retrieved": "2026-08-12",
+        "season_label": "2025-26",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Joel Embiid",
+      "status": "Played only 38 games in 2025-26 (knee and oblique), plus an appendectomy before the 2026 playoffs. In May 2026 he said he is 'as confident as I've ever been' about the knee and Philadelphia reportedly has no major offseason knee surgery scheduled.",
+      "games_impact_estimate": null,
+      "chronic": true,
+      "note": "Chronic knee-management case: CBS Sports puts him at 230 of 410 possible games (~56%) over five seasons, and a DraftKings-compiled Jan-Apr 2026 log shows near-continuous knee/ankle/injury-management designations. No specific 2026-27 timeline, so no games estimate despite the high missed-games risk.",
+      "source": {
+        "source": "NBA.com - Joel Embiid expected ready for training camp",
+        "url": "https://www.nba.com/news/joel-embiid-expected-ready-training-camp",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "LaMelo Ball",
+      "status": "Chronic ankle problems: 2024-25 limited to 47 games after March 2025 arthroscopic right-ankle surgery for impingement; 2025-26 hot start (6 games at 23.3p/7.8r/9.8a/1.7s) interrupted by ankle injury, then a left ankle bone bruise costing further games.",
+      "games_impact_estimate": null,
+      "chronic": true,
+      "note": "Sources explicitly frame this as a recurring pattern rather than isolated events. No 2026-27 timeline stated.",
+      "source": {
+        "source": "Yardbarker - LaMelo Ball's ankle injuries continue",
+        "url": "https://www.yardbarker.com/nba/articles/lamelo_balls_ankle_injuries_continue_status_vs_minnesota_is_in_question/s1_16808_42997734",
+        "retrieved": "2026-08-12",
+        "season_label": "2025-26",
+        "quality_tier": "low_medium",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Paolo Banchero",
+      "status": "Missed 7 straight games in 2025-26 with a nagging injury; pre-injury line was 21.7p/8.7r/4.1a. Reporting suggested a return sooner rather than later with no exact date.",
+      "games_impact_estimate": null,
+      "chronic": false,
+      "note": "UNRESOLVED CONFLICT, not adjudicated: one CBS Sports headline describes a torn oblique while a separate aggregated summary describes a groin issue. These may be two sequential 2025-26 events or two descriptions of one; R4 could not resolve it without full-article fetches. The groin claim has no citable URL so only the oblique source is encoded here.",
+      "source": {
+        "source": "CBS Sports - Paolo Banchero out indefinitely with torn oblique",
+        "url": "https://www.cbssports.com/nba/news/paolo-banchero-injury-update-magic-star-out-indefinitely-with-torn-oblique-bringing-a-halt-to-torrid-start",
+        "retrieved": "2026-08-12",
+        "season_label": "2025-26",
+        "quality_tier": "medium_high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "De'Aaron Fox",
+      "status": "Reported to miss all of preseason and potentially the regular-season opener with a hamstring injury (fall 2025 Spurs beat reporting).",
+      "games_impact_estimate": null,
+      "chronic": false,
+      "note": "This is a 2025-26 preseason item; no 2026-27-specific update was found in R4's pass, so no games estimate. Needs a dedicated re-check closer to camp.",
+      "source": {
+        "source": "Sports Illustrated - Spurs rule out De'Aaron Fox for preseason opener",
+        "url": "https://www.si.com/nba/spurs/onsi/news/spurs-rule-out-deaaron-fox-multiple-key-players-for-preseason-opener",
+        "retrieved": "2026-08-12",
+        "season_label": "2025-26",
+        "quality_tier": "medium",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Cade Cunningham",
+      "status": "Left-side pneumothorax (collapsed lung) diagnosed 2026-03-17/19 after initially being reported as back spasms; progressing in return-to-play with weekly re-evaluation as of early April 2026.",
+      "games_impact_estimate": null,
+      "chronic": false,
+      "note": "No explicit 2026-27 readiness statement was found, so no games estimate. Gap flagged rather than filled.",
+      "source": {
+        "source": "ESPN - Pistons' Cunningham out at least another week with collapsed lung",
+        "url": "https://www.espn.com/nba/story/_/id/48378921/pistons-cunningham-collapsed-lung-least-another-week",
+        "retrieved": "2026-08-12",
+        "season_label": "2025-26",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Klay Thompson",
+      "status": "Listed doubtful for rest on the official 2026-03-15 NBA injury report; not playing both ends of late-season back-to-backs.",
+      "games_impact_estimate": null,
+      "chronic": false,
+      "note": "Rest/load-management pattern noted by R4 but not part of the explicitly reported chronic set, so chronic is left false. Single-game report, no 2026-27 timeline.",
+      "source": {
+        "source": "NBA official injury report, 2026-03-15",
+        "url": "https://ak-static.cms.nba.com/referee/injury/Injury-Report_2026-03-15_06_00PM.pdf",
+        "retrieved": "2026-08-12",
+        "season_label": "2025-26",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "James Harden",
+      "status": "Right thumb fracture; still listed as available on the mid-March 2026 injury report.",
+      "games_impact_estimate": null,
+      "chronic": false,
+      "note": "Played through the fracture, so no games estimate. TEAM CONFLICT: this item lists Harden with the LA Clippers while R1, R2 and R3 all place him on Cleveland (where he declined a player option and is an unsigned free agent as of 2026-08-12). Unresolved.",
+      "source": {
+        "source": "FOX Sports - James Harden player injuries",
+        "url": "https://www.foxsports.com/nba/james-harden-player-injuries",
+        "retrieved": "2026-08-12",
+        "season_label": "2025-26",
+        "quality_tier": "medium",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Zion Williamson",
+      "status": "Came off a relatively productive and healthy 2025-26 by his standards and remains the Pelicans' centerpiece; had at least one in-season ankle tweak that coach James Borrego expected to be minor.",
+      "games_impact_estimate": null,
+      "chronic": false,
+      "note": "No acute current concern and no stated timeline. R4 notes the well-known historical durability pattern persists, but did not report a load-management designation, so chronic is left false.",
+      "source": {
+        "source": "ESPN - Pelicans' Zion Williamson tweaks ankle in win over Jazz",
+        "url": "https://www.espn.com/nba/story/_/id/48069733/pelicans-zion-williamson-tweaks-ankle-in-win-over-jazz",
+        "retrieved": "2026-08-12",
+        "season_label": "2025-26",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Moses Moody",
+      "status": "Out with a torn patellar tendon in the left knee; ESPN's live table lists a target of about December 1.",
+      "games_impact_estimate": 18,
+      "chronic": false,
+      "note": "Conservative conversion of the stated ~Dec 1 target against a ~2026-10-20 season start (about six weeks of games).",
+      "source": {
+        "source": "ESPN NBA injuries table",
+        "url": "https://www.espn.com/nba/injuries",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Johnny Furphy",
+      "status": "Out with a torn right ACL; ESPN's live table lists a target of about January 1.",
+      "games_impact_estimate": 35,
+      "chronic": false,
+      "note": "Conservative conversion of the stated 'out until January' target.",
+      "source": {
+        "source": "ESPN NBA injuries table",
+        "url": "https://www.espn.com/nba/injuries",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Donte DiVincenzo",
+      "status": "To undergo surgery to repair a ruptured right Achilles; ESPN's live table lists a target of about April 1.",
+      "games_impact_estimate": 65,
+      "chronic": false,
+      "note": "Conservative conversion of a stated full-year rehab target (April 1 return leaves only the season's final weeks).",
+      "source": {
+        "source": "ESPN NBA injuries table",
+        "url": "https://www.espn.com/nba/injuries",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Mouhamed Gueye",
+      "status": "Day-to-day after surgery to repair a fractured left foot.",
+      "games_impact_estimate": null,
+      "chronic": false,
+      "note": "No timeline stated beyond day-to-day.",
+      "source": {
+        "source": "ESPN NBA injuries table",
+        "url": "https://www.espn.com/nba/injuries",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Brandon Miller",
+      "status": "Day-to-day with a shoulder issue; described in the same table as Charlotte's primary offensive focal point.",
+      "games_impact_estimate": null,
+      "chronic": false,
+      "note": "No timeline stated beyond day-to-day, but fantasy-relevant given his role.",
+      "source": {
+        "source": "ESPN NBA injuries table",
+        "url": "https://www.espn.com/nba/injuries",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Jayden Quaintance",
+      "status": "Post-draft knee surgery (meniscus repair) on the knee he tore the ACL and fractured on 2025-02-23. Will miss the start of 2026-27; San Antonio's early expectation is that he will not be ready to return until some point in 2027. Did not play 2026 Summer League.",
+      "games_impact_estimate": 60,
+      "chronic": false,
+      "note": "Conservative conversion of a full-year rehab framing: a 'not until sometime in 2027' return is at minimum January and plausibly later. Reported consistently across three team-focused outlets. Fantasy implication per source: not rosterable at the start of 2026-27, dynasty stash only.",
+      "source": {
+        "source": "Pounding The Rock - Jayden Quaintance to miss the start of 2026-27",
+        "url": "https://www.poundingtherock.com/spurs-draft-rumors-news-analysis/105632/jayden-quaintance-expects-to-undergo-knee-procedure-miss-the-start-of-the-2026-27-season",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium_high",
+        "type": "news"
+      }
+    }
+  ]
+}

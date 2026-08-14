@@ -1,0 +1,293 @@
+{
+  "kind": "rookie",
+  "items": [
+    {
+      "player": "AJ Dybantsa",
+      "draft_pick": 1,
+      "team": "WAS",
+      "position": "F",
+      "expected_role": "ANALYST OPINION (FanSided/Yahoo lineup projection, not a coach announcement): 'the undisputed starter at small forward', with a projected opening-night five of Trae Young, Kyshawn George, Dybantsa, Anthony Davis and Alex Sarr; Will Riley the backup SF and Bilal Coulibaly a flex wing. Athlon (analyst opinion, low-medium confidence) projects him as a 20 PPG scorer from opening tip while cautioning that Young, Davis and Sarr make big early production hard. Supporting reported facts: NCAA-leading 25.5 PPG as a BYU freshman on 33.1% from three (scouts' flagged weakness); Summer League 25.0 PPG over two games (50 points, 13/33 FG, 1/11 3PT), the most by a No. 1 pick in Las Vegas SL history, before being shut down for load management. MINUTES RANGE IS OPINION-DERIVED from the projected starting role, not a published minutes projection. PER-MINUTE BAND IS COMP-DERIVED: built from the SI scouting comps (a young Paul George / Jayson Tatum wing archetype) and damped roughly 15% for rookie-season reality -- it is deliberately well below the 20 PPG analyst projection.",
+      "minutes_range": [28.0, 34.0],
+      "comps": ["Paul George", "Jayson Tatum"],
+      "per_minute_band": {
+        "fgm": 0.145,
+        "fga": 0.345,
+        "ftm": 0.075,
+        "fta": 0.095,
+        "tpm": 0.035,
+        "pts": 0.4,
+        "reb": 0.16,
+        "ast": 0.08,
+        "stl": 0.032,
+        "blk": 0.02,
+        "tov": 0.075
+      },
+      "source": {
+        "source": "Yahoo/FanSided - AJ Dybantsa lineup projection, Wizards",
+        "url": "https://sports.yahoo.com/articles/aj-dybantsa-lineup-projection-wizards-001421693.html",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium",
+        "type": "projection"
+      }
+    },
+    {
+      "player": "Darryn Peterson",
+      "draft_pick": 2,
+      "team": "UTA",
+      "position": "G",
+      "expected_role": "ANALYST OPINION (Yahoo Sports rookie outlook): 'considered by many to have the highest upside in this class... has the ability to score 20 PPG right out of the gate and is another top-50 fantasy draft prospect'; betting markets give him the shortest Rookie of the Year payout (2.77x). No Jazz beat report or coach quote on the opening-night rotation was captured. Reported facts: Summer League 23.0 PPG / 5.2 AST / 3.2 REB / 1.2 BLK / 1.0 STL over five games on 39.8/34.5/77.8, including a 28-point debut and a 25-point, 12-assist game; Kansas freshman year 20.2 PPG / 4.2 REB / 1.6 AST on 43.8/38.2/82.6 with a 25.4 PER (a second source listed 20.4/4.3/1.4 -- rounding-level difference). MINUTES RANGE IS OPINION-DERIVED from the top-2 pick plus lead-guard projection. PER-MINUTE BAND IS DERIVED from the reported 20 PPG analyst projection damped roughly 15%; no player comp was named for him in any retrieved source.",
+      "minutes_range": [28.0, 34.0],
+      "comps": [],
+      "per_minute_band": {
+        "fgm": 0.16,
+        "fga": 0.38,
+        "ftm": 0.085,
+        "fta": 0.105,
+        "tpm": 0.045,
+        "pts": 0.45,
+        "reb": 0.1,
+        "ast": 0.14,
+        "stl": 0.03,
+        "blk": 0.025,
+        "tov": 0.085
+      },
+      "source": {
+        "source": "Yahoo Sports - Rookies to watch, early fantasy outlook",
+        "url": "https://sports.yahoo.com/articles/rookies-watch-early-fantasy-outlook-185325359.html",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium",
+        "type": "projection"
+      }
+    },
+    {
+      "player": "Cameron Boozer",
+      "draft_pick": 3,
+      "team": "MEM",
+      "position": "F",
+      "expected_role": "ANALYST OPINION (FanSided/Yahoo lineup projection): projected 2026-27 starting five of Scotty Pippen Jr., Cedric Coward, Jerami Grant, Boozer and Zach Edey, with Boozer 'the rookie of the year favorite' who 'is going to have a premier offensive role immediately in Memphis'. Athlon (analyst opinion, low-medium confidence) sets a 'rookie expectation of 18.0 points and 9.0 rebounds with strong free-throw efficiency'. Reported facts: Summer League debut vs OKC 15 pts / 4 reb / 4 ast on 7/11 FG, then 23 pts / 6 reb / 4 ast vs Chicago; Duke freshman line of 22.5 / 10.2 / 4.1 on 55.6% FG and 39.1% from three (search-snippet sourced, medium confidence on exact decimals). MINUTES RANGE IS OPINION-DERIVED from the projected starting role. PER-MINUTE BAND IS DERIVED from the reported 18/9 analyst projection damped roughly 15%, not from a named player comp (none was surfaced for him).",
+      "minutes_range": [26.0, 32.0],
+      "comps": [],
+      "per_minute_band": {
+        "fgm": 0.19,
+        "fga": 0.4,
+        "ftm": 0.08,
+        "fta": 0.105,
+        "tpm": 0.04,
+        "pts": 0.5,
+        "reb": 0.25,
+        "ast": 0.1,
+        "stl": 0.028,
+        "blk": 0.045,
+        "tov": 0.08
+      },
+      "source": {
+        "source": "Yahoo/FanSided - Projecting Grizzlies starting lineup and rotation",
+        "url": "https://sports.yahoo.com/articles/projecting-grizzlies-starting-lineup-rotation-002520681.html",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium",
+        "type": "projection"
+      }
+    },
+    {
+      "player": "Caleb Wilson",
+      "draft_pick": 4,
+      "team": "CHI",
+      "position": "F",
+      "expected_role": "No lineup projection or minutes projection was captured for Wilson -- only performance and beat sentiment. Reported facts: Summer League averages of 23.5 PPG / 7.2 REB / 2.5 BLK / 1.8 AST / 1.2 STL on 41.9% from three (13/31), leading all SL players in total points (94), including a 35-point debut in 33 minutes (second-most in a Las Vegas SL debut) before being shut down for the final game. Beat characterization (opinion): NBA.com called him a 'throwback rookie' giving the Bulls 'renewed hope'; the Chicago Sun-Times called him a 'summer winner after dazzling in Vegas'. MINUTES RANGE IS OPINION-DERIVED from the top-5 slot on a rebuilding roster plus that Summer League showing -- it is not a published projection. No per-minute band: no analyst production projection and no named comp exist for him, so the model should not be handed a guessed rate line.",
+      "minutes_range": [20.0, 28.0],
+      "comps": [],
+      "per_minute_band": null,
+      "source": {
+        "source": "NBA.com - Caleb Wilson, throwback rookie, Bulls future",
+        "url": "https://www.nba.com/news/caleb-wilson-throwback-rookie-bulls-future",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium_high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Yaxel Lendeborg",
+      "draft_pick": 11,
+      "team": "GSW",
+      "position": "F",
+      "expected_role": "No role or minutes projection captured. Reported facts: named 2026 Las Vegas Summer League MVP and Championship Game MVP; six-game SL averages of 14.8 PPG / 6.8 REB / 4.0 AST, and 14.9 PPG on 48.4% FG (44/91) and 45.9% from three (17/37) across the California Classic and Las Vegas combined, with a best line of 21 pts / 10 reb / 6 ast in 28 minutes vs Dallas. Context that may open minutes but is not a role report: Golden State expects to start 2026-27 without Jimmy Butler (ACL) and Moses Moody (patellar tendon, ~Dec 1 target). minutes_range left null deliberately -- Summer League MVP is production evidence, not a rotation commitment.",
+      "minutes_range": null,
+      "comps": [],
+      "per_minute_band": null,
+      "source": {
+        "source": "NBC Sports Bay Area - Warriors rookie Yaxel Lendeborg named Summer League MVP",
+        "url": "https://www.nbcsports.com/nba/news/warriors-rookie-yaxel-lendeborg-named-summer-league-mvp-all-summer-league-teams-announced",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium_high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Morez Johnson Jr.",
+      "draft_pick": 9,
+      "team": "DAL",
+      "position": "F/C",
+      "expected_role": "No role or minutes projection captured. Reported facts: a single Summer League line vs Golden State of 27 pts / 8 reb / 3 ast / 3 stl / 2 blk (single-game snippet, no SL averages retrieved). Role-fit angle (medium confidence, search-snippet sourced): he reunites in Dallas with new head coach Dusty May, his Michigan college coach. minutes_range null -- a coach-familiarity angle is not a minutes projection.",
+      "minutes_range": null,
+      "comps": [],
+      "per_minute_band": null,
+      "source": {
+        "source": "Fox News - NBA Summer League recap, Mavericks 81 Bucks 64",
+        "url": "https://www.foxnews.com/sports/nba-summer-league-recap-mavericks-81-bucks-64",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "low_medium",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Nate Ament",
+      "draft_pick": 13,
+      "team": "MIL",
+      "position": "F",
+      "expected_role": "No role or minutes projection captured. Reported facts (medium confidence, search-snippet aggregated rather than primary box scores): five-game Summer League averages of 11.2 PPG / 4.8 REB / 1.4 AST / 2.8 TO on 50% FG (20/40) and 39% from three (7/18); best game 23 pts (7/13 FG, 5/6 FT) with 6 reb in 25 min vs Charlotte, worst 7 pts on 3/7 with 3 turnovers vs San Antonio. Drafted with the pick Milwaukee acquired from Miami in the Giannis Antetokounmpo trade; a Wikipedia fetch listed the pick under Miami, which two independent sources contradict. minutes_range null.",
+      "minutes_range": null,
+      "comps": [],
+      "per_minute_band": null,
+      "source": {
+        "source": "NBC Sports - 2026 NBA Draft complete list of every pick",
+        "url": "https://www.nbcsports.com/nba/news/2026-nba-draft-complete-list-of-every-pick-from-round-1-and-round-2",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Jayden Quaintance",
+      "draft_pick": 20,
+      "team": "SAS",
+      "position": "C",
+      "expected_role": "NOT ROSTERABLE at the start of 2026-27; dynasty/keeper stash only per the source. He tore his ACL, damaged the meniscus and fractured the knee on 2025-02-23 at Arizona State, transferred to Kentucky, debuted 2025-12-20 and was ruled out again four games later, then underwent a post-draft meniscus repair. He will miss the start of 2026-27 and San Antonio's early expectation is that he will not return until some point in 2027. Did not play 2026 Summer League. Once a projected top-10 pick, he fell to 20 because of the injury. minutes_range null -- there is no meaningful 2026-27 role to project. See injuries.json for the games estimate.",
+      "minutes_range": null,
+      "comps": [],
+      "per_minute_band": null,
+      "source": {
+        "source": "Pounding The Rock - Jayden Quaintance to miss the start of 2026-27",
+        "url": "https://www.poundingtherock.com/spurs-draft-rumors-news-analysis/105632/jayden-quaintance-expects-to-undergo-knee-procedure-miss-the-start-of-the-2026-27-season",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "medium_high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Keaton Wagler",
+      "draft_pick": 5,
+      "team": "LAC",
+      "position": "G",
+      "expected_role": "Lottery pick, Illinois. No opening-night role, rotation report, Summer League line or minutes projection was captured for him in this research pass. minutes_range null so the model excludes him rather than guessing.",
+      "minutes_range": null,
+      "comps": [],
+      "per_minute_band": null,
+      "source": {
+        "source": "NBC Sports - 2026 NBA Draft complete list of every pick",
+        "url": "https://www.nbcsports.com/nba/news/2026-nba-draft-complete-list-of-every-pick-from-round-1-and-round-2",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Mikel Brown Jr.",
+      "draft_pick": 6,
+      "team": "BKN",
+      "position": "G",
+      "expected_role": "Lottery pick, Louisville. R6 flagged his opening-night role as unconfirmed and out of research budget, noting only that he is one of several lead guards drafted into crowded backcourts. No minutes projection captured; minutes_range null.",
+      "minutes_range": null,
+      "comps": [],
+      "per_minute_band": null,
+      "source": {
+        "source": "NBC Sports - 2026 NBA Draft complete list of every pick",
+        "url": "https://www.nbcsports.com/nba/news/2026-nba-draft-complete-list-of-every-pick-from-round-1-and-round-2",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Darius Acuff Jr.",
+      "draft_pick": 7,
+      "team": "SAC",
+      "position": "G",
+      "expected_role": "Lottery pick, Arkansas. R6 flagged his opening-night role as unconfirmed, noting only that he is one of several lead guards drafted into crowded backcourts. No minutes projection captured; minutes_range null.",
+      "minutes_range": null,
+      "comps": [],
+      "per_minute_band": null,
+      "source": {
+        "source": "NBC Sports - 2026 NBA Draft complete list of every pick",
+        "url": "https://www.nbcsports.com/nba/news/2026-nba-draft-complete-list-of-every-pick-from-round-1-and-round-2",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Kingston Flemings",
+      "draft_pick": 8,
+      "team": "ATL",
+      "position": "G",
+      "expected_role": "Lottery pick, Houston. R6 flagged his opening-night role as unconfirmed, noting only that he is one of several lead guards drafted into crowded backcourts. No minutes projection captured; minutes_range null. Contextual note, not a role report: Atlanta traded Trae Young in January 2026.",
+      "minutes_range": null,
+      "comps": [],
+      "per_minute_band": null,
+      "source": {
+        "source": "NBC Sports - 2026 NBA Draft complete list of every pick",
+        "url": "https://www.nbcsports.com/nba/news/2026-nba-draft-complete-list-of-every-pick-from-round-1-and-round-2",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Brayden Burries",
+      "draft_pick": 10,
+      "team": "MIL",
+      "position": "G",
+      "expected_role": "Lottery pick, Arizona. No opening-night role, rotation report or minutes projection captured. minutes_range null.",
+      "minutes_range": null,
+      "comps": [],
+      "per_minute_band": null,
+      "source": {
+        "source": "NBC Sports - 2026 NBA Draft complete list of every pick",
+        "url": "https://www.nbcsports.com/nba/news/2026-nba-draft-complete-list-of-every-pick-from-round-1-and-round-2",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    },
+    {
+      "player": "Aday Mara",
+      "draft_pick": 12,
+      "team": "OKC",
+      "position": "C",
+      "expected_role": "Lottery pick, Michigan. No opening-night role, rotation report or minutes projection captured. minutes_range null.",
+      "minutes_range": null,
+      "comps": [],
+      "per_minute_band": null,
+      "source": {
+        "source": "NBC Sports - 2026 NBA Draft complete list of every pick",
+        "url": "https://www.nbcsports.com/nba/news/2026-nba-draft-complete-list-of-every-pick-from-round-1-and-round-2",
+        "retrieved": "2026-08-12",
+        "season_label": "2026-27",
+        "quality_tier": "high",
+        "type": "news"
+      }
+    }
+  ]
+}
