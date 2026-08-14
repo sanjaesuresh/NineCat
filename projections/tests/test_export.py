@@ -147,6 +147,15 @@ def test_build_dataset_writes_valid_schema(dataset_paths: dict[str, Path]) -> No
     assert 0.0 <= fg_pct <= 1.0
     assert 0.0 <= ft_pct <= 1.0
 
+    # punt-build feature needs per-category availability-adjusted z-scores
+    # alongside the existing aggregate -- same 9-key dict shape as
+    # per_game_zscores, straight off PlayerValue.availability_adjusted_zscores
+    assert "availability_adjusted_zscores" in player_one["fantasy"]
+    assert set(player_one["fantasy"]["availability_adjusted_zscores"].keys()) == set(
+        player_one["fantasy"]["per_game_zscores"].keys()
+    )
+    assert len(player_one["fantasy"]["availability_adjusted_zscores"]) == 9
+
     # ranks are dense and contiguous starting at 1
     ranks = [p["rank"] for p in players]
     assert ranks == list(range(1, len(players) + 1))

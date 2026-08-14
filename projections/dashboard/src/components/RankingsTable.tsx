@@ -1,11 +1,14 @@
 import { useMemo, useState, type KeyboardEvent } from "react";
-import type { Player } from "../lib/types";
+import type { CategoryKey, Player } from "../lib/types";
 import { DEFAULT_COLUMNS, DEFAULT_SORT, EXTRA_COLUMNS, sortPlayers, type SortState } from "./columns";
 
 export interface RankingsTableProps {
   players: Player[];
   selectedPlayerId: string | null;
   onSelectPlayer: (player: Player) => void;
+  /** Active punt-build categories -- only the per-category z columns read
+   * this (to mute a punted category's cell); defaults to none. */
+  punts?: CategoryKey[];
 }
 
 function SortIcon({ direction }: { direction: "asc" | "desc" | null }) {
@@ -28,7 +31,7 @@ function SortIcon({ direction }: { direction: "asc" | "desc" | null }) {
  * picker for the optional z-score/age/value columns, and keyboard-selectable
  * rows (Task 17 wires the click/Enter target to a detail panel).
  */
-export function RankingsTable({ players, selectedPlayerId, onSelectPlayer }: RankingsTableProps) {
+export function RankingsTable({ players, selectedPlayerId, onSelectPlayer, punts = [] }: RankingsTableProps) {
   const [sort, setSort] = useState<SortState>(DEFAULT_SORT);
   const [extraColumnIds, setExtraColumnIds] = useState<string[]>([]);
   const [columnPickerOpen, setColumnPickerOpen] = useState(false);
@@ -175,7 +178,7 @@ export function RankingsTable({ players, selectedPlayerId, onSelectPlayer }: Ran
                         col.align === "right" ? "text-right" : "text-left"
                       }`}
                     >
-                      {col.render(player)}
+                      {col.render(player, punts)}
                     </td>
                   ))}
                 </tr>

@@ -114,6 +114,7 @@ def _player_json(pid: str, rank: int, result: PipelineResult) -> dict:
         "fantasy": {
             "per_game_zscores": value.per_game_zscores,
             "per_game_value": value.per_game_value,
+            "availability_adjusted_zscores": value.availability_adjusted_zscores,
             "availability_adjusted_value": value.availability_adjusted_value,
             "regular_season_value": playoff.regular_season_z,
             "playoff_value": playoff.playoff_value,

@@ -26,4 +26,12 @@ describe("CategoryProfile", () => {
     expect(screen.queryAllByTestId("category-profile-bar")).toHaveLength(0);
     expect(screen.getByText("No data")).toBeInTheDocument();
   });
+
+  it("flags punted categories with a sr-only note, leaving non-punted bars untouched", () => {
+    render(<CategoryProfile zScores={zScores} punted={["ft_pct", "tov"]} />);
+    const bars = screen.getAllByTestId("category-profile-bar");
+    expect(bars.find((b) => b.textContent?.startsWith("FT%"))?.textContent).toContain("(punted)");
+    expect(bars.find((b) => b.textContent?.startsWith("TO:"))?.textContent).toContain("(punted)");
+    expect(bars.find((b) => b.textContent?.startsWith("PTS"))?.textContent).not.toContain("(punted)");
+  });
 });

@@ -69,6 +69,25 @@ describe("PlayerDetail", () => {
     render(<PlayerDetail player={getFixture("detail-rich")} onClose={() => {}} />);
     expect(screen.getByRole("heading", { name: /Detail Rich/ })).toHaveFocus();
   });
+
+  it("mutes a strength/risk chip naming a punted category (shipped 'elite/weak LABEL (z)' format)", () => {
+    const player = {
+      ...getFixture("detail-rich"),
+      analysis: {
+        explanation: "",
+        strengths: ["elite FT% (+2.5z)", "elite PTS (+1.8z)"],
+        risks: ["weak TO (-1.2z)"],
+      },
+    };
+    render(<PlayerDetail player={player} onClose={() => {}} punts={["ft_pct", "tov"]} />);
+
+    const ftChip = screen.getByText("elite FT% (+2.5z)").closest("span");
+    const ptsChip = screen.getByText("elite PTS (+1.8z)").closest("span");
+    const toChip = screen.getByText("weak TO (-1.2z)").closest("span");
+    expect(ftChip).toHaveClass("opacity-40");
+    expect(toChip).toHaveClass("opacity-40");
+    expect(ptsChip).not.toHaveClass("opacity-40");
+  });
 });
 
 describe("weekRowTint", () => {

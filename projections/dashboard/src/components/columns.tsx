@@ -10,7 +10,10 @@ export interface ColumnDef {
    * (Player, Team, Pos, Injury) render as plain <th> text. */
   numeric: boolean;
   align: "left" | "right";
-  render: (player: Player) => ReactNode;
+  // punts: the currently-active punt-build categories (usually []); only the
+  // per-category z columns read this to mute a punted category's cell, so
+  // every other column's render function ignores the extra argument
+  render: (player: Player, punts: CategoryKey[]) => ReactNode;
   /** Present only for numeric columns. Returns null for "no value" so
    * sortPlayers can push unknowns to the end instead of treating them as 0. */
   sortValue?: (player: Player) => number | null;
@@ -44,10 +47,13 @@ function zScoreClasses(z: number): string {
   return `bg-slate-800 text-slate-300 ${magnitude}`;
 }
 
-function ZScoreCell({ value }: { value: number }) {
+function ZScoreCell({ value, punted = false }: { value: number; punted?: boolean }) {
   return (
-    <span className={`inline-flex min-w-[3rem] justify-end rounded px-1.5 py-0.5 tabular-nums ${zScoreClasses(value)}`}>
+    <span
+      className={`inline-flex min-w-[3rem] justify-end rounded px-1.5 py-0.5 tabular-nums ${zScoreClasses(value)} ${punted ? "opacity-40" : ""}`}
+    >
       {value.toFixed(2)}
+      {punted && <span className="sr-only"> (punted)</span>}
     </span>
   );
 }
@@ -202,7 +208,7 @@ export const EXTRA_COLUMNS: ColumnDef[] = [
     numeric: true,
     align: "right",
     sortValue: (p) => p.fantasy.per_game_zscores[cat],
-    render: (p) => <ZScoreCell value={p.fantasy.per_game_zscores[cat]} />,
+    render: (p, punts) => <ZScoreCell value={p.fantasy.per_game_zscores[cat]} punted={punts.includes(cat)} />,
   })),
   {
     id: "availabilityAdjusted",

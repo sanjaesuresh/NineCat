@@ -35,6 +35,12 @@ export interface Projection {
 export interface Fantasy {
   per_game_zscores: Record<CategoryKey, number>;
   per_game_value: number;
+  // nineproj.value.ninecat.PlayerValue computes this per-category breakdown
+  // (mirrors per_game_zscores but off season-totals z's), but dataset.py's
+  // export doesn't emit it yet -- optional so the type stays honest about the
+  // currently-shipped payload; punt-build (lib/puntBuild.ts) degrades
+  // gracefully (skips the availability-adjusted swap) when it's absent.
+  availability_adjusted_zscores?: Record<CategoryKey, number>;
   availability_adjusted_value: number;
   regular_season_value: number;
   // null exactly when schedule_available is false (mirrors Schedule's null fields)

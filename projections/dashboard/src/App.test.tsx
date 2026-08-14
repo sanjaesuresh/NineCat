@@ -366,4 +366,193 @@ describe("App", () => {
       expect(within(rows[0]).getByText("Bob")).toBeInTheDocument();
     });
   });
+
+  describe("punt build", () => {
+    const ZERO = { fg_pct: 0, ft_pct: 0, tpm: 0, pts: 0, reb: 0, ast: 0, stl: 0, blk: 0, tov: 0 };
+    const zeroScores = {
+      per_game: 0,
+      availability_adjusted: 0,
+      expected_games: 0,
+      role_usage: 0,
+      playoff_schedule: 0,
+      consensus: 0,
+      team_environment: 0,
+      category_scarcity: 0,
+    };
+
+    // full 9cat sum: Balanced = 0.5*9 = 4.5 > Poor FT Big = -7.6+3+3+2+1 = 1.4
+    // (Balanced leads, shipped final_rank 1/2 below). Punting ft_pct: Poor FT
+    // Big's sum becomes 3+3+2+1 = 9 > Balanced's 4.5-0.5 = 4.0 -- the big jumps
+    // above the balanced player, exactly as hand math predicts.
+    const poorFtBig = {
+      ...fixturePlayers[0],
+      player_id: "poor-ft-big",
+      name: "Poor FT Big",
+      fantasy: {
+        ...fixturePlayers[0].fantasy,
+        per_game_zscores: { ...ZERO, ft_pct: -7.6, reb: 3, blk: 3, fg_pct: 2, pts: 1 },
+      },
+      model: { ...fixturePlayers[0].model, final_rank: 2, component_scores: { ...zeroScores } },
+      schedule: { ...fixturePlayers[0].schedule, windows: {} },
+    };
+    const balanced = {
+      ...fixturePlayers[0],
+      player_id: "balanced",
+      name: "Balanced",
+      fantasy: {
+        ...fixturePlayers[0].fantasy,
+        per_game_zscores: { fg_pct: 0.5, ft_pct: 0.5, tpm: 0.5, pts: 0.5, reb: 0.5, ast: 0.5, stl: 0.5, blk: 0.5, tov: 0.5 },
+      },
+      model: { ...fixturePlayers[0].model, final_rank: 1, component_scores: { ...zeroScores } },
+      schedule: { ...fixturePlayers[0].schedule, windows: {} },
+    };
+    const puntDataset = { ...dataset, players: [balanced, poorFtBig] };
+
+    // the popover's checkbox list is only in the DOM tree meaningfully once
+    // opened -- match RankingsTable's own Columns-picker interaction style
+    function openPuntPicker() {
+      fireEvent.click(screen.getByRole("button", { name: /^Punt:/ }));
+    }
+
+    it("checking punt FT% re-ranks the poor-FT big above the balanced player, as hand math predicts", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(new Response(JSON.stringify(puntDataset), { status: 200 })),
+      );
+
+      render(<App />);
+      await waitFor(() => expect(screen.getByText("Balanced")).toBeInTheDocument());
+
+      // shipped default: Balanced (full 9cat sum wins) leads, no punt note
+      let rows = within(screen.getByRole("table")).getAllByRole("row").slice(1);
+      expect(within(rows[0]).getByText("Balanced")).toBeInTheDocument();
+      expect(screen.queryByText(/ranked for punt/)).not.toBeInTheDocument();
+
+      openPuntPicker();
+      fireEvent.click(screen.getByRole("checkbox", { name: "FT%" }));
+
+      expect(screen.getByText("ranked for punt FT% build")).toBeInTheDocument();
+      await waitFor(() => {
+        rows = within(screen.getByRole("table")).getAllByRole("row").slice(1);
+        expect(within(rows[0]).getByText("Poor FT Big")).toBeInTheDocument();
+      });
+    });
+
+    it("checking multiple categories composes -- a 3-punt case re-ranks exactly as hand math predicts", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(new Response(JSON.stringify(puntDataset), { status: 200 })),
+      );
+
+      render(<App />);
+      await waitFor(() => expect(screen.getByText("Balanced")).toBeInTheDocument());
+
+      // punting ft_pct + ast + stl: Poor FT Big's sum is untouched (it never
+      // had ast/stl set) at reb(3)+blk(3)+fg_pct(2)+pts(1) = 9; Balanced drops
+      // to 0.5 * 6 remaining categories = 3.0 -- Poor FT Big (9) still wins
+      openPuntPicker();
+      fireEvent.click(screen.getByRole("checkbox", { name: "FT%" }));
+      fireEvent.click(screen.getByRole("checkbox", { name: "AST" }));
+      fireEvent.click(screen.getByRole("checkbox", { name: "ST" }));
+
+      expect(screen.getByText("ranked for punt FT% + AST + ST build")).toBeInTheDocument();
+      await waitFor(() => {
+        const rows = within(screen.getByRole("table")).getAllByRole("row").slice(1);
+        expect(within(rows[0]).getByText("Poor FT Big")).toBeInTheDocument();
+      });
+    });
+
+    it("unchecking all punted categories restores the shipped order", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(new Response(JSON.stringify(puntDataset), { status: 200 })),
+      );
+
+      render(<App />);
+      await waitFor(() => expect(screen.getByText("Balanced")).toBeInTheDocument());
+
+      openPuntPicker();
+      fireEvent.click(screen.getByRole("checkbox", { name: "FT%" }));
+      fireEvent.click(screen.getByRole("checkbox", { name: "AST" }));
+      await waitFor(() => {
+        const rows = within(screen.getByRole("table")).getAllByRole("row").slice(1);
+        expect(within(rows[0]).getByText("Poor FT Big")).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole("checkbox", { name: "FT%" }));
+      fireEvent.click(screen.getByRole("checkbox", { name: "AST" }));
+
+      expect(screen.queryByText(/ranked for punt/)).not.toBeInTheDocument();
+      await waitFor(() => {
+        const rows = within(screen.getByRole("table")).getAllByRole("row").slice(1);
+        expect(within(rows[0]).getByText("Balanced")).toBeInTheDocument();
+      });
+    });
+
+    it("the picker button's label reflects the current selections", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(new Response(JSON.stringify(puntDataset), { status: 200 })),
+      );
+
+      render(<App />);
+      await waitFor(() => expect(screen.getByText("Balanced")).toBeInTheDocument());
+
+      expect(screen.getByRole("button", { name: "Punt: none" })).toBeInTheDocument();
+
+      openPuntPicker();
+      fireEvent.click(screen.getByRole("checkbox", { name: "FT%" }));
+      expect(screen.getByRole("button", { name: "Punt: FT%" })).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("checkbox", { name: "AST" }));
+      expect(screen.getByRole("button", { name: "Punt: FT%, AST" })).toBeInTheDocument();
+    });
+
+    it("popover a11y: aria-expanded reflects open state, and Escape closes it", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(new Response(JSON.stringify(puntDataset), { status: 200 })),
+      );
+
+      render(<App />);
+      await waitFor(() => expect(screen.getByText("Balanced")).toBeInTheDocument());
+
+      const button = screen.getByRole("button", { name: "Punt: none" });
+      expect(button).toHaveAttribute("aria-expanded", "false");
+
+      openPuntPicker();
+      expect(button).toHaveAttribute("aria-expanded", "true");
+      expect(screen.getByRole("checkbox", { name: "FT%" })).toBeInTheDocument();
+
+      fireEvent.keyDown(document, { key: "Escape" });
+      expect(button).toHaveAttribute("aria-expanded", "false");
+    });
+
+    it("mutes the punted category's z column cell and the detail chart's punted bar", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(new Response(JSON.stringify(puntDataset), { status: 200 })),
+      );
+
+      render(<App />);
+      await waitFor(() => expect(screen.getByText("Balanced")).toBeInTheDocument());
+
+      openPuntPicker();
+      fireEvent.click(screen.getByRole("checkbox", { name: "FT%" }));
+      await waitFor(() => expect(screen.getByText(/ranked for punt/)).toBeInTheDocument());
+
+      // turn on the FT% z column via the column picker
+      fireEvent.click(screen.getByRole("button", { name: "Columns" }));
+      fireEvent.click(screen.getByRole("checkbox", { name: "FT% z" }));
+
+      const rows = within(screen.getByRole("table")).getAllByRole("row").slice(1);
+      const balancedRow = rows.find((r) => within(r).queryByText("Balanced"));
+      const ftCell = within(balancedRow as HTMLElement).getByText("0.50");
+      expect(ftCell).toHaveClass("opacity-40");
+
+      // open the detail panel and confirm the chart's punted bar is flagged
+      fireEvent.click(screen.getByText("Balanced"));
+      expect(screen.getByText(/FT%: 0\.50 \(punted\)/)).toBeInTheDocument();
+    });
+  });
 });

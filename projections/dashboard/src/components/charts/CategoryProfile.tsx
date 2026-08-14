@@ -4,6 +4,10 @@ import { CATEGORY_LABELS, CHART_COLORS, ChartEmptyState, ZSCORE_CATEGORY_ORDER }
 
 export interface CategoryProfileProps {
   zScores: Record<CategoryKey, number> | null;
+  /** Active punt-build categories -- muted (opacity-40) in the chart and
+   * flagged in the sr-only list, since they no longer count toward the
+   * selected build's ranking. Defaults to none. */
+  punted?: CategoryKey[];
 }
 
 /**
@@ -13,10 +17,16 @@ export interface CategoryProfileProps {
  * whole z, floor of 1) so bars never clip and "average" always sits dead
  * center regardless of which categories this particular player is strong in.
  */
-export function CategoryProfile({ zScores }: CategoryProfileProps) {
+export function CategoryProfile({ zScores, punted = [] }: CategoryProfileProps) {
   if (!zScores) return <ChartEmptyState label="Category z-score profile" />;
 
-  const data = ZSCORE_CATEGORY_ORDER.map((key) => ({ key, label: CATEGORY_LABELS[key], z: zScores[key] }));
+  const puntedSet = new Set(punted);
+  const data = ZSCORE_CATEGORY_ORDER.map((key) => ({
+    key,
+    label: CATEGORY_LABELS[key],
+    z: zScores[key],
+    isPunted: puntedSet.has(key),
+  }));
   const maxAbs = Math.max(1, ...data.map((d) => Math.ceil(Math.abs(d.z))));
 
   return (
@@ -55,7 +65,11 @@ export function CategoryProfile({ zScores }: CategoryProfileProps) {
             <ReferenceLine x={0} stroke={CHART_COLORS.reference} />
             <Bar dataKey="z" isAnimationActive={false} radius={2}>
               {data.map((d) => (
-                <Cell key={d.key} fill={d.z >= 0 ? CHART_COLORS.teal : CHART_COLORS.rose} />
+                <Cell
+                  key={d.key}
+                  fill={d.z >= 0 ? CHART_COLORS.teal : CHART_COLORS.rose}
+                  fillOpacity={d.isPunted ? 0.4 : 1}
+                />
               ))}
             </Bar>
           </BarChart>
@@ -69,6 +83,7 @@ export function CategoryProfile({ zScores }: CategoryProfileProps) {
         {data.map((d) => (
           <li key={d.key} data-testid="category-profile-bar">
             {d.label}: {d.z.toFixed(2)}
+            {d.isPunted && " (punted)"}
           </li>
         ))}
       </ul>

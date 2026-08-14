@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { Filters } from "./components/Filters";
 import { PlayerDetail } from "./components/PlayerDetail";
+import { PuntBuildPicker } from "./components/PuntBuildPicker";
 import { RankingsTable } from "./components/RankingsTable";
+import { CATEGORY_LABELS } from "./components/charts/chartTheme";
 import { defaultFilters, filterPlayers, type FilterState } from "./components/filterPlayers";
 import { DataUnavailableError, loadPlayers } from "./lib/data";
+import { applyPuntBuild } from "./lib/puntBuild";
 import { applyWindow, componentContributions, extractDefaultWeights, recomputeScores, weightsEqual } from "./lib/recompute";
-import type { CompositeWeights, Dataset, Player } from "./lib/types";
+import type { CategoryKey, CompositeWeights, Dataset, Player } from "./lib/types";
 import { Movers } from "./pages/Movers";
 import { Settings } from "./pages/Settings";
 
@@ -71,6 +74,12 @@ function App() {
   const [selectedWindow, setSelectedWindow] = useState<string | null>(null);
   const [weights, setWeights] = useState<CompositeWeights | null>(null);
   const [debouncedWeights, setDebouncedWeights] = useState<CompositeWeights | null>(null);
+  // punt-build: categories to drop from the 9-cat sum before re-ranking
+  // (lib/puntBuild.ts), picked via PuntBuildPicker's single multiselect
+  // popover -- no cap on how many, applyPuntBuild takes an arbitrary-length
+  // array (a degenerate all-9 punt collapses to a zero-variance pool, which
+  // applyPuntBuild's populationZ already handles).
+  const [punts, setPunts] = useState<CategoryKey[]>([]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedWeights(weights), RECOMPUTE_DEBOUNCE_MS);
@@ -119,17 +128,18 @@ function App() {
 
   // single source of truth for "what the Rankings table, Movers, and the
   // detail panel show": the shipped order/values, byte-for-byte, UNLESS the
-  // user has picked a non-default window and/or non-default weights -- then
-  // every player is re-ranked under applyWindow + recomputeScores together
-  // (the same mechanism Settings' own preview uses), composing both choices
-  // into one list instead of two independent transforms
+  // user has picked a non-default window, non-default weights, and/or a punt
+  // build -- then every player flows through applyWindow -> applyPuntBuild ->
+  // recomputeScores together (the same mechanism Settings' own preview uses),
+  // composing all three choices into one list instead of independent transforms
   const basePlayers = useMemo((): Player[] => {
     if (state.status !== "ready") return [];
-    if (isDefaultWindow && isDefaultWeights) return state.dataset.players;
+    if (isDefaultWindow && isDefaultWeights && punts.length === 0) return state.dataset.players;
 
     const effectiveWeights = activeDebouncedWeights ?? extractDefaultWeights(state.dataset);
     const windowed = applyWindow(state.dataset.players, activeWindow ?? state.dataset.default_window);
-    const ranked = recomputeScores(windowed, effectiveWeights);
+    const punted = applyPuntBuild(windowed, punts);
+    const ranked = recomputeScores(punted, effectiveWeights);
     return ranked.map((r) => ({
       ...r.player,
       model: {
@@ -138,7 +148,7 @@ function App() {
         component_contributions: componentContributions(r.player, effectiveWeights),
       },
     }));
-  }, [state, activeWindow, activeDebouncedWeights, isDefaultWindow, isDefaultWeights]);
+  }, [state, activeWindow, activeDebouncedWeights, isDefaultWindow, isDefaultWeights, punts]);
 
   const filteredPlayers = useMemo(() => filterPlayers(basePlayers, filters), [basePlayers, filters]);
 
@@ -209,9 +219,17 @@ function App() {
               ))}
             </select>
           </div>
+          <div className="flex items-center gap-1.5">
+            <PuntBuildPicker punts={punts} onChange={setPunts} />
+          </div>
         </dl>
         {currentWindow !== dataset.default_window && (
           <p className="mt-1 text-sm text-slate-500">ranking recomputed for weeks {currentWindow}</p>
+        )}
+        {punts.length > 0 && (
+          <p className="mt-1 text-sm text-amber-400/80">
+            ranked for punt {punts.map((cat) => CATEGORY_LABELS[cat]).join(" + ")} build
+          </p>
         )}
         {!dataset.schedule_available && (
           <p className="mt-2 rounded bg-amber-950 px-3 py-1.5 text-sm text-amber-200">
@@ -280,6 +298,7 @@ function App() {
                     players={filteredPlayers}
                     selectedPlayerId={selectedPlayer?.player_id ?? null}
                     onSelectPlayer={(player) => setSelectedPlayerId(player.player_id)}
+                    punts={punts}
                   />
                 )}
               </div>
@@ -292,6 +311,7 @@ function App() {
                   key={selectedPlayer.player_id}
                   player={selectedPlayer}
                   onClose={() => setSelectedPlayerId(null)}
+                  punts={punts}
                 />
               )}
             </div>
