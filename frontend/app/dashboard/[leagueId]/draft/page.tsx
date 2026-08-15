@@ -15,13 +15,17 @@ import {
 import BuildProfile from "@/components/dashboard/BuildProfile";
 import StaleBanner from "@/components/dashboard/StaleBanner";
 import ErrorState from "@/components/dashboard/ErrorState";
-import { SkeletonCard, SkeletonTable } from "@/components/dashboard/Skeletons";
-import { LABEL_BY_CONTRACT_KEY } from "@/components/dashboard/categoryKeys";
+import { SkeletonCard, SkeletonStatRow, SkeletonTable } from "@/components/dashboard/Skeletons";
 import BigBoardTable from "@/components/dashboard/draft/BigBoardTable";
 import PuntSuggestions from "@/components/dashboard/draft/PuntSuggestions";
 import DraftSessionPanel from "@/components/dashboard/draft/DraftSessionPanel";
 import { useDraftSession } from "@/components/dashboard/draft/useDraftSession";
-import type { DraftPick } from "@/components/dashboard/draft/draftSession";
+import { MOCK_DRAFT_TEAMS, type DraftPick } from "@/components/dashboard/draft/draftSession";
+import PageHeader from "@/components/dashboard/layout/PageHeader";
+import Panel from "@/components/dashboard/layout/Panel";
+import StatRow from "@/components/dashboard/layout/StatRow";
+import StatTile from "@/components/dashboard/layout/StatTile";
+import { deriveDraftStats } from "@/components/dashboard/stats/deriveDraftStats";
 
 type Status = "loading" | "ready" | "error";
 type TeamStatus = "loading" | "ready" | "unclaimed" | "error";
@@ -179,52 +183,140 @@ export default function DraftPage() {
   const stale = Boolean(board?.stale || team?.stale);
   const syncedAt = board?.synced_at ?? team?.synced_at ?? null;
 
-  const puntLabels = useMemo(
-    () => appliedPunt.map((key) => LABEL_BY_CONTRACT_KEY[key] ?? key),
-    [appliedPunt],
-  );
+  // every tile comes from state this page already holds -- no new fetch;
+  // only meaningful once the board has loaded (mirrors the mock-draft
+  // controls' own rounds >= 1 gate below). `session.draftComplete` is passed
+  // through so deriveDraftStats can null out pick/round once the draft is
+  // done -- overallPick overshoots totalPicks by design at that point (see
+  // useDraftSession), so there's no valid "N of M" to show (review fix).
+  const draftStats =
+    status === "ready" && board
+      ? deriveDraftStats(
+          session.overallPick,
+          session.totalPicks,
+          MOCK_DRAFT_TEAMS,
+          poolSize,
+          appliedPunt,
+          session.draftComplete,
+        )
+      : null;
+
+  // single gate for both Pick/Round tiles (collapses what used to be a
+  // separate `rounds >= 1` check duplicated on each tile): they're only
+  // meaningful mid-draft -- hidden before the pool supports a full round,
+  // and hidden again once complete (deriveDraftStats already nulls the
+  // values for that case, but the boolean here avoids passing `null` into a
+  // rendered tile in the first place)
+  const showPickRoundTiles = session.rounds >= 1 && !session.draftComplete;
+
+  // the slot select used to live inside DraftSessionPanel; it moves up here
+  // so it can render in PageHeader's sticky actions slot. Gated the same way
+  // DraftSessionPanel itself gates its controls -- hidden until the board is
+  // ready and the pool supports at least one round -- so a locked/disabled
+  // select never appears before there's a session to lock. The reset button
+  // stays inside DraftSessionPanel (see that file's docstring): e2e/draft.spec.ts
+  // scopes its "Reset mock draft" locator to `section:has(#session-heading)`,
+  // so it must remain a descendant of that section, not PageHeader.
+  const showSessionControls = status === "ready" && session.rounds >= 1;
 
   return (
-    <main className="mx-auto min-w-0 w-full max-w-6xl px-6 py-10 sm:px-10 sm:py-14">
-      <h1 className="font-display text-3xl text-ink">Draft</h1>
+    <main className="min-w-0 w-full">
+      <PageHeader
+        title="Draft"
+        actions={
+          showSessionControls ? (
+            <>
+              <label className="flex items-center gap-2 font-mono text-xs uppercase tracking-wide text-ink/70">
+                Your slot
+                <select
+                  value={session.mySlot}
+                  disabled={session.draftStarted}
+                  onChange={(e) => session.setMySlot(Number(e.target.value))}
+                  title={
+                    session.draftStarted
+                      ? "Locked once the mock draft starts — reset it in Mock draft & recommendations, below"
+                      : undefined
+                  }
+                  className="border border-ink bg-paper px-2 py-1.5 font-mono text-xs text-ink disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {Array.from({ length: MOCK_DRAFT_TEAMS }, (_, i) => i + 1).map((slot) => (
+                    <option key={slot} value={slot}>
+                      {slot} of {MOCK_DRAFT_TEAMS}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {session.draftStarted && (
+                <span className="font-mono text-[0.65rem] uppercase tracking-wide text-ink/70">
+                  Locked — reset in Mock draft &amp; recommendations, below
+                </span>
+              )}
+            </>
+          ) : undefined
+        }
+      />
 
-      {status === "loading" && (
-        <div className="mt-8 space-y-8" aria-busy="true">
-          <p role="status" className="sr-only">
-            Loading draft board…
-          </p>
-          <SkeletonCard lines={4} />
-          <SkeletonCard lines={2} />
-          <SkeletonTable rows={8} cols={14} />
-        </div>
-      )}
-
-      {status === "error" && (
-        <div className="mt-8">
-          <ErrorState message={errorMessage ?? undefined} onRetry={loadBoard} />
-        </div>
-      )}
-
-      {status === "ready" && board && baseBoard && (
-        <div className="mt-8 space-y-10">
-          {stale && syncedAt && <StaleBanner syncedAt={syncedAt} onRefresh={handleRefresh} />}
-
-          {/* the recommendation engine is the product -- it comes first, well
-              above the 72-row board, which is reference material by comparison */}
-          <section aria-labelledby="session-heading">
-            <h2 id="session-heading" className="font-display text-xl text-ink">
-              Mock draft &amp; recommendations
-            </h2>
-            <div className="mt-3">
-              <DraftSessionPanel session={session} adpPlayers={adpPlayers} />
+      <div className="mt-4 space-y-4 px-6 sm:px-10">
+        {status === "loading" && (
+          <div aria-busy="true">
+            <p role="status" className="sr-only">
+              Loading draft board…
+            </p>
+            {/* mirrors the real ready-state order below (session, punt,
+                build, board) so nothing reflows/reorders once data lands */}
+            <div className="space-y-4">
+              <SkeletonStatRow tiles={4} />
+              <SkeletonCard lines={4} />
+              <SkeletonCard lines={2} />
+              <SkeletonCard lines={2} />
+              <SkeletonTable rows={8} cols={14} />
             </div>
-          </section>
+          </div>
+        )}
 
-          <section aria-labelledby="punt-heading">
-            <h2 id="punt-heading" className="font-display text-xl text-ink">
-              Punt suggestions
-            </h2>
-            <div className="mt-3">
+        {status === "error" && (
+          <Panel title="Draft status">
+            <ErrorState message={errorMessage ?? undefined} onRetry={loadBoard} />
+          </Panel>
+        )}
+
+        {status === "ready" && board && baseBoard && (
+          <>
+            {stale && syncedAt && <StaleBanner syncedAt={syncedAt} onRefresh={handleRefresh} />}
+
+            {draftStats && (
+              <StatRow>
+                {showPickRoundTiles && <StatTile label="Pick" value={draftStats.pick} />}
+                {showPickRoundTiles && <StatTile label="Round" value={draftStats.round} />}
+                <StatTile
+                  label="Pool size"
+                  value={draftStats.pool}
+                  sub="Full draftable board — doesn't shrink as picks are made"
+                />
+                <StatTile
+                  label="Punt build"
+                  value={draftStats.puntLabels.length > 0 ? draftStats.puntLabels.join(" + ") : "None"}
+                />
+              </StatRow>
+            )}
+
+            {/* stacked, full-width panels, in priority order -- restores the
+                original page's ordering (the recommendation engine is the
+                product: it comes first, well above the 72-row board, which
+                is reference material by comparison). The prior regrid paired
+                the board with a 360px right rail for recommendations, which
+                doesn't work at any width this page ships at: the rail was too
+                narrow for a recommendation card's own content, and the board
+                lost exactly the width (rail + gap + panel padding) it needed
+                to fit its own 980px min-width table without scrolling. See
+                deriveDraftStats and BigBoardTable docstrings, and the
+                dash-task-9-report.md "Fix pass 1" section, for the measured
+                numbers (review fix). */}
+            <Panel title="Mock draft & recommendations" headingId="session-heading">
+              <DraftSessionPanel session={session} adpPlayers={adpPlayers} />
+            </Panel>
+
+            <Panel title="Punt suggestions" headingId="punt-heading">
               <PuntSuggestions
                 suggestions={board.punt_suggestions}
                 applied={appliedPunt}
@@ -233,14 +325,9 @@ export default function DraftPage() {
                 onSelect={syncBoard}
                 onClear={() => syncBoard([])}
               />
-            </div>
-          </section>
+            </Panel>
 
-          <section aria-labelledby="build-heading">
-            <h2 id="build-heading" className="font-display text-xl text-ink">
-              Your build
-            </h2>
-            <div className="mt-3">
+            <Panel title="Your build" headingId="build-heading">
               {teamStatus === "loading" && <SkeletonCard lines={2} />}
               {teamStatus === "unclaimed" && (
                 <p className="border border-dashed border-rule px-4 py-6 text-center text-ink/80">
@@ -252,46 +339,48 @@ export default function DraftPage() {
                 <ErrorState message="Couldn't load your build." onRetry={loadTeam} />
               )}
               {teamStatus === "ready" && team && <BuildProfile profile={team.build_profile} />}
-            </div>
-          </section>
+            </Panel>
 
-          <section aria-labelledby="board-heading">
-            <h2 id="board-heading" className="font-display text-xl text-ink">
-              Big board
-            </h2>
+            {/* flush: no inner padding, so BigBoardTable's 980px-min table
+                gets the panel's full width instead of losing 32px to it --
+                see BigBoardTable's docstring for how it owns its own inset
+                on the descriptive text above the table */}
+            <Panel title="Big board" headingId="board-heading" flush>
+              {(appliedPunt.length > 0 || pendingPunt !== null || puntError) && (
+                <div className="space-y-3 px-4 pt-4 pb-3">
+                  {appliedPunt.length > 0 && (
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-l-4 border-amber bg-ink/[0.03] px-4 py-2">
+                      <p className="text-sm text-ink">
+                        Board adjusted for punt: {draftStats?.puntLabels.join(", ")} — value
+                        excludes these categories.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => syncBoard([])}
+                        disabled={pendingPunt !== null}
+                        aria-busy={pendingPunt?.length === 0}
+                        className="shrink-0 border border-ink px-3 py-1.5 font-mono text-xs uppercase tracking-wide text-ink transition-colors hover:bg-ink hover:text-paper disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {pendingPunt?.length === 0 ? "Clearing…" : "Clear punt"}
+                      </button>
+                    </div>
+                  )}
+                  {pendingPunt !== null && (
+                    <p role="status" className="text-sm text-ink/70">
+                      Re-ranking board…
+                    </p>
+                  )}
+                  {puntError && (
+                    <p
+                      role="alert"
+                      className="border-l-4 border-alert bg-ink/[0.03] px-3 py-2 text-sm text-ink"
+                    >
+                      {puntError}
+                    </p>
+                  )}
+                </div>
+              )}
 
-            {appliedPunt.length > 0 && (
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-l-4 border-amber bg-ink/[0.03] px-4 py-2">
-                <p className="text-sm text-ink">
-                  Board adjusted for punt: {puntLabels.join(", ")} — value excludes these
-                  categories.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => syncBoard([])}
-                  disabled={pendingPunt !== null}
-                  aria-busy={pendingPunt?.length === 0}
-                  className="shrink-0 border border-ink px-3 py-1.5 font-mono text-xs uppercase tracking-wide text-ink transition-colors hover:bg-ink hover:text-paper disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {pendingPunt?.length === 0 ? "Clearing…" : "Clear punt"}
-                </button>
-              </div>
-            )}
-            {pendingPunt !== null && (
-              <p role="status" className="mt-3 text-sm text-ink/70">
-                Re-ranking board…
-              </p>
-            )}
-            {puntError && (
-              <p
-                role="alert"
-                className="mt-3 border-l-4 border-alert bg-ink/[0.03] px-3 py-2 text-sm text-ink"
-              >
-                {puntError}
-              </p>
-            )}
-
-            <div className="mt-3">
               <BigBoardTable
                 players={board.players}
                 source={board.source}
@@ -299,10 +388,10 @@ export default function DraftPage() {
                 onDraft={draftFromBoard}
                 puntPending={pendingPunt !== null}
               />
-            </div>
-          </section>
-        </div>
-      )}
+            </Panel>
+          </>
+        )}
+      </div>
     </main>
   );
 }

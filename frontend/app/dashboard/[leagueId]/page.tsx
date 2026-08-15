@@ -17,7 +17,13 @@ import StandingsCard from "@/components/dashboard/StandingsCard";
 import MatchupStrip from "@/components/dashboard/MatchupStrip";
 import StaleBanner from "@/components/dashboard/StaleBanner";
 import ErrorState from "@/components/dashboard/ErrorState";
-import { SkeletonCard, SkeletonTable } from "@/components/dashboard/Skeletons";
+import { SkeletonCard, SkeletonStatRow, SkeletonTable } from "@/components/dashboard/Skeletons";
+import PageHeader from "@/components/dashboard/layout/PageHeader";
+import Panel from "@/components/dashboard/layout/Panel";
+import StatRow from "@/components/dashboard/layout/StatRow";
+import StatTile from "@/components/dashboard/layout/StatTile";
+import { deriveTeamStats } from "@/components/dashboard/stats/deriveTeamStats";
+import { categoryLabelOrGap } from "@/components/dashboard/categoryKeys";
 
 type Status = "loading" | "ready" | "error";
 
@@ -78,68 +84,93 @@ export default function MyTeamPage() {
   const stale = Boolean(overview?.stale || team?.stale);
   const syncedAt = team?.synced_at ?? overview?.synced_at ?? null;
 
+  // derived once data is in, never fetched separately -- every field here
+  // comes from the overview/team payloads this page already loaded
+  const stats = overview && team ? deriveTeamStats(overview, team) : null;
+
   return (
-    <main className="mx-auto min-w-0 w-full max-w-4xl px-6 py-10 sm:px-10 sm:py-14">
-      <h1 className="font-display text-3xl text-ink">My Team</h1>
+    <main className="min-w-0 w-full">
+      <PageHeader
+        title="My Team"
+        actions={
+          stale && syncedAt ? (
+            <StaleBanner variant="chip" syncedAt={syncedAt} onRefresh={handleRefresh} />
+          ) : undefined
+        }
+      />
 
-      {status === "loading" && (
-        <div className="mt-8 space-y-8" aria-busy="true">
-          <p role="status" className="sr-only">
-            Loading roster…
-          </p>
-          <SkeletonTable rows={6} cols={12} />
-          <SkeletonCard lines={2} />
-          <SkeletonCard lines={4} />
-        </div>
-      )}
+      <div className="mt-4 space-y-4 px-6 sm:px-10">
+        {status === "loading" && (
+          <div aria-busy="true">
+            <p role="status" className="sr-only">
+              Loading roster…
+            </p>
+            <div className="space-y-4">
+              <SkeletonStatRow tiles={4} />
+              <SkeletonTable rows={6} cols={12} />
+              <div className="grid gap-4 lg:grid-cols-2">
+                <SkeletonCard lines={4} />
+                <SkeletonCard lines={5} />
+              </div>
+              {/* This week: a two-row table shape (team vs. opponent x 9 categories),
+                  matching MatchupStrip's own table so the section doesn't reflow when data lands */}
+              <SkeletonTable rows={2} cols={10} />
+            </div>
+          </div>
+        )}
 
-      {status === "error" && (
-        <div className="mt-8">
-          <ErrorState message={errorMessage ?? undefined} onRetry={load} />
-        </div>
-      )}
+        {status === "error" && (
+          <Panel title="Team status">
+            <ErrorState message={errorMessage ?? undefined} onRetry={load} />
+          </Panel>
+        )}
 
-      {status === "ready" && overview && team && (
-        <div className="mt-8 space-y-10">
-          {stale && syncedAt && <StaleBanner syncedAt={syncedAt} onRefresh={handleRefresh} />}
+        {status === "ready" && overview && team && stats && (
+          <>
+            {(stats.record ||
+              stats.rank ||
+              stats.strongest.length > 0 ||
+              stats.weakest.length > 0) && (
+              <StatRow>
+                {stats.record && <StatTile label="Record" value={stats.record} />}
+                {stats.rank && <StatTile label="Rank" value={stats.rank} />}
+                {stats.strongest.length > 0 && (
+                  <StatTile
+                    label="Strongest"
+                    value={stats.strongest.map(categoryLabelOrGap).join(" + ")}
+                  />
+                )}
+                {stats.weakest.length > 0 && (
+                  <StatTile
+                    label="Weakest"
+                    value={stats.weakest.map(categoryLabelOrGap).join(" + ")}
+                  />
+                )}
+              </StatRow>
+            )}
 
-          <section aria-labelledby="roster-heading">
-            <h2 id="roster-heading" className="font-display text-xl text-ink">
-              Roster
-            </h2>
-            <div className="mt-3">
+            <Panel title="Roster" flush>
               <RosterTable roster={team.roster} />
-            </div>
-          </section>
+            </Panel>
 
-          <section aria-labelledby="build-heading">
-            <h2 id="build-heading" className="font-display text-xl text-ink">
-              Category build
-            </h2>
-            <div className="mt-3">
-              <BuildProfile profile={team.build_profile} />
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Panel title="Category build">
+                <BuildProfile profile={team.build_profile} />
+              </Panel>
+              <Panel title="Standings">
+                <StandingsCard standings={overview.standings} myTeamId={overview.my_team_id} />
+              </Panel>
             </div>
-          </section>
 
-          <section aria-labelledby="standings-heading">
-            <h2 id="standings-heading" className="font-display text-xl text-ink">
-              Standings
-            </h2>
-            <div className="mt-3">
-              <StandingsCard standings={overview.standings} myTeamId={overview.my_team_id} />
-            </div>
-          </section>
-
-          <section aria-labelledby="matchup-heading">
-            <h2 id="matchup-heading" className="font-display text-xl text-ink">
-              This week
-            </h2>
-            <div className="mt-3">
+            {/* full-width: the matchup table has a team column plus 9 category
+                columns, which reads cramped squeezed into a half-width panel
+                next to Category build/Standings, so it gets its own row */}
+            <Panel title="This week">
               <MatchupStrip matchup={overview.matchup} />
-            </div>
-          </section>
-        </div>
-      )}
+            </Panel>
+          </>
+        )}
+      </div>
     </main>
   );
 }

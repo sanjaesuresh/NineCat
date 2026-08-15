@@ -12,20 +12,14 @@ import type { ReactNode } from "react";
 export default function PageHeader({
   title,
   actions,
-  leading,
 }: {
   title: string;
   /** Right-aligned controls, e.g. a refresh or filter action. */
   actions?: ReactNode;
-  /** Rendered before the title; reserved for a later mobile drawer trigger. */
-  leading?: ReactNode;
 }) {
   return (
-    <header className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-rule bg-paper px-6 py-4">
-      <div className="flex items-center gap-3">
-        {leading}
-        <h1 className="font-display text-3xl text-ink">{title}</h1>
-      </div>
+    <header className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-rule bg-paper px-6 py-4 sm:px-10">
+      <h1 className="font-display text-3xl text-ink">{title}</h1>
       {actions && <div className="flex items-center gap-2">{actions}</div>}
     </header>
   );

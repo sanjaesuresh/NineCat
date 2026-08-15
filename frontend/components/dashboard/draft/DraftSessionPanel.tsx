@@ -11,7 +11,7 @@ import {
   reasoningByItemKey,
 } from "@/components/dashboard/advisor/tokens";
 import { formatSignedNumber } from "@/components/dashboard/format";
-import { MAY_NOT_LAST_REASON, MOCK_DRAFT_TEAMS, pickRound } from "./draftSession";
+import { MAY_NOT_LAST_REASON, MOCK_DRAFT_TEAMS } from "./draftSession";
 import type { DraftSession } from "./useDraftSession";
 
 /**
@@ -20,6 +20,14 @@ import type { DraftSession } from "./useDraftSession";
  * draft players and mark them taken). Recommendations come from the real
  * `postDraftRecommend` endpoint on the user's own turn; opponent picks are a
  * local weighted-ADP simulation (D7 — never a backend round trip).
+ *
+ * The slot select moved out to PageHeader's actions slot (dash regrid task
+ * 9) -- the page already holds `session`, so it renders that control
+ * directly rather than threading it back down through this component. The
+ * reset button stays here, not in the header: e2e/draft.spec.ts scopes
+ * `getByRole("button", { name: "Reset mock draft" })` to
+ * `section:has(#session-heading)`, so moving it out of this section's
+ * subtree would break that literal locator.
  */
 export default function DraftSessionPanel({
   session,
@@ -31,12 +39,8 @@ export default function DraftSessionPanel({
   const {
     rounds,
     totalPicks,
-    mySlot,
-    setMySlot,
-    overallPick,
     myPicks,
     lastOpponentRun,
-    draftStarted,
     draftComplete,
     recStatus,
     recommendations,
@@ -83,39 +87,24 @@ export default function DraftSessionPanel({
 
   return (
     <div>
+      {/* the live "Pick N of M / Round R" line used to render here too --
+          removed (review fix, pass 2) now that the page's Pick/Round tiles
+          own that number; keeping both was two live copies of the same
+          state. The completion copy stays: it's the one thing the tiles
+          can't say (they hide entirely once complete, see deriveDraftStats),
+          and it belongs beside the control that acts on it. ml-auto on the
+          button (not just justify-between) keeps Reset pinned to the right
+          even when this line has nothing to render. */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-4">
-          <label className="flex items-center gap-2 font-mono text-xs uppercase tracking-wide text-ink/70">
-            Your slot
-            <select
-              value={mySlot}
-              disabled={draftStarted}
-              onChange={(e) => setMySlot(Number(e.target.value))}
-              title={draftStarted ? "Locked once the mock draft starts — reset to change it" : undefined}
-              className="border border-ink bg-paper px-2 py-1.5 font-mono text-xs text-ink disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {Array.from({ length: MOCK_DRAFT_TEAMS }, (_, i) => i + 1).map((slot) => (
-                <option key={slot} value={slot}>
-                  {slot} of {MOCK_DRAFT_TEAMS}
-                </option>
-              ))}
-            </select>
-          </label>
-          {draftStarted && (
-            <span className="font-mono text-[0.65rem] uppercase tracking-wide text-ink/70">
-              Locked — reset to change
-            </span>
-          )}
+        {draftComplete && (
           <p className="font-mono text-xs uppercase tracking-wide text-ink/70">
-            {draftComplete
-              ? `Mock draft complete — ${totalPicks} picks`
-              : `Pick ${overallPick} of ${totalPicks} · Round ${pickRound(overallPick, MOCK_DRAFT_TEAMS)}`}
+            Mock draft complete — {totalPicks} picks
           </p>
-        </div>
+        )}
         <button
           type="button"
           onClick={startSession}
-          className="min-h-[2.25rem] border border-ink px-3 py-1.5 font-mono text-xs uppercase tracking-wide text-ink transition-colors hover:bg-ink hover:text-paper"
+          className="ml-auto min-h-[2.25rem] border border-ink px-3 py-1.5 font-mono text-xs uppercase tracking-wide text-ink transition-colors hover:bg-ink hover:text-paper"
         >
           Reset mock draft
         </button>

@@ -29,7 +29,12 @@ export default function FocusCategories({
   return (
     <div>
       <p className="mb-3 text-xs text-ink/70">Ranked most flippable first.</p>
-      <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {/* caps at 2 columns, not 3 -- this panel now sits at half page width
+          (lg:grid-cols-2 on the outer page grid), so a viewport-based
+          lg:grid-cols-3 here would triple the inner grid at the exact
+          breakpoint the outer grid halves the available width, leaving each
+          card too narrow for its label + verdict badge + mono stat line */}
+      <ol className="grid gap-3 sm:grid-cols-2">
         {focus.map((key, i) => {
           const cv = byKey.get(key);
           if (!cv) return null;

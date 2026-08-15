@@ -15,6 +15,18 @@ export function isVerdictToken(token: string): token is VerdictToken {
   return (VERDICT_TOKENS as readonly string[]).includes(token);
 }
 
+// Single source of truth for verdict display text -- read by both
+// TradeVerdictBadge (the pill on each proposal card) and deriveTradesStats
+// (the "Best verdict" summary tile on the same page), so the tile and the
+// badge on the same card can never disagree. Per-tone styling (border/dot
+// colour) stays local to TradeVerdictBadge; only the label string is shared.
+export const VERDICT_LABEL: Record<VerdictToken, string> = {
+  favors_me: "Favors you",
+  favors_them: "Favors them",
+  balanced: "Balanced",
+  rejected: "Not worth it",
+};
+
 // TradeVerdict.reasons' two non-category tokens. The three category-prefixed
 // families ("gained:" / "lost:" / "collapsed:") are handled generically below
 // since there is one per CATEGORIES key.

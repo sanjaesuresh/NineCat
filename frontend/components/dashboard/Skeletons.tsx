@@ -2,6 +2,7 @@
 // table shape you can recognize before the data lands) and respects
 // prefers-reduced-motion via the global rule in globals.css.
 import type { CSSProperties } from "react";
+import { statRowClasses, statTileClasses } from "./layout/layoutTokens";
 
 export function SkeletonLine({
   className = "",
@@ -28,6 +29,24 @@ export function SkeletonTable({ rows = 4, cols = 6 }: { rows?: number; cols?: nu
           {Array.from({ length: cols }).map((_, c) => (
             <SkeletonLine key={c} className="h-3 flex-1" />
           ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Placeholder for a StatRow of StatTiles, sized off the same layoutTokens
+ * helpers the real tiles use so the skeleton and loaded grid share identical
+ * column widths and the page doesn't reflow when data lands.
+ */
+export function SkeletonStatRow({ tiles = 4 }: { tiles?: number }) {
+  return (
+    <div className={statRowClasses(tiles)} aria-hidden="true">
+      {Array.from({ length: tiles }).map((_, i) => (
+        <div key={i} className={statTileClasses()}>
+          <SkeletonLine className="h-3 w-1/2" />
+          <SkeletonLine className="mt-2 h-6 w-2/3" />
         </div>
       ))}
     </div>

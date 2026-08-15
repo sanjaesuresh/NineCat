@@ -14,13 +14,18 @@ import {
 import StaleBanner from "@/components/dashboard/StaleBanner";
 import ErrorState from "@/components/dashboard/ErrorState";
 import { formatSyncedAt } from "@/components/dashboard/format";
-import { SkeletonCard, SkeletonTable } from "@/components/dashboard/Skeletons";
+import { SkeletonCard, SkeletonStatRow, SkeletonTable } from "@/components/dashboard/Skeletons";
 import SideStrengths from "@/components/dashboard/trades/SideStrengths";
 import ExplanationsNotice from "@/components/dashboard/advisor/ExplanationsNotice";
 import { modelRankByItemKey, reasoningByItemKey } from "@/components/dashboard/advisor/tokens";
 import ModelReasoning from "@/components/dashboard/advisor/ModelReasoning";
 import TradeCard from "@/components/dashboard/trades/TradeCard";
 import ValueBasisNotice from "@/components/dashboard/trades/ValueBasisNotice";
+import PageHeader from "@/components/dashboard/layout/PageHeader";
+import Panel from "@/components/dashboard/layout/Panel";
+import StatRow from "@/components/dashboard/layout/StatRow";
+import StatTile from "@/components/dashboard/layout/StatTile";
+import { deriveTradesStats } from "@/components/dashboard/stats/deriveListStats";
 
 type Status = "loading" | "ready" | "error";
 
@@ -137,66 +142,82 @@ export default function TradesPage() {
   }
 
   return (
-    <main className="mx-auto min-w-0 w-full max-w-5xl px-6 py-10 sm:px-10 sm:py-14">
-      <h1 className="font-display text-3xl text-ink">Trades</h1>
-      <p className="mt-2 max-w-2xl text-sm text-ink/80">
-        Two-sided trades built from what each roster has spare and what it actually needs. Advisory
-        only — NineCat never proposes anything to anyone but you.
-      </p>
+    <main className="min-w-0 w-full">
+      <PageHeader
+        title="Trades"
+        actions={
+          opponents.length > 0 ? (
+            <label className="flex items-center gap-2 font-mono text-xs uppercase tracking-wide text-ink/70">
+              Trade partner
+              <select
+                value={selectedTeamId ?? ""}
+                onChange={(event) => handlePartnerChange(Number(event.target.value))}
+                className="border border-ink bg-paper px-2 py-1.5 font-mono text-xs text-ink"
+              >
+                {opponents.map((team) => (
+                  <option key={team.team_id} value={team.team_id}>
+                    {team.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : undefined
+        }
+      />
 
-      {opponents.length > 0 && (
-        <div className="mt-6 flex flex-wrap items-center gap-3">
-          <label htmlFor="trade-partner" className="font-mono text-xs uppercase tracking-wide text-ink/70">
-            Trade partner
-          </label>
-          <select
-            id="trade-partner"
-            value={selectedTeamId ?? ""}
-            onChange={(event) => handlePartnerChange(Number(event.target.value))}
-            className="border border-rule bg-transparent px-3 py-1.5 font-body text-sm text-ink"
-          >
-            {opponents.map((team) => (
-              <option key={team.team_id} value={team.team_id}>
-                {team.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
-      {status === "loading" && (
-        <div className="mt-8 space-y-8" aria-busy="true">
-          <p role="status" className="sr-only">
-            Loading trade analysis…
-          </p>
-          <SkeletonCard lines={3} />
-          <SkeletonTable rows={6} cols={6} />
-        </div>
-      )}
-
-      {status === "error" && (
-        <div className="mt-8">
-          <ErrorState message={errorMessage ?? undefined} onRetry={loadAll} />
-        </div>
-      )}
-
-      {status === "ready" && opponents.length === 0 && (
-        <p className="mt-8 border border-dashed border-rule px-4 py-6 text-center text-ink/80">
-          {myTeamId === null
-            ? "Your team isn't linked in this league yet, so there's nobody to compare against."
-            : "No other team has synced into this league yet — a trade needs two rosters."}
+      <div className="mt-4 space-y-4 px-6 sm:px-10">
+        <p className="max-w-2xl text-sm text-ink/80">
+          Two-sided trades built from what each roster has spare and what it actually needs.
+          Advisory only — NineCat never proposes anything to anyone but you.
         </p>
-      )}
 
-      {status === "ready" && trades && opponents.length > 0 && (
-        <TradesContent
-          trades={trades}
-          partnerName={
-            opponents.find((team) => team.team_id === selectedTeamId)?.name ?? "the other team"
-          }
-          onRefresh={handleRefresh}
-        />
-      )}
+        {status === "loading" && (
+          <div aria-busy="true">
+            <p role="status" className="sr-only">
+              Loading trade analysis…
+            </p>
+            {/* mirrors the ready-state order below (tiles, freshness line,
+                proposals, strengths) so nothing reflows once data lands.
+                Tile count is 1, not 2: "Proposals" always renders, but
+                "Best verdict" only renders when trades.verdicts is
+                non-empty (deriveTradesStats.bestVerdict is null on an empty
+                proposal list). Sizing the skeleton to the guaranteed tile
+                means the second tile can only ever APPEAR on load, never
+                vanish -- the reflow this skeleton exists to prevent. */}
+            <div className="space-y-4">
+              <SkeletonStatRow tiles={1} />
+              <SkeletonCard lines={3} />
+              <SkeletonTable rows={6} cols={6} />
+            </div>
+          </div>
+        )}
+
+        {status === "error" && (
+          <Panel title="Trades status">
+            <ErrorState message={errorMessage ?? undefined} onRetry={loadAll} />
+          </Panel>
+        )}
+
+        {status === "ready" && opponents.length === 0 && (
+          <Panel title="Trades status">
+            <p className="border border-dashed border-rule px-4 py-6 text-center text-ink/80">
+              {myTeamId === null
+                ? "Your team isn't linked in this league yet, so there's nobody to compare against."
+                : "No other team has synced into this league yet — a trade needs two rosters."}
+            </p>
+          </Panel>
+        )}
+
+        {status === "ready" && trades && opponents.length > 0 && (
+          <TradesContent
+            trades={trades}
+            partnerName={
+              opponents.find((team) => team.team_id === selectedTeamId)?.name ?? "the other team"
+            }
+            onRefresh={handleRefresh}
+          />
+        )}
+      </div>
     </main>
   );
 }
@@ -232,8 +253,12 @@ function TradesContent({
   partnerName: string;
   onRefresh: () => Promise<void>;
 }) {
+  // derived once data is in, never fetched separately -- every tile here
+  // comes from the trades payload this page already loaded
+  const stats = deriveTradesStats(trades);
+
   return (
-    <div className="mt-8 space-y-10">
+    <div className="space-y-4">
       {trades.stale && <StaleBanner syncedAt={trades.synced_at} onRefresh={onRefresh} />}
 
       {/* freshness is shown always, not only when stale: this page advises a
@@ -243,13 +268,16 @@ function TradesContent({
         Rosters as of {formatSyncedAt(trades.synced_at)}
       </p>
 
-      <section aria-labelledby="proposals-heading">
-        <h2 id="proposals-heading" className="font-display text-xl text-ink">
-          Proposed trades with {partnerName}
-        </h2>
-        <p className="mt-1 text-sm text-ink/80">
-          Ranked by how much they fix your weakest categories.
-        </p>
+      <StatRow>
+        <StatTile label="Proposals" value={stats.proposals} />
+        {stats.bestVerdict !== null && <StatTile label="Best verdict" value={stats.bestVerdict} />}
+      </StatRow>
+
+      {/* title is the exact interpolated string e2e/trades.spec.ts matches by
+          regex (`/Proposed trades with /`, no level pinned) -- Panel renders
+          it verbatim as this section's h2, so the two must never diverge */}
+      <Panel title={`Proposed trades with ${partnerName}`} headingId="proposals-heading">
+        <p className="text-sm text-ink/80">Ranked by how much they fix your weakest categories.</p>
 
         <div className="mt-3">
           <ValueBasisNotice
@@ -292,13 +320,16 @@ function TradesContent({
             {emptyProposalCopy(trades)}
           </p>
         )}
-      </section>
+      </Panel>
 
-      <section aria-labelledby="strengths-heading">
-        <h2 id="strengths-heading" className="font-display text-xl text-ink">
-          What each roster has spare
-        </h2>
-        <p className="mt-2 max-w-2xl text-sm text-ink/80">
+      {/* deliberately not flush, unlike the big board's table (see
+          BigBoardTable.tsx): this panel holds intro/caveat text and two h3
+          subheadings around the tables, not just a table, and a flush panel
+          would run that text straight into the panel border with no inset --
+          the big board's table supplies its own inner padding instead, which
+          SideStrengths does not */}
+      <Panel title="What each roster has spare" headingId="strengths-heading">
+        <p className="max-w-2xl text-sm text-ink/80">
           A category is only tradeable surplus when more than one player carries it. Strong on one
           player&apos;s back is fragile — trading them collapses the category rather than trimming
           it.
@@ -319,7 +350,7 @@ function TradesContent({
             </div>
           </div>
         </div>
-      </section>
+      </Panel>
     </div>
   );
 }

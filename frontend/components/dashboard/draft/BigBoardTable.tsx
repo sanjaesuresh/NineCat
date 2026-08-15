@@ -12,6 +12,16 @@ import PlayerAvatar from "@/components/dashboard/PlayerAvatar";
  * motif as the rest of the dashboard, just with a valuation column instead
  * of raw per-game stats. Games is the LAST column deliberately, so adding it
  * never shifts the Value column's position (rank/name/pos/value stay 1-4).
+ *
+ * Only ever rendered inside the draft page's "Big board" Panel, which is
+ * `flush` (no inner padding) specifically so this table's 980px min-width
+ * has the maximum room the page can give it (review fix, dash regrid task 9
+ * pass 2 -- a 360px right rail plus the panel's own 32px of padding put the
+ * table underwater at every viewport width). Because the panel supplies no
+ * padding, this component owns its own horizontal inset for the descriptive
+ * text above the table, while the table's scroll container runs edge to
+ * edge and borrows the panel's own left/right border instead of drawing its
+ * own (hence border-y, not border, below).
  */
 export default function BigBoardTable({
   players,
@@ -27,8 +37,11 @@ export default function BigBoardTable({
   puntPending: boolean;
 }) {
   if (players.length === 0) {
+    // m-4 (not the surrounding p-4/px-4 convention): the panel this renders
+    // in is flush and supplies zero inner padding, so this empty state needs
+    // its own inset on every side, not just left/right
     return (
-      <p className="border border-dashed border-rule px-4 py-6 text-center text-ink/80">
+      <p className="m-4 border border-dashed border-rule px-4 py-6 text-center text-ink/80">
         No draftable players yet — the season&apos;s projections and averages haven&apos;t
         synced for this league.
       </p>
@@ -39,7 +52,7 @@ export default function BigBoardTable({
 
   return (
     <div>
-      <div className="mb-3 space-y-1">
+      <div className="mb-3 space-y-1 px-4 pt-4">
         <p className="font-mono text-xs uppercase tracking-wide text-ink/70">
           {source
             ? "Valued using synced player projections."
@@ -59,8 +72,11 @@ export default function BigBoardTable({
 
       {/* relative: makes this the positioning context for the sr-only caption
           so it stays clipped inside the scroll container instead of
-          escaping to the initial containing block and stretching the page */}
-      <div className="relative overflow-x-auto border border-rule" aria-busy={puntPending}>
+          escaping to the initial containing block and stretching the page.
+          border-y (not border): the panel's own left/right border already
+          runs flush against this container, so a left/right border here
+          would just double it. */}
+      <div className="relative overflow-x-auto border-y border-rule" aria-busy={puntPending}>
         <table className="w-full min-w-[980px] border-collapse text-left">
           <caption className="sr-only">
             Draftable players ranked by value, with per-category z-scores
