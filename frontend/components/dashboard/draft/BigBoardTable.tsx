@@ -2,6 +2,7 @@ import type { DraftBoardPlayer } from "@/lib/api";
 import { CATEGORIES } from "@/components/categories";
 import { CONTRACT_KEY_BY_LABEL } from "@/components/dashboard/categoryKeys";
 import { formatGamesCount, formatSignedNumber } from "@/components/dashboard/format";
+import { tableRowClasses } from "@/components/dashboard/layout/layoutTokens";
 import PlayerAvatar from "@/components/dashboard/PlayerAvatar";
 
 /**
@@ -86,7 +87,7 @@ export default function BigBoardTable({
               </th>
               <th
                 scope="col"
-                className="whitespace-nowrap border-l border-rule px-2 py-2 text-center font-mono text-[11px] font-normal tracking-wide text-ink/70"
+                className="whitespace-nowrap border-l border-rule px-2 py-2 text-right font-mono text-[11px] font-normal tracking-wide text-ink/70"
               >
                 Value
               </th>
@@ -94,14 +95,14 @@ export default function BigBoardTable({
                 <th
                   key={cat}
                   scope="col"
-                  className="whitespace-nowrap border-l border-rule px-2 py-2 text-center font-mono text-[11px] font-normal tracking-wide text-ink/70"
+                  className="whitespace-nowrap border-l border-rule px-2 py-2 text-right font-mono text-[11px] font-normal tracking-wide text-ink/70"
                 >
                   {cat}
                 </th>
               ))}
               <th
                 scope="col"
-                className="whitespace-nowrap border-l border-rule px-2 py-2 text-center font-mono text-[11px] font-normal tracking-wide text-ink/70"
+                className="whitespace-nowrap border-l border-rule px-2 py-2 text-right font-mono text-[11px] font-normal tracking-wide text-ink/70"
               >
                 Games
               </th>
@@ -116,14 +117,23 @@ export default function BigBoardTable({
               return (
                 <tr
                   key={player.player_key}
-                  className={`border-b border-rule last:border-b-0 ${taken ? "bg-ink/[0.03]" : ""}`}
+                  className={
+                    taken
+                      ? `${tableRowClasses(i, { rowCount: players.length })} bg-ink/[0.03]`
+                      : tableRowClasses(i, { rowCount: players.length })
+                  }
                 >
-                  <td className="px-2 py-2 text-right font-mono text-xs text-ink/80">{i + 1}</td>
-                  <td className="px-3 py-2">
+                  <td className="px-2 py-2 text-right font-mono text-xs tabular-nums text-ink/80">{i + 1}</td>
+                  <td className="px-3 py-1">
                     <div className="flex items-center gap-3">
-                      <PlayerAvatar src={player.headshot_url} />
+                      <PlayerAvatar src={player.headshot_url} size="sm" />
                       <span className="flex items-center gap-1.5">
-                        <span className={`font-body text-ink ${taken ? "line-through decoration-ink/40" : ""}`}>
+                        {/* whitespace-nowrap: without it a long name text-wraps inside
+                            the flex item, blowing the row well past 36px -- every other
+                            data cell here already carries this class */}
+                        <span
+                          className={`whitespace-nowrap font-body text-ink ${taken ? "line-through decoration-ink/40" : ""}`}
+                        >
                           {player.name}
                         </span>
                         {player.stat_basis === "season_average" && (
@@ -134,22 +144,27 @@ export default function BigBoardTable({
                       </span>
                     </div>
                   </td>
-                  <td className="px-2 py-2 font-mono text-xs text-ink/80">{player.position ?? "—"}</td>
-                  <td className="whitespace-nowrap border-l border-rule px-2 py-2 text-center font-mono text-sm text-ink">
+                  {/* whitespace-nowrap: a dual-position value like "PG-SG" otherwise
+                      breaks after the hyphen in a narrow column, wrapping to 2 lines
+                      and blowing the row past 36px */}
+                  <td className="whitespace-nowrap px-2 py-2 font-mono text-xs text-ink/80">
+                    {player.position ?? "—"}
+                  </td>
+                  <td className="whitespace-nowrap border-l border-rule px-2 py-2 text-right font-mono text-sm tabular-nums text-ink">
                     {formatSignedNumber(player.value)}
                   </td>
                   {CATEGORIES.map((cat) => (
                     <td
                       key={cat}
-                      className="whitespace-nowrap border-l border-rule px-2 py-2 text-center font-mono text-sm text-ink"
+                      className="whitespace-nowrap border-l border-rule px-2 py-2 text-right font-mono text-sm tabular-nums text-ink"
                     >
                       {formatSignedNumber(player.zscores?.[CONTRACT_KEY_BY_LABEL[cat]])}
                     </td>
                   ))}
-                  <td className="whitespace-nowrap border-l border-rule px-2 py-2 text-center font-mono text-sm text-ink">
+                  <td className="whitespace-nowrap border-l border-rule px-2 py-2 text-right font-mono text-sm tabular-nums text-ink">
                     {formatGamesCount(player.projected_games)}
                   </td>
-                  <td className="px-2 py-2 text-right">
+                  <td className="px-2 py-1 text-right">
                     {taken ? (
                       <span className="font-mono text-[0.65rem] uppercase tracking-wide text-ink/70">
                         Drafted

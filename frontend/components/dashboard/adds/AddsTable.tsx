@@ -3,6 +3,7 @@ import ModelReasoning from "@/components/dashboard/advisor/ModelReasoning";
 import { modelRankByItemKey, reasoningByItemKey } from "@/components/dashboard/advisor/tokens";
 import { categoryLabelOrGap } from "@/components/dashboard/categoryKeys";
 import { formatGamesCount } from "@/components/dashboard/format";
+import { tableRowClasses } from "@/components/dashboard/layout/layoutTokens";
 import PlayerAvatar from "@/components/dashboard/PlayerAvatar";
 import { formatWaiverScore } from "./format";
 import { describeReason } from "./tokens";
@@ -90,13 +91,13 @@ export default function AddsTable({
               </th>
               <th
                 scope="col"
-                className="whitespace-nowrap border-l border-rule px-2 py-2 text-center font-mono text-[11px] font-normal tracking-wide text-ink/70"
+                className="whitespace-nowrap border-l border-rule px-2 py-2 text-right font-mono text-[11px] font-normal tracking-wide text-ink/70"
               >
                 Score
               </th>
               <th
                 scope="col"
-                className="whitespace-nowrap border-l border-rule px-2 py-2 text-center font-mono text-[11px] font-normal tracking-wide text-ink/70"
+                className="whitespace-nowrap border-l border-rule px-2 py-2 text-right font-mono text-[11px] font-normal tracking-wide text-ink/70"
               >
                 {/* the count means the WHOLE week when as_of falls outside it,
                     so the header must not keep saying "left" -- the number is
@@ -119,13 +120,16 @@ export default function AddsTable({
           </thead>
           <tbody>
             {candidates.map((candidate, i) => (
-              <tr key={candidate.player_key} className="border-b border-rule last:border-b-0">
-                <td className="px-2 py-2 text-right font-mono text-xs text-ink/80">{i + 1}</td>
-                <td className="px-3 py-2">
+              <tr key={candidate.player_key} className={tableRowClasses(i, { rowCount: candidates.length })}>
+                <td className="px-2 py-2 text-right font-mono text-xs tabular-nums text-ink/80">{i + 1}</td>
+                <td className="px-3 py-1">
                   <div className="flex items-center gap-3">
-                    <PlayerAvatar src={candidate.headshot_url} />
+                    <PlayerAvatar src={candidate.headshot_url} size="sm" />
                     <span className="flex items-center gap-1.5">
-                      <span className="font-body text-ink">{candidate.name}</span>
+                      {/* whitespace-nowrap: without it a long name text-wraps inside
+                          the flex item, blowing the row well past 36px -- every other
+                          data cell here already carries this class */}
+                      <span className="whitespace-nowrap font-body text-ink">{candidate.name}</span>
                       {candidate.stat_basis === "season_average" && (
                         <span className="border border-rule px-1 py-0.5 font-mono text-[0.6rem] uppercase tracking-wide text-ink/80">
                           SZN AVG
@@ -134,13 +138,16 @@ export default function AddsTable({
                     </span>
                   </div>
                 </td>
-                <td className="px-2 py-2 font-mono text-xs text-ink/80">
+                {/* whitespace-nowrap: a dual-position value like "PG-SG" otherwise
+                    breaks after the hyphen in a narrow column, wrapping to 2 lines
+                    and blowing the row past 36px */}
+                <td className="whitespace-nowrap px-2 py-2 font-mono text-xs text-ink/80">
                   {candidate.position ?? "—"}
                 </td>
-                <td className="whitespace-nowrap border-l border-rule px-2 py-2 text-center font-mono text-sm text-ink">
+                <td className="whitespace-nowrap border-l border-rule px-2 py-2 text-right font-mono text-sm tabular-nums text-ink">
                   {formatWaiverScore(candidate.score)}
                 </td>
-                <td className="whitespace-nowrap border-l border-rule px-2 py-2 text-center font-mono text-sm text-ink">
+                <td className="whitespace-nowrap border-l border-rule px-2 py-2 text-right font-mono text-sm tabular-nums text-ink">
                   {formatGamesCount(candidate.games_remaining)}
                 </td>
                 <td className="border-l border-rule px-3 py-2 text-sm text-ink">

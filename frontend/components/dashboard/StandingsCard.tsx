@@ -1,4 +1,5 @@
 import type { StandingsEntry } from "@/lib/api";
+import { tableRowClasses } from "./layout/layoutTokens";
 
 export default function StandingsCard({
   standings,
@@ -24,33 +25,52 @@ export default function StandingsCard({
         <caption className="sr-only">League standings</caption>
         <thead>
           <tr className="border-b-2 border-ink">
-            <th scope="col" className="px-2 py-2 font-mono text-[11px] font-normal tracking-wide text-ink/70">
+            <th
+              scope="col"
+              className="px-2 py-2 text-right font-mono text-[11px] font-normal tracking-wide text-ink/70"
+            >
               Rank
             </th>
-            <th scope="col" className="px-2 py-2 font-mono text-[11px] font-normal tracking-wide text-ink/70">
+            <th
+              scope="col"
+              className="px-2 py-2 font-mono text-[11px] font-normal tracking-wide text-ink/70"
+            >
               Team
             </th>
-            <th scope="col" className="px-2 py-2 text-center font-mono text-[11px] font-normal tracking-wide text-ink/70">
+            <th
+              scope="col"
+              className="px-2 py-2 text-right font-mono text-[11px] font-normal tracking-wide text-ink/70"
+            >
               W
             </th>
-            <th scope="col" className="px-2 py-2 text-center font-mono text-[11px] font-normal tracking-wide text-ink/70">
+            <th
+              scope="col"
+              className="px-2 py-2 text-right font-mono text-[11px] font-normal tracking-wide text-ink/70"
+            >
               L
             </th>
-            <th scope="col" className="px-2 py-2 text-center font-mono text-[11px] font-normal tracking-wide text-ink/70">
+            <th
+              scope="col"
+              className="px-2 py-2 text-right font-mono text-[11px] font-normal tracking-wide text-ink/70"
+            >
               T
             </th>
           </tr>
         </thead>
         <tbody>
-          {standings.map((team) => {
+          {standings.map((team, i) => {
             const isMine = myTeamId !== null && team.team_id === myTeamId;
             return (
               <tr
                 key={team.team_id}
-                className={`border-b border-rule last:border-b-0 ${isMine ? "border-l-4 border-l-court bg-court/[0.06]" : ""}`}
+                className={
+                  isMine
+                    ? `${tableRowClasses(i, { rowCount: standings.length })} border-l-4 border-l-court bg-court/[0.06]`
+                    : tableRowClasses(i, { rowCount: standings.length })
+                }
               >
-                <td className="px-2 py-2 font-mono text-sm text-ink">{team.rank}</td>
-                <td className="px-2 py-2 text-ink">
+                <td className="px-2 py-2 text-right font-mono text-sm tabular-nums text-ink">{team.rank}</td>
+                <td className="px-2 py-1 text-ink">
                   {team.name}
                   {isMine && (
                     <span className="ml-2 inline-flex items-center gap-1.5 font-mono text-[0.65rem] uppercase tracking-wide text-ink">
@@ -59,9 +79,9 @@ export default function StandingsCard({
                     </span>
                   )}
                 </td>
-                <td className="px-2 py-2 text-center font-mono text-sm text-ink">{team.wins}</td>
-                <td className="px-2 py-2 text-center font-mono text-sm text-ink">{team.losses}</td>
-                <td className="px-2 py-2 text-center font-mono text-sm text-ink">{team.ties}</td>
+                <td className="px-2 py-2 text-right font-mono text-sm tabular-nums text-ink">{team.wins}</td>
+                <td className="px-2 py-2 text-right font-mono text-sm tabular-nums text-ink">{team.losses}</td>
+                <td className="px-2 py-2 text-right font-mono text-sm tabular-nums text-ink">{team.ties}</td>
               </tr>
             );
           })}

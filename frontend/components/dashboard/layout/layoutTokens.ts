@@ -61,7 +61,8 @@ export function statRowClasses(tileCount: number): string {
 }
 
 // fixed project-wide table row height -- h-9 is Tailwind's standard scale
-// utility that equals 36px (matches PlayerAvatar.tsx's h-9), not an
+// utility that equals 36px, chosen as the shared minimum every dashboard
+// table's row content (text, badges, avatars) must fit inside, not an
 // arbitrary value, so it scales with the user's root font size
 const TABLE_ROW_HEIGHT = "h-9";
 

@@ -3,6 +3,7 @@ import ModelReasoning from "@/components/dashboard/advisor/ModelReasoning";
 import { modelRankByItemKey, reasoningByItemKey } from "@/components/dashboard/advisor/tokens";
 import { categoryLabelOrGap } from "@/components/dashboard/categoryKeys";
 import { formatGamesCount } from "@/components/dashboard/format";
+import { tableRowClasses } from "@/components/dashboard/layout/layoutTokens";
 import PlayerAvatar from "@/components/dashboard/PlayerAvatar";
 import { formatSlotDay, describeWindowDirection } from "./format";
 import { describeReason, describeNote } from "./tokens";
@@ -109,7 +110,7 @@ export default function AddScheduleTable({
                   </th>
                   <th
                     scope="col"
-                    className="whitespace-nowrap border-l border-rule px-2 py-2 text-center font-mono text-[11px] font-normal tracking-wide text-ink/70"
+                    className="whitespace-nowrap border-l border-rule px-2 py-2 text-right font-mono text-[11px] font-normal tracking-wide text-ink/70"
                   >
                     Games added
                   </th>
@@ -131,15 +132,18 @@ export default function AddScheduleTable({
                 {streaming.slots.map((slot, i) => (
                   <tr
                     key={`${slot.day}-${slot.player_key}-${i}`}
-                    className="border-b border-rule last:border-b-0"
+                    className={tableRowClasses(i, { rowCount: streaming.slots.length })}
                   >
                     <td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-ink/80">
                       {formatSlotDay(slot.day)}
                     </td>
-                    <td className="px-3 py-2 text-sm text-ink">
+                    <td className="px-3 py-1 text-sm text-ink">
                       <span className="flex items-center gap-2">
-                        <PlayerAvatar src={slot.headshot_url} />
-                        <span className="min-w-0">
+                        <PlayerAvatar src={slot.headshot_url} size="sm" />
+                        {/* whitespace-nowrap: without it a long name text-wraps inside
+                            the flex item, blowing the row well past 36px -- every other
+                            data cell here already carries this class */}
+                        <span className="min-w-0 whitespace-nowrap">
                           {slot.name}
                           {slot.position ? (
                             <span className="ml-1.5 font-mono text-[0.65rem] uppercase tracking-wide text-ink/70">
@@ -149,7 +153,7 @@ export default function AddScheduleTable({
                         </span>
                       </span>
                     </td>
-                    <td className="whitespace-nowrap border-l border-rule px-2 py-2 text-center font-mono text-sm text-ink">
+                    <td className="whitespace-nowrap border-l border-rule px-2 py-2 text-right font-mono text-sm tabular-nums text-ink">
                       {formatGamesCount(slot.games_added)}
                     </td>
                     <td className="border-l border-rule px-3 py-2 text-sm text-ink">

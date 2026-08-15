@@ -1,10 +1,25 @@
+// default (h-9/36px) is used by non-table callers (e.g. TradeCard); "sm"
+// (h-7/28px) exists only so the five dashboard tables can hit a genuine
+// 36px row (28px avatar + 4px cell padding top/bottom) without shrinking
+// the avatar everywhere it appears
+const SIZE_CLASSES: Record<"default" | "sm", string> = {
+  default: "h-9 w-9",
+  sm: "h-7 w-7",
+};
+
 /**
  * Roster headshot cell. Falls back to a self-drawn silhouette (no external
  * asset) when headshot_url is null — decorative, since the player's name
  * already renders as text in the adjacent cell.
  */
-export default function PlayerAvatar({ src }: { src: string | null }) {
-  const base = "h-9 w-9 shrink-0 rounded-full border border-rule bg-ink/5 object-cover";
+export default function PlayerAvatar({
+  src,
+  size = "default",
+}: {
+  src: string | null;
+  size?: "default" | "sm";
+}) {
+  const base = `${SIZE_CLASSES[size]} shrink-0 rounded-full border border-rule bg-ink/5 object-cover`;
 
   if (src) {
     // eslint-disable-next-line @next/next/no-img-element
