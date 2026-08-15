@@ -1,7 +1,6 @@
-// Same pill shape as InjuryBadge/DashboardNav's "Soon" badge: border + dot
-// carry the color, text stays full-contrast ink — accent color never carries
-// meaning on its own, so this reads correctly even for someone who can't
-// distinguish the border color.
+// Same pill shape as InjuryBadge: border + dot carry the color, text stays
+// full-contrast ink — accent color never carries meaning on its own, so this
+// reads correctly even for someone who can't distinguish the border color.
 const TONE: Record<
   "winning" | "losing" | "close" | "tie",
   { label: string; border: string; dot: string }

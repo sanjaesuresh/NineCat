@@ -155,7 +155,7 @@ export default function TradeCard({
 
       <details className="mt-4 border-t border-rule pt-3">
         {/* py-1.5 pads the ~16px mono text to a 24px target (WCAG 2.2 2.5.8),
-            same as DashboardNav's links */}
+            same as Sidebar's links */}
         <summary className="inline-flex cursor-pointer items-center py-1.5 font-mono text-xs uppercase tracking-wide text-ink underline decoration-rule underline-offset-4 hover:decoration-ink">
           Before and after, both rosters
         </summary>

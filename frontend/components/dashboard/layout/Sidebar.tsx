@@ -95,13 +95,20 @@ export default function Sidebar({
   // an arrow-keying keyboard user passes over, each a real navigation
   // (WCAG 3.2.2 On Input)
   const [pendingLeagueId, setPendingLeagueId] = useState(leagueId);
-  // resync pendingLeagueId when the route's leagueId changes underneath us
-  // (e.g. browser back/forward) -- adjusted during render, not in an effect,
-  // per React's "adjusting state when a prop changes" pattern, so this
-  // doesn't cost an extra commit+effect pass
-  const [syncedLeagueId, setSyncedLeagueId] = useState(leagueId);
-  if (leagueId !== syncedLeagueId) {
-    setSyncedLeagueId(leagueId);
+  // resync pendingLeagueId whenever the *route* (not just leagueId) changes
+  // underneath us -- adjusted during render, not in an effect, per React's
+  // "adjusting state when a prop changes" pattern, so this doesn't cost an
+  // extra commit+effect pass. Keyed on pathname rather than leagueId: a nav
+  // link click never fires the select's blur handler in Chromium/Firefox
+  // (plain <a> elements aren't focused by a mouse click there, only by
+  // keyboard), so if the user had picked a different league but not yet
+  // committed it, that abandoned selection would otherwise survive an
+  // in-league tab switch forever -- the switcher would keep showing a league
+  // the URL and the rest of the page have already left. Any route change,
+  // including one that leaves leagueId itself unchanged, discards it.
+  const [syncedPath, setSyncedPath] = useState(pathname);
+  if (pathname !== syncedPath) {
+    setSyncedPath(pathname);
     setPendingLeagueId(leagueId);
   }
 
@@ -113,11 +120,16 @@ export default function Sidebar({
       // by the accident of navigating to /dashboard and unmounting the shell
       if (drawerOpen) onCloseDrawer();
       router.push(`/dashboard/${nextLeagueId}`);
+    } else {
+      // no navigation resulted (blurred back to the already-routed league) --
+      // reset explicitly rather than relying solely on the pathname effect
+      // above, since nothing here guarantees the pathname is about to change
+      setPendingLeagueId(leagueId);
     }
   }
 
   // inline-flex + py-1.5 pads each link's hit area to a ~24px target (WCAG
-  // 2.2 2.5.8), preserved verbatim from DashboardNav.tsx's linkClass
+  // 2.2 2.5.8)
   const linkClass = (active: boolean) =>
     `inline-flex items-center py-1.5 font-mono text-xs uppercase tracking-wide underline decoration-rule underline-offset-4 ${
       active ? "text-ink decoration-ink" : "text-ink/80 hover:text-ink hover:decoration-ink"

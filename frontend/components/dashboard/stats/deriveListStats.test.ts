@@ -111,7 +111,7 @@ describe("deriveAddsStats", () => {
     expect(result.candidates).toBe(3);
   });
 
-  it("(a) candidates is 0 for an empty candidate list", () => {
+  it("(b) candidates is 0 for an empty candidate list", () => {
     const result = deriveAddsStats(adds({ candidates: [] }));
     expect(result.candidates).toBe(0);
   });
@@ -148,7 +148,7 @@ describe("deriveTradesStats", () => {
     expect(result.bestVerdict).toBe("Favors you");
   });
 
-  it("(e) bestVerdict returns the FIRST proposal's label even when a later one ranks 'better' -- pins that this takes the top-ranked proposal, not the best verdict", () => {
+  it("(f) bestVerdict returns the FIRST proposal's label even when a later one ranks 'better' -- pins that this takes the top-ranked proposal, not the best verdict", () => {
     // reversed relative to the case above: here the first element is the
     // WORSE verdict ("rejected") and a later element is the "better" one
     // ("favors_me"). An implementation that picked the best verdict across
@@ -165,7 +165,7 @@ describe("deriveTradesStats", () => {
     expect(result.bestVerdict).toBe("Not worth it");
   });
 
-  it("(e) bestVerdict covers all four known verdict labels", () => {
+  it("(g) bestVerdict covers all four known verdict labels", () => {
     expect(deriveTradesStats(trades({ verdicts: [verdict({ verdict: "favors_me" })] })).bestVerdict).toBe(
       "Favors you",
     );
@@ -180,7 +180,7 @@ describe("deriveTradesStats", () => {
     ).toBe("Not worth it");
   });
 
-  it("bestVerdict surfaces an unrecognized verdict explicitly rather than silently mislabeling it", () => {
+  it("(h) bestVerdict surfaces an unrecognized verdict explicitly rather than silently mislabeling it", () => {
     const result = deriveTradesStats(trades({ verdicts: [verdict({ verdict: "mystery" })] }));
     expect(result.bestVerdict).toBe("Unrecognized verdict (mystery)");
   });

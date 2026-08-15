@@ -153,11 +153,16 @@ export default function MyTeamPage() {
               <RosterTable roster={team.roster} />
             </Panel>
 
+            {/* min-w-0 on each grid child: CSS grid items default to
+                min-width: auto, which lets an implicit single column size to
+                its content's min-content width (BuildProfile's table) rather
+                than the track below the lg breakpoint, blowing out the page's
+                horizontal scroll -- see globals.css's mobile-overflow note */}
             <div className="grid gap-4 lg:grid-cols-2">
-              <Panel title="Category build">
+              <Panel title="Category build" className="min-w-0">
                 <BuildProfile profile={team.build_profile} />
               </Panel>
-              <Panel title="Standings">
+              <Panel title="Standings" className="min-w-0">
                 <StandingsCard standings={overview.standings} myTeamId={overview.my_team_id} />
               </Panel>
             </div>

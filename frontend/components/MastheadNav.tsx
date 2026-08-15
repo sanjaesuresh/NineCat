@@ -18,7 +18,7 @@ const NAV_LINKS = [
 
 // inline-flex + py-1.5 pads each link's hit area to a ~24px target (WCAG 2.2
 // 2.5.8) even though the 15px condensed text plus its 3px hover border alone
-// measure well short of that — same pattern as DashboardNav's linkClass
+// measure well short of that — same pattern as Sidebar's linkClass
 const linkClass =
   "inline-flex items-center border-b-[3px] border-transparent py-1.5 no-underline transition-colors hover:border-red-ink hover:text-red-ink focus-visible:border-red-ink focus-visible:text-red-ink";
 

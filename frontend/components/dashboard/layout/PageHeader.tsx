@@ -1,10 +1,9 @@
 import type { ReactNode } from "react";
 
 /**
- * Sticky header for a dashboard page. Meant to pin to the top of a
- * scrolling main region (a later task wires the scroll container), so it
- * carries the page background so scrolled content can't show through, and
- * a bottom hairline to separate it from that content. Renders the page's
+ * Sticky header for a dashboard page. Pins to the top of the scrolling body,
+ * so it carries the page background so scrolled content can't show through,
+ * and a bottom hairline to separate it from that content. Renders the page's
  * single h1 -- smoke.spec.ts and friends assert on level-1 headings by
  * exact name (e.g. "My Team", "Settings"), so `title` must match whatever
  * text each page used to render directly.

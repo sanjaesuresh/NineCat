@@ -235,3 +235,145 @@ test.describe("dashboard shell", () => {
     await expectDrawerLinksHidden(page);
   });
 });
+
+// Regression coverage for a whole-branch review's two blockers, both
+// reproduced against this running app:
+//   1. two of the six dashboard tabs (My Team, Matchup) wrapped a Panel pair
+//      directly in `grid lg:grid-cols-2`; below `lg:` the implicit single
+//      column sized to BuildProfile's min-content width instead of the
+//      track, blowing the page out to 603px of horizontal scroll at 375px.
+//   2. the league switcher's pending value only resynced when the routed
+//      leagueId itself changed -- picking a different league in the select
+//      and then clicking a nav link (not blurring first) left the switcher
+//      showing the abandoned selection forever, disagreeing with the URL,
+//      because plain <a> elements aren't focused by a mouse click in
+//      Chromium/Firefox, so blur (and the commit it drives) never fires.
+
+const ROUTE_LABELS: { path: string; heading: string }[] = [
+  { path: "", heading: "My Team" },
+  { path: "/draft", heading: "Draft" },
+  { path: "/matchup", heading: "Matchup" },
+  { path: "/adds", heading: "Adds" },
+  { path: "/trades", heading: "Trades" },
+  { path: "/settings", heading: "Settings" },
+];
+
+test.describe("dashboard shell — mobile overflow sweep", () => {
+  test("at 375px, none of the six dashboard routes overflow the viewport horizontally", async ({
+    page,
+  }) => {
+    await devLogin(page);
+    const leagueId = page.url().match(/\/dashboard\/(\d+)$/)?.[1];
+    if (!leagueId) throw new Error("dev-login didn't land on a league route");
+
+    await page.setViewportSize(MOBILE_VIEWPORT);
+
+    for (const { path, heading } of ROUTE_LABELS) {
+      await page.goto(`/dashboard/${leagueId}${path}`);
+      // wait for the ready state (not the loading skeleton) so the measurement
+      // reflects real content -- BuildProfile, the min-content offender, only
+      // renders once data lands
+      await expect(page.getByRole("heading", { name: heading, level: 1 })).toBeVisible();
+
+      const overflow = await page.evaluate(() => ({
+        scrollWidth: document.documentElement.scrollWidth,
+        clientWidth: document.documentElement.clientWidth,
+      }));
+      expect(
+        overflow.scrollWidth,
+        `${heading} overflowed: scrollWidth ${overflow.scrollWidth} > clientWidth ${overflow.clientWidth}`,
+      ).toBeLessThanOrEqual(overflow.clientWidth);
+    }
+  });
+});
+
+test.describe("dashboard shell — league switcher stays in sync with the route", () => {
+  // a league id no seeded fixture uses -- only needs to be distinct from the
+  // dev league's real id, since this test never depends on that league's
+  // page actually loading data
+  const OTHER_LEAGUE_ID = 999999;
+
+  async function interceptTwoLeagues(page: Page, currentLeagueId: string) {
+    // real getMe() shape with two entries so the switcher renders two real
+    // <option>s and both fixes below exercise the genuine commit path
+    // (selectOption + blur/click), not DOM manipulation
+    await page.route("**/api/me", (route) =>
+      route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          display_name: "Dev User",
+          leagues: [
+            {
+              id: Number(currentLeagueId),
+              yahoo_league_key: "000.l.000",
+              name: "Current League",
+              season: "2025",
+              synced_at: null,
+            },
+            {
+              id: OTHER_LEAGUE_ID,
+              yahoo_league_key: "111.l.111",
+              name: "Second League",
+              season: "2025",
+              synced_at: null,
+            },
+          ],
+        }),
+      }),
+    );
+    // the layout only re-fetches getMe() when its leagueId param changes, so
+    // force a fresh mount to pick up the intercepted two-league response
+    await page.reload();
+    const select = page.locator("#league-switcher");
+    await expect(select.locator("option")).toHaveCount(2);
+    return select;
+  }
+
+  test("selecting a league and blurring navigates to it", async ({ page }) => {
+    await devLogin(page);
+    const leagueId = page.url().match(/\/dashboard\/(\d+)$/)?.[1];
+    if (!leagueId) throw new Error("dev-login didn't land on a league route");
+
+    const select = await interceptTwoLeagues(page, leagueId);
+
+    // an explicit focus() first: Playwright's selectOption() changes the
+    // value via a synthetic input/change dispatch but doesn't reliably leave
+    // real DOM focus on the element afterward, so without this the follow-up
+    // click has nothing genuine to blur
+    await select.focus();
+    await select.selectOption(String(OTHER_LEAGUE_ID));
+    // clicking a non-focusable element (the page's own h1, not a link or
+    // button) blurs the select via the browser's default mousedown focus
+    // fixup -- a real, no-longer-focused blur, unlike page.keyboard.press
+    // ("Tab"), which starts from document.activeElement and would land on
+    // the drawer's first link instead if focus wasn't genuinely on the
+    // select
+    await page.getByRole("heading", { name: "My Team", level: 1 }).click();
+
+    await page.waitForURL(new RegExp(`/dashboard/${OTHER_LEAGUE_ID}$`));
+    await expect(select).toHaveValue(String(OTHER_LEAGUE_ID));
+  });
+
+  test("selecting a league then clicking a nav link leaves the switcher agreeing with the URL, not the abandoned selection", async ({
+    page,
+  }) => {
+    await devLogin(page);
+    const leagueId = page.url().match(/\/dashboard\/(\d+)$/)?.[1];
+    if (!leagueId) throw new Error("dev-login didn't land on a league route");
+
+    const select = await interceptTwoLeagues(page, leagueId);
+
+    await select.focus();
+    await select.selectOption(String(OTHER_LEAGUE_ID));
+    // a mouse click on a nav link never focuses the link in Chromium/Firefox
+    // (only keyboard Tab does), so the select's blur/commit handler never
+    // fires here -- the fix must not rely on that blur ever happening
+    await page.getByRole("link", { name: "Draft", exact: true }).click();
+
+    await page.waitForURL(new RegExp(`/dashboard/${leagueId}/draft$`));
+    await expect(page.getByRole("heading", { name: "Draft", level: 1 })).toBeVisible();
+    // the switcher must show the league the route is actually on, not the
+    // second league the user picked but never committed
+    await expect(select).toHaveValue(leagueId);
+  });
+});

@@ -22,6 +22,24 @@ describe("panelClasses", () => {
     expect(panelClasses({ flush: true })).toContain("border-rule");
     expect(panelClasses({ flush: true })).toContain("bg-panel");
   });
+
+  it("emits the hairline border class for the default tone, and no alert border class", () => {
+    const classes = panelClasses({ tone: "default" }).split(" ");
+    expect(classes).toContain("border-rule");
+    expect(classes).not.toContain("border-alert");
+  });
+
+  it("emits the alert border class for the destructive tone, and no hairline class", () => {
+    const classes = panelClasses({ tone: "destructive" }).split(" ");
+    expect(classes).toContain("border-alert");
+    expect(classes).not.toContain("border-rule");
+  });
+
+  it("defaults to the hairline border when no tone is passed", () => {
+    const classes = panelClasses().split(" ");
+    expect(classes).toContain("border-rule");
+    expect(classes).not.toContain("border-alert");
+  });
 });
 
 describe("panelHeadingId", () => {

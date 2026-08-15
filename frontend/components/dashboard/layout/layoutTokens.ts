@@ -8,22 +8,36 @@
  * in one place.
  */
 
+type PanelTone = "default" | "destructive";
+
 type PanelOptions = {
   /** True for a panel that should not carry its own inner padding, e.g. one
    * whose child already manages spacing (a table that wants to run its rows
    * flush to the panel's border). */
   flush?: boolean;
+  /** "default" (the usual hairline border) or "destructive" (the alert-red
+   * border for irreversible actions, e.g. Settings' delete-account panel).
+   * A tone rather than a raw className override: panelClasses returns
+   * exactly one border-color class per call, so a caller never needs
+   * `!important` to make a destructive border win the cascade. */
+  tone?: PanelTone;
 };
 
-// --panel is the committed section backdrop and --rule is the only
-// text/border-safe hairline token -- see globals.css's TEXT-SAFE list.
-const PANEL_BASE = "border border-rule bg-panel";
+// --panel is the committed section backdrop; --rule is globals.css's
+// documented translucent 24% hairline token (used here as a divider, not as
+// text -- it is not on the TEXT-SAFE list) and --alert is the only
+// text/border-safe destructive token, per that same list.
+const PANEL_BORDER: Record<PanelTone, string> = {
+  default: "border-rule",
+  destructive: "border-alert",
+};
 const PANEL_PADDING = "p-4";
 
 /** Container classes for the dashboard's Panel primitive. */
 export function panelClasses(options: PanelOptions = {}): string {
-  const { flush = false } = options;
-  return flush ? PANEL_BASE : `${PANEL_BASE} ${PANEL_PADDING}`;
+  const { flush = false, tone = "default" } = options;
+  const base = `border ${PANEL_BORDER[tone]} bg-panel`;
+  return flush ? base : `${base} ${PANEL_PADDING}`;
 }
 
 /**
@@ -66,9 +80,10 @@ export function statRowClasses(tileCount: number): string {
 // arbitrary value, so it scales with the user's root font size
 const TABLE_ROW_HEIGHT = "h-9";
 
-// --rule is the only text/border-safe hairline token (see globals.css's
-// TEXT-SAFE list) -- zebra striping was removed because no --paper-*/--panel
-// pairing in this palette clears 1.1:1 contrast, so it read as invisible
+// --rule is globals.css's documented translucent 24% hairline token, used
+// here as a divider, not as text -- zebra striping was removed because no
+// --paper-*/--panel pairing in this palette clears 1.1:1 contrast, so it
+// read as invisible
 const ROW_SEPARATOR = "border-b border-rule";
 
 type TableRowOptions = {

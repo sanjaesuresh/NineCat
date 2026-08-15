@@ -1,4 +1,4 @@
-/** Pure nav model for the dashboard sidebar, extracted from DashboardNav.tsx. */
+/** Pure nav model for the dashboard sidebar. */
 
 export type NavItem = {
   label: string;
@@ -7,10 +7,9 @@ export type NavItem = {
 };
 
 /**
- * Builds the six dashboard section entries for a given league. Hrefs mirror
- * DashboardNav.tsx's construction exactly: the league root for My Team, and
- * the root plus a lowercase segment for the rest -- this is a faithful
- * extraction, not a redesign of the URL scheme.
+ * Builds the six dashboard section entries for a given league. Hrefs follow
+ * the dashboard's established URL scheme exactly: the league root for My
+ * Team, and the root plus a lowercase segment for the rest.
  */
 export function buildNavItems(leagueId: string): NavItem[] {
   const root = `/dashboard/${leagueId}`;

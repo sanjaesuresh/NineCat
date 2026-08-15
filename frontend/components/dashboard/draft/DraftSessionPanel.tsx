@@ -88,9 +88,9 @@ export default function DraftSessionPanel({
   return (
     <div>
       {/* the live "Pick N of M / Round R" line used to render here too --
-          removed (review fix, pass 2) now that the page's Pick/Round tiles
-          own that number; keeping both was two live copies of the same
-          state. The completion copy stays: it's the one thing the tiles
+          removed now that the page's Pick/Round tiles own that number;
+          keeping both was two live copies of the same state. The
+          completion copy stays: it's the one thing the tiles
           can't say (they hide entirely once complete, see deriveDraftStats),
           and it belongs beside the control that acts on it. ml-auto on the
           button (not just justify-between) keeps Reset pinned to the right

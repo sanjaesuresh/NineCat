@@ -13,12 +13,13 @@ import Sidebar from "./Sidebar";
  * centered -- not worth the extra state/persistence/toggle surface. The
  * content column is a plain div, not a second <main> -- every child route
  * under app/dashboard/[leagueId] already renders its own <main> (its own
- * max-width + padding), so a second <main> landmark here would be an a11y
- * foot-gun (two "main" regions on one page). The capped column only
- * contributes the 1600px width cap; it deliberately does NOT add its own
- * horizontal padding -- every child page still applies its own (its own
- * <main>'s px-*), and adding padding here too would double it. Revisit once
- * pages stop owning their own padding.
+ * horizontal padding; no child route sets its own max-width anymore, since
+ * removing those per-page caps was the point of this redesign), so a second
+ * <main> landmark here would be an a11y foot-gun (two "main" regions on one
+ * page). The capped column only contributes the 1600px width cap; it
+ * deliberately does NOT add its own horizontal padding -- every child page
+ * still applies its own (its own <main>'s px-*), and adding padding here too
+ * would double it. Revisit once pages stop owning their own padding.
  *
  * This is a client component to own the mobile drawer's open/closed state --
  * the single source of truth threaded down into Sidebar as a prop rather

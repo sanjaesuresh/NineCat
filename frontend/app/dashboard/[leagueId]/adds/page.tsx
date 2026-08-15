@@ -11,9 +11,10 @@ import {
 } from "@/lib/api";
 import StaleBanner from "@/components/dashboard/StaleBanner";
 import ErrorState from "@/components/dashboard/ErrorState";
-import { SkeletonCard, SkeletonStatRow, SkeletonTable } from "@/components/dashboard/Skeletons";
+import { SkeletonCard, SkeletonTable } from "@/components/dashboard/Skeletons";
 import ScheduleCoverageNotice from "@/components/dashboard/matchup/ScheduleCoverageNotice";
-import { formatWeekRange, formatSlotDay, describeWindowDirection } from "@/components/dashboard/matchup/format";
+import { describeWindowDirection } from "@/components/dashboard/matchup/format";
+import WeekDateLine from "@/components/dashboard/WeekDateLine";
 import ExplanationsNotice from "@/components/dashboard/advisor/ExplanationsNotice";
 import RankingBasis from "@/components/dashboard/adds/RankingBasis";
 import AddsTable from "@/components/dashboard/adds/AddsTable";
@@ -106,10 +107,16 @@ export default function AddsPage() {
             <p role="status" className="sr-only">
               Loading available adds…
             </p>
-            {/* mirrors the ready-state order below (tile, week/date line,
-                basis + candidates) so nothing reflows once data lands */}
+            {/* mirrors the ready-state order below (week/date line, basis +
+                candidates) so nothing reflows once data lands. No StatRow
+                skeleton: no tile is guaranteed here -- when
+                schedule_coverage.ok is false, AddsContent shows
+                ScheduleCoverageNotice instead of the Candidates tile, which
+                is a real, reachable state. Skeletoning a tile the loading
+                state can't guarantee would itself cause the row to vanish
+                once data lands (the Trades rule: size to the guaranteed
+                tile, never more). */}
             <div className="space-y-4">
-              <SkeletonStatRow tiles={1} />
               <SkeletonCard lines={2} />
               <SkeletonTable rows={8} cols={7} />
             </div>
@@ -148,15 +155,7 @@ function AddsContent({
     <div className="space-y-4">
       {adds.stale && <StaleBanner syncedAt={adds.synced_at} onRefresh={onRefresh} />}
 
-      <p className="font-mono text-xs uppercase tracking-wide text-ink/70">
-        Week {adds.week} · {formatWeekRange(adds.week_range.start_date, adds.week_range.end_date)}
-        {adds.week_range.is_derived && (
-          <span className="ml-2 normal-case text-ink/70">
-            (dates estimated — not confirmed by Yahoo)
-          </span>
-        )}
-        {" · "}Data as of {formatSlotDay(adds.as_of)}
-      </p>
+      <WeekDateLine week={adds.week} weekRange={adds.week_range} asOf={adds.as_of} />
 
       {/* schedule_coverage.ok false means this roster's (and/or the
           opponent's) games for the week couldn't be counted. It gates BOTH

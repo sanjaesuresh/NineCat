@@ -17,6 +17,7 @@ export default function Panel({
   title,
   meta,
   flush,
+  tone = "default",
   className,
   headingId,
   children,
@@ -27,6 +28,9 @@ export default function Panel({
   meta?: ReactNode;
   /** True when a child (e.g. a table) should run flush to the panel's border instead of getting the panel's own inner padding. */
   flush?: boolean;
+  /** "default" (hairline border) or "destructive" (alert-red border), e.g.
+   * Settings' delete-account panel. See layoutTokens.ts's panelClasses. */
+  tone?: "default" | "destructive";
   className?: string;
   /** Overrides the default title-derived heading id, e.g. to match an
    * existing e2e locator (`#punt-heading`) that predates this component. */
@@ -38,7 +42,7 @@ export default function Panel({
   return (
     <section
       aria-labelledby={resolvedHeadingId}
-      className={[panelClasses({ flush }), className].filter(Boolean).join(" ")}
+      className={[panelClasses({ flush, tone }), className].filter(Boolean).join(" ")}
     >
       {/* flush panels have no inner padding on the section itself, so the
           header strip carries its own horizontal/top padding to match the

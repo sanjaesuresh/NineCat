@@ -46,7 +46,7 @@ export default function DraftPage() {
 
   // the team fetch is independent of the board -- a user with no claimed
   // team in this league must still get a working draft board, just an empty
-  // "your build" section, not a whole-page 404 (review fix)
+  // "your build" section, not a whole-page 404
   const [team, setTeam] = useState<LeagueTeamResponse | null>(null);
   const [teamStatus, setTeamStatus] = useState<TeamStatus>("loading");
 
@@ -188,17 +188,17 @@ export default function DraftPage() {
   // controls' own rounds >= 1 gate below). `session.draftComplete` is passed
   // through so deriveDraftStats can null out pick/round once the draft is
   // done -- overallPick overshoots totalPicks by design at that point (see
-  // useDraftSession), so there's no valid "N of M" to show (review fix).
+  // useDraftSession), so there's no valid "N of M" to show.
   const draftStats =
     status === "ready" && board
-      ? deriveDraftStats(
-          session.overallPick,
-          session.totalPicks,
-          MOCK_DRAFT_TEAMS,
+      ? deriveDraftStats({
+          overallPick: session.overallPick,
+          totalPicks: session.totalPicks,
+          teams: MOCK_DRAFT_TEAMS,
           poolSize,
           appliedPunt,
-          session.draftComplete,
-        )
+          complete: session.draftComplete,
+        })
       : null;
 
   // single gate for both Pick/Round tiles (collapses what used to be a
@@ -305,13 +305,12 @@ export default function DraftPage() {
                 product: it comes first, well above the 72-row board, which
                 is reference material by comparison). The prior regrid paired
                 the board with a 360px right rail for recommendations, which
-                doesn't work at any width this page ships at: the rail was too
-                narrow for a recommendation card's own content, and the board
-                lost exactly the width (rail + gap + panel padding) it needed
-                to fit its own 980px min-width table without scrolling. See
-                deriveDraftStats and BigBoardTable docstrings, and the
-                dash-task-9-report.md "Fix pass 1" section, for the measured
-                numbers (review fix). */}
+                doesn't work at any width this page ships at: the rail (360px)
+                plus its gap and the panel's own padding was too narrow for a
+                recommendation card's own content, and it took exactly that
+                much width away from the board, leaving no room for its 980px
+                min-width table without horizontal scroll. See BigBoardTable's
+                docstring for that table's own min-width contract. */}
             <Panel title="Mock draft & recommendations" headingId="session-heading">
               <DraftSessionPanel session={session} adpPlayers={adpPlayers} />
             </Panel>

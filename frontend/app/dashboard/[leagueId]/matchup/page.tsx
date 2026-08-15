@@ -15,7 +15,6 @@ import ErrorState from "@/components/dashboard/ErrorState";
 import {
   SkeletonCard,
   SkeletonLine,
-  SkeletonStatRow,
   SkeletonTable,
 } from "@/components/dashboard/Skeletons";
 import ProjectedScoreboard from "@/components/dashboard/matchup/ProjectedScoreboard";
@@ -24,7 +23,7 @@ import ScheduleCoverageNotice from "@/components/dashboard/matchup/ScheduleCover
 import OpponentEmptyState from "@/components/dashboard/matchup/OpponentEmptyState";
 import ExplanationsNotice from "@/components/dashboard/advisor/ExplanationsNotice";
 import AddScheduleTable from "@/components/dashboard/matchup/AddScheduleTable";
-import { formatWeekRange, formatSlotDay } from "@/components/dashboard/matchup/format";
+import WeekDateLine from "@/components/dashboard/WeekDateLine";
 import PageHeader from "@/components/dashboard/layout/PageHeader";
 import Panel from "@/components/dashboard/layout/Panel";
 import StatRow from "@/components/dashboard/layout/StatRow";
@@ -93,13 +92,17 @@ export default function MatchupPage() {
             <p role="status" className="sr-only">
               Loading matchup…
             </p>
-            {/* mirrors the ready-state order below (tiles, week/date line,
+            {/* mirrors the ready-state order below (week/date line,
                 scoreboard, focus + builds, add schedule) so nothing reflows
-                once data lands. tiles=3 matches the ready state's max tile
-                count now that the Week tile is gone (Opponent, Projected,
-                Categories winning) */}
+                once data lands. No StatRow skeleton: no tile is guaranteed
+                here -- deriveMatchupStats returns all-null on the
+                no-opponent path, and MatchupContent hides the whole StatRow
+                in that case, which is exactly what the seeded dev league
+                produces. Skeletoning a tile count the loading state can't
+                guarantee would itself cause the row to vanish once data
+                lands, the very reflow this skeleton exists to prevent (the
+                Trades rule: size to the guaranteed tile, never more). */}
             <div className="space-y-4">
-              <SkeletonStatRow tiles={3} />
               <SkeletonLine className="h-3 w-64" />
               <SkeletonCard lines={4} />
               <div className="grid gap-4 lg:grid-cols-2">
@@ -173,16 +176,7 @@ function MatchupContent({
         </StatRow>
       )}
 
-      <p className="font-mono text-xs uppercase tracking-wide text-ink/70">
-        Week {matchup.week} ·{" "}
-        {formatWeekRange(matchup.week_range.start_date, matchup.week_range.end_date)}
-        {matchup.week_range.is_derived && (
-          <span className="ml-2 normal-case text-ink/70">
-            (dates estimated — not confirmed by Yahoo)
-          </span>
-        )}
-        {" · "}Data as of {formatSlotDay(matchup.as_of)}
-      </p>
+      <WeekDateLine week={matchup.week} weekRange={matchup.week_range} asOf={matchup.as_of} />
 
       <Panel title="Projected scoreboard" headingId="scoreboard-heading">
         {blockedReason === "no_opponent" && (
@@ -209,10 +203,17 @@ function MatchupContent({
           builds stacks mine/opponent vertically here (rather than the
           side-by-side layout it uses at full width elsewhere) so each single
           build table keeps the full half-column width instead of squeezing
-          two tables into a quarter column each -- see the min-width note in
-          BuildProfile.tsx and the dash-task-10-report.md measurements */}
+          two tables into a quarter column each -- each build table has 9
+          narrow category columns, and a quarter-width column left too little
+          room per column for the meter plus its z-score text without
+          wrapping */}
+      {/* min-w-0 on each grid child: CSS grid items default to min-width:
+          auto, which lets an implicit single column size to its content's
+          min-content width (BuildProfile's table) rather than the track
+          below the lg breakpoint, blowing out the page's horizontal scroll
+          -- see globals.css's mobile-overflow note */}
       <div className="grid gap-4 lg:grid-cols-2">
-        <Panel title="Focus categories" headingId="focus-heading">
+        <Panel title="Focus categories" headingId="focus-heading" className="min-w-0">
           {canCompare && comparison ? (
             <FocusCategories focus={comparison.focus} categories={comparison.categories} />
           ) : (
@@ -224,7 +225,7 @@ function MatchupContent({
           )}
         </Panel>
 
-        <Panel title="Category builds" headingId="builds-heading">
+        <Panel title="Category builds" headingId="builds-heading" className="min-w-0">
           <div className="space-y-4">
             <div>
               <p className="mb-2 font-mono text-xs uppercase tracking-wide text-ink/70">

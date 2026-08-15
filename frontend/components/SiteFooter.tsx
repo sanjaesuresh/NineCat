@@ -8,7 +8,7 @@ const FOOTER_LINKS = [
 ];
 
 // inline-flex + py-1.5 pads each link's hit area to a ~24px target (WCAG 2.2
-// 2.5.8), same pattern as DashboardNav's linkClass and MastheadNav's linkClass
+// 2.5.8), same pattern as Sidebar's linkClass and MastheadNav's linkClass
 const footerLinkClass =
   "inline-flex items-center border-b-2 border-transparent py-1.5 no-underline transition-colors hover:border-red-ink hover:text-gold focus-visible:border-red-ink focus-visible:text-gold";
 
