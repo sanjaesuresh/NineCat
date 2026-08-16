@@ -13,6 +13,8 @@ import {
 import { formatSignedNumber } from "@/components/dashboard/format";
 import { MAY_NOT_LAST_REASON, MOCK_DRAFT_TEAMS } from "./draftSession";
 import type { DraftSession } from "./useDraftSession";
+import { captionClasses, controlClasses, eyebrowClasses, proseClasses, subheadingClasses, uiTextClasses } from "@/components/dashboard/layout/typography";
+import { controlMotionClasses, emptyStateClasses } from "@/components/dashboard/layout/layoutTokens";
 
 /**
  * Live pick-by-pick draft session: presentational shell around
@@ -70,7 +72,7 @@ export default function DraftSessionPanel({
 
   if (rounds < 1) {
     return (
-      <p className="border border-dashed border-rule px-4 py-6 text-center text-ink/80">
+      <p className={emptyStateClasses()}>
         Not enough draftable players yet for a mock draft ({adpPlayers.length} available, need
         at least {MOCK_DRAFT_TEAMS}).
       </p>
@@ -97,14 +99,14 @@ export default function DraftSessionPanel({
           even when this line has nothing to render. */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         {draftComplete && (
-          <p className="font-mono text-xs uppercase tracking-wide text-ink/70">
+          <p className={captionClasses()}>
             Mock draft complete — {totalPicks} picks
           </p>
         )}
         <button
           type="button"
           onClick={startSession}
-          className="ml-auto min-h-[2.25rem] border border-ink px-3 py-1.5 font-mono text-xs uppercase tracking-wide text-ink transition-colors hover:bg-ink hover:text-paper"
+          className={`ml-auto min-h-[2.25rem] border border-ink px-3 py-1.5 hover:bg-ink hover:text-paper ${controlClasses()}`}
         >
           Reset mock draft
         </button>
@@ -119,13 +121,13 @@ export default function DraftSessionPanel({
 
       {lastOpponentRun.length > 0 && !draftComplete && (
         <div className="mt-4">
-          <p className="font-mono text-[0.65rem] uppercase tracking-wide text-ink/70">
+          <p className={captionClasses()}>
             Since your last turn ({lastOpponentRun.length} opponent{" "}
             {lastOpponentRun.length === 1 ? "pick" : "picks"})
           </p>
           <ul aria-label="Opponent picks since your last turn" className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
             {lastOpponentRun.map((p) => (
-              <li key={p.playerKey} className="font-mono text-xs text-ink/70">
+              <li key={p.playerKey} className={uiTextClasses("muted")}>
                 {p.name}
                 {p.position ? ` (${p.position})` : ""}
               </li>
@@ -136,7 +138,7 @@ export default function DraftSessionPanel({
 
       {!draftComplete && (
         <div className="mt-4">
-          <p ref={headingRef} tabIndex={-1} className="font-mono text-xs uppercase tracking-[0.15em] text-ink/80">
+          <p ref={headingRef} tabIndex={-1} className={subheadingClasses()}>
             On the clock — top recommendations
           </p>
 
@@ -156,7 +158,7 @@ export default function DraftSessionPanel({
           )}
 
           {recStatus === "ready" && recommendations.length === 0 && (
-            <p className="mt-3 border border-dashed border-rule px-4 py-6 text-center text-ink/80">
+            <p className={`mt-3 ${emptyStateClasses()}`}>
               No available players match this pick — the draftable pool may be exhausted.
             </p>
           )}
@@ -173,23 +175,23 @@ export default function DraftSessionPanel({
                   return (
                     <li
                       key={rec.player_key}
-                      className={`border p-3 ${isPrimary ? "border-2 border-court bg-court/[0.06]" : "border-rule"}`}
+                      className={`border p-3 ${isPrimary ? "border-2 border-court bg-court-wash" : "border-rule"}`}
                     >
-                      <p className="font-mono text-[0.65rem] uppercase tracking-wide text-ink/70">
+                      <p className={captionClasses()}>
                         #{i + 1}
                         {isPrimary ? " · Top pick" : ""}
                       </p>
-                      <p className="mt-0.5 font-display text-base leading-tight text-ink">{rec.name}</p>
-                      <p className="mt-0.5 font-mono text-[0.65rem] uppercase tracking-wide text-ink/70">
+                      <p className={`mt-0.5 ${subheadingClasses()}`}>{rec.name}</p>
+                      <p className={`mt-0.5 ${captionClasses()}`}>
                         {rec.position ?? "—"} · value {formatSignedNumber(rec.value)}
                         {statBasis === "season_average" && (
-                          <span className="ml-1.5 border border-rule px-1 py-0.5 text-[0.6rem] text-ink/80">
+                          <span className={`ml-1.5 border border-rule px-1.5 py-0.5 ${eyebrowClasses()}`}>
                             SZN AVG
                           </span>
                         )}
                       </p>
                       {reasonsFor(rec).length > 0 && (
-                        <ul className="mt-2 space-y-1 text-xs text-ink/80">
+                        <ul className={`mt-2 space-y-1 ${captionClasses()}`}>
                           {reasonsFor(rec).map((reason) => (
                             <li key={reason}>{reason}</li>
                           ))}
@@ -205,7 +207,7 @@ export default function DraftSessionPanel({
                         onClick={() =>
                           draftPlayer({ playerKey: rec.player_key, name: rec.name, position: rec.position })
                         }
-                        className={`mt-3 min-h-[2.25rem] w-full px-3 py-1.5 font-mono text-xs uppercase tracking-wide transition-colors duration-200 ${
+                        className={`mt-3 min-h-[2.25rem] w-full px-3 py-1.5 font-condensed text-ui font-semibold ${controlMotionClasses()} ${
                           isPrimary
                             ? "border-2 border-court bg-court text-ink-fill hover:bg-paper hover:text-court"
                             : "border-2 border-ink text-ink hover:bg-ink hover:text-paper"
@@ -218,7 +220,7 @@ export default function DraftSessionPanel({
                 })}
               </ul>
               {universalMayNotLast && (
-                <p className="mt-2 font-mono text-[0.65rem] uppercase tracking-wide text-ink/70">
+                <p className={`mt-2 ${proseClasses("muted")}`}>
                   Depth is thin at this point in the draft — most of this list may not last to
                   your next pick.
                 </p>
@@ -229,19 +231,19 @@ export default function DraftSessionPanel({
       )}
 
       {draftComplete && (
-        <p className="mt-4 max-w-prose text-ink/80">Mock draft complete. Reset to run it again.</p>
+        <p className={`mt-4 ${proseClasses("muted")}`}>Mock draft complete. Reset to run it again.</p>
       )}
 
       <div className="mt-6">
-        <p className="font-mono text-xs uppercase tracking-wide text-ink/70">
+        <p className={captionClasses()}>
           Your picks ({myPicks.length})
         </p>
         {myPicks.length === 0 ? (
-          <p className="mt-1 text-xs text-ink/70">None yet</p>
+          <p className={`mt-1 ${captionClasses()}`}>None yet</p>
         ) : (
           <ol className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
             {myPicks.map((p, i) => (
-              <li key={p.playerKey} className="font-mono text-xs text-ink/80">
+              <li key={p.playerKey} className={uiTextClasses("muted")}>
                 {i + 1}. {p.name}
               </li>
             ))}

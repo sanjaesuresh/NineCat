@@ -1,5 +1,7 @@
 import type { ModelExplanations } from "@/lib/api";
 import { describeExplanationsReason } from "./tokens";
+import { captionClasses } from "@/components/dashboard/layout/typography";
+import { noticeClasses, noticeDotClasses } from "@/components/dashboard/layout/layoutTokens";
 
 /**
  * The header for a model-explained list: either the model's own summary, named
@@ -19,11 +21,14 @@ export default function ExplanationsNotice({
 }) {
   if (explanations) {
     return (
-      <div className="border-l-4 border-court bg-court/[0.05] px-4 py-3">
-        <p className="font-mono text-[0.65rem] uppercase tracking-wide text-ink/70">
-          Written by {explanations.model} · advisory, not arithmetic
-        </p>
-        <p className="mt-1 text-ink">{explanations.summary}</p>
+      <div className={noticeClasses()}>
+        <span className={noticeDotClasses("info")} aria-hidden="true" />
+        <div className="min-w-0">
+          <p className={captionClasses()}>
+            Written by {explanations.model} · advisory, not arithmetic
+          </p>
+          <p className="mt-1 text-ink">{explanations.summary}</p>
+        </div>
       </div>
     );
   }
@@ -34,7 +39,7 @@ export default function ExplanationsNotice({
   if (!note) return null;
 
   return (
-    <p role="status" className="font-mono text-[0.65rem] uppercase tracking-wide text-ink/70">
+    <p role="status" className={captionClasses()}>
       {note}
     </p>
   );

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import type { League } from "@/lib/api";
 import Sidebar from "./Sidebar";
+import { controlClasses } from "./typography";
 
 /**
  * Two-column dashboard app shell: the Sidebar (fixed 224px on desktop; an
@@ -158,9 +159,14 @@ export default function DashboardShell({
           onClick={() => setDrawerOpen(true)}
           aria-expanded={drawerOpen}
           aria-controls="dashboard-sidebar"
-          className="inline-flex items-center gap-2 border border-ink-muted px-3 py-1.5 font-mono text-xs uppercase tracking-wide text-ink hover:border-ink"
+          className={`inline-flex items-center gap-2 border border-ink-muted px-3 py-1.5 hover:border-ink ${controlClasses()}`}
         >
-          <span aria-hidden="true">≡</span>
+          {/* hand-drawn inline svg, not a text glyph: "≡" renders in the OS
+              font with no stroke voice and differently on every device;
+              currentColor keeps the hover/press colour inversion working */}
+          <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" aria-hidden="true">
+            <path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" strokeWidth="1.5" />
+          </svg>
           <span className="sr-only">Open navigation</span>
         </button>
       </div>

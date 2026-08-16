@@ -6,6 +6,8 @@ import { refreshLeague, disconnectYahoo, deleteAccount } from "@/lib/api";
 import ConfirmDialog from "@/components/dashboard/ConfirmDialog";
 import PageHeader from "@/components/dashboard/layout/PageHeader";
 import Panel from "@/components/dashboard/layout/Panel";
+import { controlClasses, proseClasses } from "@/components/dashboard/layout/typography";
+import { controlMotionClasses, noticeClasses, noticeDotClasses, pageStackClasses } from "@/components/dashboard/layout/layoutTokens";
 
 type RefreshState = "idle" | "pending" | "done" | "error";
 
@@ -49,7 +51,7 @@ export default function SettingsPage() {
           benefits from a narrow measure. That's an inner cap, not a revival
           of the per-tab container-width inconsistency this redesign removed:
           no max-w- class lives on the <main> or its immediate wrapper here. */}
-      <div className="mt-4 max-w-[640px] space-y-4 px-6 sm:px-10">
+      <div className={`max-w-[640px] ${pageStackClasses()}`}>
         {/* Panel titles below deliberately avoid the substring "Settings":
             PageHeader already renders the page's one h1 "Settings", and
             e2e/smoke.spec.ts:67 looks up a heading by that name with no
@@ -57,37 +59,38 @@ export default function SettingsPage() {
             "Settings" would produce two matches and fail Playwright's
             strict-mode uniqueness check. */}
         <Panel title="Refresh league data" headingId="refresh-heading">
-          <p className="text-ink/90">
+          <p className={proseClasses()}>
             Pull the latest rosters, standings, and matchup from Yahoo for this league.
           </p>
           <button
             type="button"
             onClick={handleRefresh}
             disabled={refreshState === "pending"}
-            className="mt-4 border border-ink px-4 py-2 font-mono text-xs uppercase tracking-wide text-ink transition-colors hover:bg-ink hover:text-paper disabled:cursor-not-allowed disabled:opacity-60"
+            className={`mt-4 border border-ink px-4 py-2 hover:bg-ink hover:text-paper disabled:cursor-not-allowed disabled:opacity-60 ${controlClasses()}`}
           >
             {refreshState === "pending" ? "Refreshing…" : "Refresh now"}
           </button>
           {refreshState === "done" && (
-            <p role="status" className="mt-3 text-sm text-ink/90">
+            <p role="status" className={`mt-3 ${proseClasses()}`}>
               Refreshed. Head back to My Team to see the latest.
             </p>
           )}
           {refreshState === "error" && (
-            <p role="alert" className="mt-3 border-l-4 border-alert bg-ink/[0.03] px-3 py-2 text-sm text-ink">
+            <p role="alert" className={`mt-3 ${noticeClasses()} ${proseClasses()}`}>
+              <span className={noticeDotClasses("error")} aria-hidden="true" />
               Refresh didn&apos;t go through. Try again.
             </p>
           )}
         </Panel>
 
         <Panel title="Disconnect Yahoo" headingId="disconnect-heading">
-          <p className="text-ink/90">
+          <p className={proseClasses()}>
             Revokes NineCat&apos;s access to your Yahoo account. You&apos;ll need to sign in
             again to reconnect.
           </p>
           <ConfirmDialog
             triggerLabel="Disconnect Yahoo"
-            triggerClassName="mt-4 border border-alert px-4 py-2 font-mono text-xs uppercase tracking-wide text-ink transition-colors hover:bg-alert hover:text-paper"
+            triggerClassName={`mt-4 border border-alert px-4 py-2 hover:bg-alert hover:text-paper ${controlClasses()}`}
             title="Disconnect Yahoo?"
             description="NineCat will lose access to your Yahoo leagues until you sign in again. This doesn't delete your NineCat account."
             confirmLabel="Disconnect"
@@ -102,13 +105,13 @@ export default function SettingsPage() {
             class internally so there is exactly one per call, no className
             override or `!important` needed to win the cascade. */}
         <Panel title="Delete account" headingId="delete-heading" tone="destructive">
-          <p className="text-ink/90">
+          <p className={proseClasses()}>
             Permanently deletes your NineCat account and all synced league data. This
             can&apos;t be undone.
           </p>
           <ConfirmDialog
             triggerLabel="Delete account"
-            triggerClassName="mt-4 border-2 border-alert bg-alert px-4 py-2 font-mono text-xs uppercase tracking-wide text-paper transition-colors hover:bg-paper hover:text-alert"
+            triggerClassName={`mt-4 border-2 border-alert bg-alert px-4 py-2 font-condensed text-ui font-semibold text-paper hover:bg-paper hover:text-alert ${controlMotionClasses()}`}
             title="Delete your account?"
             description="This permanently deletes your NineCat account and all synced league data. This can't be undone."
             confirmLabel="Delete account"

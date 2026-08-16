@@ -3,17 +3,24 @@ import ModelReasoning from "@/components/dashboard/advisor/ModelReasoning";
 import { modelRankByItemKey, reasoningByItemKey } from "@/components/dashboard/advisor/tokens";
 import { categoryLabelOrGap } from "@/components/dashboard/categoryKeys";
 import { formatGamesCount } from "@/components/dashboard/format";
-import { tableRowClasses } from "@/components/dashboard/layout/layoutTokens";
+import { emptyStateClasses, tableRowClasses } from "@/components/dashboard/layout/layoutTokens";
+import {
+  columnHeaderClasses,
+  eyebrowClasses,
+  numericClasses,
+  proseClasses,
+  uiTextClasses,
+} from "@/components/dashboard/layout/typography";
 import PlayerAvatar from "@/components/dashboard/PlayerAvatar";
 import { formatWaiverScore } from "./format";
 import { describeReason } from "./tokens";
 
 /**
  * Ranked free-agent candidates. Follows BigBoardTable's table conventions
- * exactly (overflow wrapper + relative, min-w, border-b-2 header, font-mono
- * stats, sr-only caption, SZN AVG badge for stat_basis fallback) so this
- * reads as the same box-score motif as the draft board rather than a new
- * pattern.
+ * exactly (overflow wrapper + relative, min-w, border-b-2 header, monospace
+ * reserved for the numeric columns, sr-only caption, SZN AVG badge for
+ * stat_basis fallback) so this reads as the same box-score motif as the draft
+ * board rather than a new pattern.
  *
  * An empty `candidates` array is a real, deliberately-designed answer here
  * (see AddsCandidate/score_waiver_candidates: a candidate that doesn't
@@ -38,7 +45,7 @@ export default function AddsTable({
 }) {
   if (candidates.length === 0) {
     return (
-      <p className="border border-dashed border-rule px-4 py-6 text-center text-ink/80">
+      <p className={emptyStateClasses()}>
         No free agent on the wire actually helps this roster this week — every candidate either
         has no games left in this window or wouldn&apos;t move a category that matters. Nothing
         here is worth an add.
@@ -55,7 +62,7 @@ export default function AddsTable({
   return (
     <div>
       {hasFallback && (
-        <p className="mb-3 font-mono text-[0.65rem] uppercase tracking-wide text-ink/80">
+        <p className={`mb-4 ${proseClasses("muted")}`}>
           SZN AVG marks a candidate with no live projection, valued off last season&apos;s
           averages instead.
         </p>
@@ -63,8 +70,15 @@ export default function AddsTable({
 
       {/* relative: keeps the sr-only caption clipped inside this scroll
           container instead of escaping to the initial containing block and
-          stretching the page -- a real past bug on this exact motif */}
-      <div className="relative overflow-x-auto border border-rule">
+          stretching the page -- a real past bug on this exact motif.
+          tabIndex + named region: keyboard scroll access once the table
+          overflows (WCAG 2.1.1) -- see RosterTable for the full reasoning */}
+      <div
+        className="relative overflow-x-auto border border-rule"
+        tabIndex={0}
+        role="region"
+        aria-label="Available free agents ranked by projected value to this roster this week"
+      >
         <table className="w-full min-w-[760px] border-collapse text-left">
           <caption className="sr-only">
             Available free agents ranked by projected value to this roster this week
@@ -73,31 +87,31 @@ export default function AddsTable({
             <tr className="border-b-2 border-ink">
               <th
                 scope="col"
-                className="px-2 py-2 text-right font-mono text-[11px] font-normal tracking-wide text-ink/70"
+                className={`px-3 py-2 text-right ${columnHeaderClasses()}`}
               >
                 Rank
               </th>
               <th
                 scope="col"
-                className="px-3 py-2 font-mono text-[11px] font-normal tracking-wide text-ink/70"
+                className={`px-3 py-2 ${columnHeaderClasses()}`}
               >
                 Player
               </th>
               <th
                 scope="col"
-                className="px-2 py-2 font-mono text-[11px] font-normal tracking-wide text-ink/70"
+                className={`px-3 py-2 ${columnHeaderClasses()}`}
               >
                 Pos
               </th>
               <th
                 scope="col"
-                className="whitespace-nowrap border-l border-rule px-2 py-2 text-right font-mono text-[11px] font-normal tracking-wide text-ink/70"
+                className={`whitespace-nowrap border-l border-rule px-3 py-2 text-right ${columnHeaderClasses()}`}
               >
                 Score
               </th>
               <th
                 scope="col"
-                className="whitespace-nowrap border-l border-rule px-2 py-2 text-right font-mono text-[11px] font-normal tracking-wide text-ink/70"
+                className={`whitespace-nowrap border-l border-rule px-3 py-2 text-right ${columnHeaderClasses()}`}
               >
                 {/* the count means the WHOLE week when as_of falls outside it,
                     so the header must not keep saying "left" -- the number is
@@ -106,13 +120,13 @@ export default function AddsTable({
               </th>
               <th
                 scope="col"
-                className="border-l border-rule px-3 py-2 font-mono text-[11px] font-normal tracking-wide text-ink/70"
+                className={`border-l border-rule px-3 py-2 ${columnHeaderClasses()}`}
               >
                 Helps
               </th>
               <th
                 scope="col"
-                className="border-l border-rule px-3 py-2 font-mono text-[11px] font-normal tracking-wide text-ink/70"
+                className={`border-l border-rule px-3 py-2 ${columnHeaderClasses()}`}
               >
                 Why
               </th>
@@ -121,7 +135,7 @@ export default function AddsTable({
           <tbody>
             {candidates.map((candidate, i) => (
               <tr key={candidate.player_key} className={tableRowClasses(i, { rowCount: candidates.length })}>
-                <td className="px-2 py-2 text-right font-mono text-xs tabular-nums text-ink/80">{i + 1}</td>
+                <td className={`px-3 py-2 text-right ${numericClasses("muted")}`}>{i + 1}</td>
                 <td className="px-3 py-1">
                   <div className="flex items-center gap-3">
                     <PlayerAvatar src={candidate.headshot_url} size="sm" />
@@ -129,9 +143,9 @@ export default function AddsTable({
                       {/* whitespace-nowrap: without it a long name text-wraps inside
                           the flex item, blowing the row well past 36px -- every other
                           data cell here already carries this class */}
-                      <span className="whitespace-nowrap font-body text-ink">{candidate.name}</span>
+                      <span className={`whitespace-nowrap ${uiTextClasses()}`}>{candidate.name}</span>
                       {candidate.stat_basis === "season_average" && (
-                        <span className="border border-rule px-1 py-0.5 font-mono text-[0.6rem] uppercase tracking-wide text-ink/80">
+                        <span className={`border border-rule px-1.5 py-0.5 ${eyebrowClasses()}`}>
                           SZN AVG
                         </span>
                       )}
@@ -141,21 +155,21 @@ export default function AddsTable({
                 {/* whitespace-nowrap: a dual-position value like "PG-SG" otherwise
                     breaks after the hyphen in a narrow column, wrapping to 2 lines
                     and blowing the row past 36px */}
-                <td className="whitespace-nowrap px-2 py-2 font-mono text-xs text-ink/80">
+                <td className={`whitespace-nowrap px-3 py-2 ${uiTextClasses("muted")}`}>
                   {candidate.position ?? "—"}
                 </td>
-                <td className="whitespace-nowrap border-l border-rule px-2 py-2 text-right font-mono text-sm tabular-nums text-ink">
+                <td className={`whitespace-nowrap border-l border-rule px-3 py-2 text-right ${numericClasses()}`}>
                   {formatWaiverScore(candidate.score)}
                 </td>
-                <td className="whitespace-nowrap border-l border-rule px-2 py-2 text-right font-mono text-sm tabular-nums text-ink">
+                <td className={`whitespace-nowrap border-l border-rule px-3 py-2 text-right ${numericClasses()}`}>
                   {formatGamesCount(candidate.games_remaining)}
                 </td>
-                <td className="border-l border-rule px-3 py-2 text-sm text-ink">
+                <td className={`border-l border-rule px-3 py-2 ${uiTextClasses()}`}>
                   {candidate.categories_helped.length > 0
                     ? candidate.categories_helped.map(categoryLabelOrGap).join(", ")
                     : "—"}
                 </td>
-                <td className="border-l border-rule px-3 py-2 text-sm text-ink">
+                <td className={`border-l border-rule px-3 py-2 ${uiTextClasses()}`}>
                   {candidate.reasons.length > 0
                     ? candidate.reasons.map(describeReason).join("; ")
                     : "—"}

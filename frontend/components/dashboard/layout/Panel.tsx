@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { panelClasses, panelHeadingId } from "./layoutTokens";
+import { captionClasses, headingClasses } from "./typography";
 
 /**
  * Shared section shell for every dashboard panel: a header strip (title +
@@ -49,16 +50,17 @@ export default function Panel({
           panel's standard 16px inset; non-flush panels already get that
           inset from the section, so the header only needs the gap below it */}
       <div
-        className={`flex items-center justify-between gap-3 border-b border-rule pb-2 ${
-          flush ? "px-4 pt-4" : "mb-3"
+        className={`flex items-baseline justify-between gap-3 border-b border-rule pb-2.5 ${
+          flush ? "px-5 pt-5" : "mb-4"
         }`}
       >
-        <h2 id={resolvedHeadingId} className="font-condensed text-xs uppercase tracking-wide text-ink-muted">
+        {/* sentence-case 18px condensed, not the old 12px uppercase mono: a
+            panel title is the top of the local hierarchy and now carries that
+            with size instead of borrowing it from shouting */}
+        <h2 id={resolvedHeadingId} className={headingClasses()}>
           {title}
         </h2>
-        {meta && (
-          <div className="font-condensed text-xs uppercase tracking-wide text-ink-muted">{meta}</div>
-        )}
+        {meta && <div className={captionClasses()}>{meta}</div>}
       </div>
       {children}
     </section>

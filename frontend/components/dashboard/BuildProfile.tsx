@@ -2,6 +2,8 @@ import type { BuildProfile as BuildProfileData } from "@/lib/api";
 import { CATEGORIES } from "@/components/categories";
 import { classifyBuildLabel, formatZScore, type BuildTone } from "./format";
 import { CONTRACT_KEY_BY_LABEL } from "./categoryKeys";
+import { columnHeaderClasses, eyebrowClasses, subheadingClasses, uiTextClasses } from "@/components/dashboard/layout/typography";
+import { emptyStateClasses } from "@/components/dashboard/layout/layoutTokens";
 
 // Encoding decision (see dataviz skill): `means` mixes incompatible units across
 // the 9 categories (points averages vs. shooting percentages vs. turnovers), so
@@ -69,21 +71,31 @@ export default function BuildProfile({
 
   if (!hasLabels) {
     return (
-      <p className="border border-dashed border-rule px-4 py-6 text-center text-ink/80">
+      <p className={emptyStateClasses()}>
         No build data yet — this fills in once your roster has season averages.
       </p>
     );
   }
 
+  // tabIndex + named region: keyboard scroll access once the table overflows
+  // (WCAG 2.1.1) -- see RosterTable for the full reasoning. aria-label rather
+  // than aria-labelledby matters most here: the trade card stacks four of
+  // these, so a static caption id would collide
+  const caption = "Category build — mean z-score per category";
   return (
     <div>
       {/* relative: this wrapper is the live blocker — its sr-only status/legend
           spans are absolutely positioned, so without a positioning context here
           they escape to the initial containing block and stretch the page */}
-      <div className="relative overflow-x-auto border border-rule">
+      <div
+        className="relative overflow-x-auto border border-rule"
+        tabIndex={0}
+        role="region"
+        aria-label={caption}
+      >
         <table className="w-full border-collapse text-left">
-          <caption className="mb-2 text-left font-mono text-xs uppercase tracking-[0.15em] text-ink/70">
-            Category build — mean z-score per category
+          <caption className={`mb-2 text-left ${subheadingClasses()}`}>
+            {caption}
           </caption>
           <thead>
             <tr className="border-b-2 border-ink">
@@ -91,7 +103,7 @@ export default function BuildProfile({
                 <th
                   key={cat}
                   scope="col"
-                  className="whitespace-nowrap border-r border-rule px-1 py-2 text-center font-mono text-[11px] font-normal tracking-wide text-ink/70 last:border-r-0"
+                  className={`whitespace-nowrap border-r border-rule px-1 py-2 text-center ${columnHeaderClasses()} last:border-r-0`}
                 >
                   {cat}
                 </th>
@@ -110,7 +122,7 @@ export default function BuildProfile({
                   >
                     <BuildMeter tone={tone} />
                     <span className="sr-only">{tone === null ? "No data" : TONE_TEXT[tone]}</span>
-                    <div className="mt-1 font-mono text-xs text-ink/80">
+                    <div className={`mt-1 ${uiTextClasses("muted")}`}>
                       {formatZScore(profile.means?.[contractKey])}
                     </div>
                   </td>
@@ -125,12 +137,12 @@ export default function BuildProfile({
         aria-hidden="true"
       >
         {(["strong", "average", "punt"] as const).map((tone) => (
-          <li key={tone} className="flex items-center gap-1.5 font-mono text-[0.65rem] uppercase tracking-wide text-ink/70">
+          <li key={tone} className={`flex items-center gap-1.5 ${eyebrowClasses()}`}>
             <span className={`h-1.5 w-1.5 rounded-full ${TONE_FILL[tone]}`} />
             {TONE_TEXT[tone]}
           </li>
         ))}
-        <li className="flex items-center gap-1.5 font-mono text-[0.65rem] uppercase tracking-wide text-ink/70">
+        <li className={`flex items-center gap-1.5 ${eyebrowClasses()}`}>
           <span className="h-1.5 w-1.5 rounded-full border border-dashed border-rule" />
           No data
         </li>

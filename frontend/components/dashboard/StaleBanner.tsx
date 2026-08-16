@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { ApiError } from "@/lib/api";
 import { formatSyncedAt } from "./format";
+import { controlClasses, eyebrowClasses, proseClasses } from "@/components/dashboard/layout/typography";
+import { noticeClasses, noticeDotClasses } from "@/components/dashboard/layout/layoutTokens";
 
 /** Shown when a data view's `stale: true` flag says the cached league data is outdated. */
 export default function StaleBanner({
@@ -48,14 +50,14 @@ export default function StaleBanner({
       <div className="inline-flex flex-col items-start gap-1">
         <div role="status" className="inline-flex w-fit items-center gap-2 border border-amber px-2 py-1">
           <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber" aria-hidden="true" />
-          <p className="whitespace-nowrap font-mono text-[0.65rem] uppercase tracking-wide text-ink">
+          <p className={`whitespace-nowrap ${eyebrowClasses("ink")}`}>
             Stale — synced {formatSyncedAt(syncedAt)}
           </p>
           <button
             type="button"
             onClick={handleRefresh}
             disabled={refreshing}
-            className="shrink-0 whitespace-nowrap border border-ink px-1.5 py-0.5 font-mono text-[0.65rem] uppercase tracking-wide text-ink transition-colors hover:bg-ink hover:text-paper disabled:cursor-not-allowed disabled:opacity-60"
+            className={`shrink-0 whitespace-nowrap border border-ink px-2 py-0.5 hover:bg-ink hover:text-paper disabled:cursor-not-allowed disabled:opacity-60 ${controlClasses()}`}
           >
             {refreshLabel}
           </button>
@@ -63,7 +65,7 @@ export default function StaleBanner({
         {error && (
           // no whitespace-nowrap here: this can run to 63 chars and must wrap inside
           // the sticky header, or it reopens the mobile horizontal-scroll bug
-          <p role="alert" className="font-mono text-xs text-alert">
+          <p role="alert" className="max-w-[68ch] font-body text-prose text-alert">
             {error}
           </p>
         )}
@@ -72,25 +74,32 @@ export default function StaleBanner({
   }
 
   return (
-    <div className="border-l-4 border-amber bg-ink/[0.03] px-4 py-3">
-      <div role="status" className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-ink">
-          This data is stale — last synced {formatSyncedAt(syncedAt)}.
-        </p>
-        <button
-          type="button"
-          onClick={handleRefresh}
-          disabled={refreshing}
-          className="shrink-0 border border-ink px-3 py-1.5 font-mono text-xs uppercase tracking-wide text-ink transition-colors hover:bg-ink hover:text-paper disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {refreshLabel}
-        </button>
+    <div className={noticeClasses()}>
+      <span className={noticeDotClasses("warn")} aria-hidden="true" />
+      {/* min-w-0 + flex-1: the notice container is flex for its dot, so this
+          wrapper must both shrink (long sync copy) and fill the row so the
+          refresh button keeps its right-aligned justify-between position */}
+      <div className="min-w-0 flex-1">
+        <div role="status" className="flex flex-wrap items-center justify-between gap-3">
+          <p className={proseClasses()}>
+            This data is stale — last synced {formatSyncedAt(syncedAt)}.
+          </p>
+          <button
+            type="button"
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className={`shrink-0 border border-ink px-3 py-1.5 hover:bg-ink hover:text-paper disabled:cursor-not-allowed disabled:opacity-60 ${controlClasses()}`}
+          >
+            {refreshLabel}
+          </button>
+        </div>
+        {error && (
+          <p role="alert" className={`mt-3 ${noticeClasses()} ${proseClasses()}`}>
+            <span className={noticeDotClasses("error")} aria-hidden="true" />
+            {error}
+          </p>
+        )}
       </div>
-      {error && (
-        <p role="alert" className="mt-3 border-l-4 border-alert bg-ink/[0.03] px-3 py-2 text-sm text-ink">
-          {error}
-        </p>
-      )}
     </div>
   );
 }

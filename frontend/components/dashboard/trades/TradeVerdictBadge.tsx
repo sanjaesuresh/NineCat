@@ -1,4 +1,5 @@
 import { isVerdictToken, VERDICT_LABEL, type VerdictToken } from "./tokens";
+import { eyebrowClasses, uiTextClasses } from "@/components/dashboard/layout/typography";
 
 // Same pill construction as matchup/VerdictBadge: border + dot carry the
 // colour, the text stays full-contrast ink, so the state is never conveyed by
@@ -20,14 +21,14 @@ const TONE: Record<VerdictToken, { border: string; dot: string }> = {
 export default function TradeVerdictBadge({ verdict }: { verdict: string }) {
   if (!isVerdictToken(verdict)) {
     return (
-      <span className="font-mono text-xs text-ink/80">Unrecognized verdict ({verdict})</span>
+      <span className={uiTextClasses("muted")}>Unrecognized verdict ({verdict})</span>
     );
   }
   const { border, dot } = TONE[verdict];
   const label = VERDICT_LABEL[verdict];
   return (
     <span
-      className={`inline-flex w-fit items-center gap-1.5 border px-1.5 py-0.5 font-mono text-[0.65rem] uppercase tracking-wide text-ink ${border}`}
+      className={`inline-flex w-fit items-center gap-1.5 border px-1.5 py-0.5 ${eyebrowClasses("ink")} ${border}`}
     >
       <span className={`h-1.5 w-1.5 rounded-full ${dot}`} aria-hidden="true" />
       {label}

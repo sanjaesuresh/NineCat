@@ -5,6 +5,7 @@ import { formatSignedNumber } from "@/components/dashboard/format";
 import PlayerAvatar from "@/components/dashboard/PlayerAvatar";
 import TradeVerdictBadge from "./TradeVerdictBadge";
 import { describeReason } from "./tokens";
+import { controlClasses, eyebrowClasses, headingClasses, proseClasses, subheadingClasses, uiTextClasses } from "@/components/dashboard/layout/typography";
 
 function categoryList(keys: string[]): string {
   return keys.map(categoryLabelOrGap).join(", ");
@@ -14,14 +15,14 @@ function PlayerChip({ info, playerKey }: { info: TradePlayerInfo | undefined; pl
   // an unresolved key means the response's player dictionary and its verdicts
   // disagreed -- show the key rather than an empty row, so the gap is obvious
   if (!info) {
-    return <li className="font-mono text-xs text-ink/80">Unresolved player ({playerKey})</li>;
+    return <li className={uiTextClasses("muted")}>Unresolved player ({playerKey})</li>;
   }
   return (
     <li className="flex items-center gap-3">
       <PlayerAvatar src={info.headshot_url} />
       <span className="min-w-0">
         <span className="block truncate font-body text-ink">{info.name}</span>
-        <span className="font-mono text-xs text-ink/80">{info.position ?? "—"}</span>
+        <span className={uiTextClasses("muted")}>{info.position ?? "—"}</span>
       </span>
     </li>
   );
@@ -40,16 +41,16 @@ function ProfilePair({
 }) {
   return (
     <section aria-labelledby={headingId}>
-      <h4 id={headingId} className="font-mono text-xs uppercase tracking-wide text-ink">
+      <h4 id={headingId} className={subheadingClasses()}>
         {heading}
       </h4>
       <div className="mt-2 space-y-4">
         <div>
-          <p className="mb-1 font-mono text-[0.65rem] uppercase tracking-wide text-ink/70">Before</p>
+          <p className={`mb-1 ${eyebrowClasses()}`}>Before</p>
           <BuildProfile profile={outcome.before} showLegend={false} />
         </div>
         <div>
-          <p className="mb-1 font-mono text-[0.65rem] uppercase tracking-wide text-ink/70">After</p>
+          <p className={`mb-1 ${eyebrowClasses()}`}>After</p>
           <BuildProfile profile={outcome.after} showLegend={showLegend} />
         </div>
       </div>
@@ -95,19 +96,19 @@ export default function TradeCard({
   return (
     <article className={`border p-4 sm:p-5 ${rejected ? "border-alert" : "border-rule"}`}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
-        <h3 className="font-display text-lg text-ink">
+        <h3 className={headingClasses()}>
           {rejected ? `Not recommended (${rank})` : `Proposal ${rank}`}
         </h3>
         <div className="flex flex-wrap items-center gap-3">
           <TradeVerdictBadge verdict={verdict.verdict} />
-          <span className="font-mono text-xs text-ink/80">
+          <span className={uiTextClasses("muted")}>
             Net category swing {formatSignedNumber(verdict.net_value)}
           </span>
         </div>
       </div>
 
       {rejected && collapseReasons.length > 0 && (
-        <ul className="mt-3 space-y-1 text-sm text-ink">
+        <ul className={`mt-3 space-y-1 ${uiTextClasses()}`}>
           {collapseReasons.map((token) => (
             <li key={token}>{describeReason(token)}</li>
           ))}
@@ -119,7 +120,7 @@ export default function TradeCard({
           {/* full-ink labels with a divider: give-vs-get is the most
               consequential distinction on the card and must not be the
               faintest thing on it */}
-          <h4 className="font-mono text-xs uppercase tracking-wide text-ink">You give</h4>
+          <h4 className={subheadingClasses()}>You give</h4>
           <ul className="mt-2 space-y-2">
             {verdict.give.map((key) => (
               <PlayerChip key={key} playerKey={key} info={players[key]} />
@@ -127,7 +128,7 @@ export default function TradeCard({
           </ul>
         </div>
         <div className="border-t border-rule pt-4 sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0">
-          <h4 className="font-mono text-xs uppercase tracking-wide text-ink">You get</h4>
+          <h4 className={subheadingClasses()}>You get</h4>
           <ul className="mt-2 space-y-2">
             {verdict.get.map((key) => (
               <PlayerChip key={key} playerKey={key} info={players[key]} />
@@ -136,13 +137,13 @@ export default function TradeCard({
         </div>
       </div>
 
-      <ul className="mt-4 space-y-1 text-sm text-ink">
+      <ul className={`mt-4 space-y-1 ${uiTextClasses()}`}>
         {(rejected ? otherReasons : verdict.reasons).map((token) => (
           <li key={token}>{describeReason(token)}</li>
         ))}
       </ul>
 
-      <p className="mt-3 text-sm text-ink/80">
+      <p className={`mt-3 ${proseClasses("muted")}`}>
         For them:{" "}
         {verdict.theirs.gained.length > 0
           ? `gains ${categoryList(verdict.theirs.gained)}`
@@ -156,7 +157,7 @@ export default function TradeCard({
       <details className="mt-4 border-t border-rule pt-3">
         {/* py-1.5 pads the ~16px mono text to a 24px target (WCAG 2.2 2.5.8),
             same as Sidebar's links */}
-        <summary className="inline-flex cursor-pointer items-center py-1.5 font-mono text-xs uppercase tracking-wide text-ink underline decoration-rule underline-offset-4 hover:decoration-ink">
+        <summary className={`inline-flex cursor-pointer items-center py-1.5 underline decoration-rule underline-offset-4 hover:decoration-ink ${controlClasses()}`}>
           Before and after, both rosters
         </summary>
         <div id={detailsId} className="mt-4 space-y-6">

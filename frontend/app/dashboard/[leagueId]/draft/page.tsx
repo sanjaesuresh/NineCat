@@ -26,6 +26,8 @@ import Panel from "@/components/dashboard/layout/Panel";
 import StatRow from "@/components/dashboard/layout/StatRow";
 import StatTile from "@/components/dashboard/layout/StatTile";
 import { deriveDraftStats } from "@/components/dashboard/stats/deriveDraftStats";
+import { captionClasses, controlClasses, proseClasses, uiTextClasses } from "@/components/dashboard/layout/typography";
+import { emptyStateClasses, noticeClasses, noticeDotClasses, pageStackClasses } from "@/components/dashboard/layout/layoutTokens";
 
 type Status = "loading" | "ready" | "error";
 type TeamStatus = "loading" | "ready" | "unclaimed" | "error";
@@ -226,7 +228,7 @@ export default function DraftPage() {
         actions={
           showSessionControls ? (
             <>
-              <label className="flex items-center gap-2 font-mono text-xs uppercase tracking-wide text-ink/70">
+              <label className={`flex items-center gap-2 ${controlClasses("muted")}`}>
                 Your slot
                 <select
                   value={session.mySlot}
@@ -237,7 +239,7 @@ export default function DraftPage() {
                       ? "Locked once the mock draft starts — reset it in Mock draft & recommendations, below"
                       : undefined
                   }
-                  className="border border-ink bg-paper px-2 py-1.5 font-mono text-xs text-ink disabled:cursor-not-allowed disabled:opacity-60"
+                  className={`border border-ink bg-paper px-3 py-1.5 ${uiTextClasses()} disabled:cursor-not-allowed disabled:opacity-60`}
                 >
                   {Array.from({ length: MOCK_DRAFT_TEAMS }, (_, i) => i + 1).map((slot) => (
                     <option key={slot} value={slot}>
@@ -247,7 +249,7 @@ export default function DraftPage() {
                 </select>
               </label>
               {session.draftStarted && (
-                <span className="font-mono text-[0.65rem] uppercase tracking-wide text-ink/70">
+                <span className={captionClasses()}>
                   Locked — reset in Mock draft &amp; recommendations, below
                 </span>
               )}
@@ -256,7 +258,7 @@ export default function DraftPage() {
         }
       />
 
-      <div className="mt-4 space-y-4 px-6 sm:px-10">
+      <div className={pageStackClasses()}>
         {status === "loading" && (
           <div aria-busy="true">
             <p role="status" className="sr-only">
@@ -329,7 +331,7 @@ export default function DraftPage() {
             <Panel title="Your build" headingId="build-heading">
               {teamStatus === "loading" && <SkeletonCard lines={2} />}
               {teamStatus === "unclaimed" && (
-                <p className="border border-dashed border-rule px-4 py-6 text-center text-ink/80">
+                <p className={emptyStateClasses()}>
                   You haven&apos;t claimed a team in this league yet — the board still works;
                   punt suggestions need a roster.
                 </p>
@@ -348,32 +350,38 @@ export default function DraftPage() {
               {(appliedPunt.length > 0 || pendingPunt !== null || puntError) && (
                 <div className="space-y-3 px-4 pt-4 pb-3">
                   {appliedPunt.length > 0 && (
-                    <div className="flex flex-wrap items-center justify-between gap-3 border-l-4 border-amber bg-ink/[0.03] px-4 py-2">
-                      <p className="text-sm text-ink">
-                        Board adjusted for punt: {draftStats?.puntLabels.join(", ")} — value
-                        excludes these categories.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => syncBoard([])}
-                        disabled={pendingPunt !== null}
-                        aria-busy={pendingPunt?.length === 0}
-                        className="shrink-0 border border-ink px-3 py-1.5 font-mono text-xs uppercase tracking-wide text-ink transition-colors hover:bg-ink hover:text-paper disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {pendingPunt?.length === 0 ? "Clearing…" : "Clear punt"}
-                      </button>
+                    <div className={noticeClasses()}>
+                      <span className={noticeDotClasses("warn")} aria-hidden="true" />
+                      {/* flex-1 so justify-between still pushes the clear
+                          button to the notice's right edge beside the dot */}
+                      <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-3">
+                        <p className={proseClasses()}>
+                          Board adjusted for punt: {draftStats?.puntLabels.join(", ")} — value
+                          excludes these categories.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => syncBoard([])}
+                          disabled={pendingPunt !== null}
+                          aria-busy={pendingPunt?.length === 0}
+                          className={`shrink-0 border border-ink px-3 py-1.5 hover:bg-ink hover:text-paper disabled:cursor-not-allowed disabled:opacity-60 ${controlClasses()}`}
+                        >
+                          {pendingPunt?.length === 0 ? "Clearing…" : "Clear punt"}
+                        </button>
+                      </div>
                     </div>
                   )}
                   {pendingPunt !== null && (
-                    <p role="status" className="text-sm text-ink/70">
+                    <p role="status" className={proseClasses("muted")}>
                       Re-ranking board…
                     </p>
                   )}
                   {puntError && (
                     <p
                       role="alert"
-                      className="border-l-4 border-alert bg-ink/[0.03] px-3 py-2 text-sm text-ink"
+                      className={`${noticeClasses()} ${proseClasses()}`}
                     >
+                      <span className={noticeDotClasses("error")} aria-hidden="true" />
                       {puntError}
                     </p>
                   )}

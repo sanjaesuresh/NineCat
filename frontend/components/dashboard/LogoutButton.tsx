@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { controlClasses } from "@/components/dashboard/layout/typography";
 
 /**
  * Logout intentionally bypasses lib/api.ts (per spec: plain fetch, not the
@@ -31,7 +32,7 @@ export default function LogoutButton({ className }: { className?: string }) {
       className={
         className ??
         // inline-flex + py-1.5 pads the hit area to a ~24px target (WCAG 2.2 2.5.8)
-        "inline-flex items-center py-1.5 font-mono text-xs uppercase tracking-wide text-ink underline decoration-rule underline-offset-4 hover:decoration-ink disabled:opacity-60"
+        `inline-flex items-center py-1.5 underline decoration-rule underline-offset-4 hover:decoration-ink disabled:opacity-60 ${controlClasses()}`
       }
     >
       {pending ? "Signing out…" : "Log out"}

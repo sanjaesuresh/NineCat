@@ -23,6 +23,7 @@ import Panel from "@/components/dashboard/layout/Panel";
 import StatRow from "@/components/dashboard/layout/StatRow";
 import StatTile from "@/components/dashboard/layout/StatTile";
 import { deriveTeamStats } from "@/components/dashboard/stats/deriveTeamStats";
+import { pageStackClasses } from "@/components/dashboard/layout/layoutTokens";
 import { categoryLabelOrGap } from "@/components/dashboard/categoryKeys";
 
 type Status = "loading" | "ready" | "error";
@@ -99,7 +100,7 @@ export default function MyTeamPage() {
         }
       />
 
-      <div className="mt-4 space-y-4 px-6 sm:px-10">
+      <div className={pageStackClasses()}>
         {status === "loading" && (
           <div aria-busy="true">
             <p role="status" className="sr-only">

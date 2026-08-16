@@ -2,6 +2,8 @@
 
 import { useId, useRef, useState } from "react";
 import { ApiError } from "@/lib/api";
+import { captionClasses, controlClasses, headingClasses, proseClasses, uiTextClasses } from "@/components/dashboard/layout/typography";
+import { noticeClasses, noticeDotClasses } from "@/components/dashboard/layout/layoutTokens";
 
 /**
  * Accessible confirm dialog built on native <dialog> — showModal() gives us
@@ -86,16 +88,16 @@ export default function ConfirmDialog({
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
       >
-        <h2 id={titleId} className="font-display text-lg text-ink">
+        <h2 id={titleId} className={headingClasses()}>
           {title}
         </h2>
-        <p id={descriptionId} className="mt-2 text-sm text-ink/90">
+        <p id={descriptionId} className={`mt-2 ${proseClasses()}`}>
           {description}
         </p>
 
         {requirePhrase && (
           <label className="mt-4 block">
-            <span className="font-mono text-xs uppercase tracking-wide text-ink/70">
+            <span className={captionClasses()}>
               Type {requirePhrase} to confirm
             </span>
             <input
@@ -103,13 +105,14 @@ export default function ConfirmDialog({
               value={typedPhrase}
               onChange={(e) => setTypedPhrase(e.target.value)}
               autoComplete="off"
-              className="mt-1 w-full border border-ink bg-paper px-3 py-2 font-mono text-sm text-ink"
+              className={`mt-1 w-full border border-ink bg-paper px-3 py-2 ${uiTextClasses()}`}
             />
           </label>
         )}
 
         {error && (
-          <p role="alert" className="mt-3 border-l-4 border-alert bg-ink/[0.03] px-3 py-2 text-sm text-ink">
+          <p role="alert" className={`mt-3 ${noticeClasses()} ${proseClasses()}`}>
+            <span className={noticeDotClasses("error")} aria-hidden="true" />
             {error}
           </p>
         )}
@@ -119,7 +122,7 @@ export default function ConfirmDialog({
             type="button"
             onClick={close}
             disabled={pending}
-            className="border border-ink px-3 py-1.5 font-mono text-xs uppercase tracking-wide text-ink hover:bg-ink hover:text-paper disabled:opacity-60"
+            className={`border border-ink px-3 py-1.5 hover:bg-ink hover:text-paper disabled:opacity-60 ${controlClasses()}`}
           >
             Cancel
           </button>
@@ -127,10 +130,10 @@ export default function ConfirmDialog({
             type="button"
             onClick={handleConfirm}
             disabled={pending || !phraseSatisfied}
-            className={`border px-3 py-1.5 font-mono text-xs uppercase tracking-wide transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+            className={`border px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-60 ${controlClasses()} ${
               danger
-                ? "border-alert text-ink hover:bg-alert hover:text-paper"
-                : "border-ink text-ink hover:bg-ink hover:text-paper"
+                ? "border-alert hover:bg-alert hover:text-paper"
+                : "border-ink hover:bg-ink hover:text-paper"
             }`}
           >
             {pending ? pendingLabel : confirmLabel}

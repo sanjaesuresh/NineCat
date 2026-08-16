@@ -1,5 +1,7 @@
 import { categoryLabelOrGap } from "@/components/dashboard/categoryKeys";
 import { describeOpponentReason } from "./tokens";
+import { eyebrowClasses, proseClasses } from "@/components/dashboard/layout/typography";
+import { noticeClasses, noticeDotClasses } from "@/components/dashboard/layout/layoutTokens";
 
 /**
  * Tells the user what this ranking is actually optimizing for -- the single
@@ -26,12 +28,15 @@ export default function RankingBasis({
 }) {
   if (opponentReason) {
     return (
-      <div role="status" className="border-l-4 border-amber bg-ink/[0.03] px-4 py-3">
-        <p className="text-ink">
-          Ranking by roster need only — no opponent could be identified this week, so this list
-          isn&apos;t weighted toward a specific matchup.
-        </p>
-        <p className="mt-1 text-sm text-ink/80">{describeOpponentReason(opponentReason)}</p>
+      <div role="status" className={noticeClasses()}>
+        <span className={noticeDotClasses("warn")} aria-hidden="true" />
+        <div className="min-w-0">
+          <p className="text-ink">
+            Ranking by roster need only — no opponent could be identified this week, so this list
+            isn&apos;t weighted toward a specific matchup.
+          </p>
+          <p className={`mt-1 ${proseClasses("muted")}`}>{describeOpponentReason(opponentReason)}</p>
+        </div>
       </div>
     );
   }
@@ -50,12 +55,12 @@ export default function RankingBasis({
 
   return (
     <div>
-      <p className="text-sm text-ink/80">Targeting the categories close in this week&apos;s matchup:</p>
+      <p className={proseClasses("muted")}>Targeting the categories close in this week&apos;s matchup:</p>
       <ul className="mt-2 flex flex-wrap gap-2">
         {closeCategories.map((key) => (
           <li
             key={key}
-            className="border border-rule px-2 py-1 font-mono text-xs uppercase tracking-wide text-ink"
+            className={`border border-rule px-2 py-1 ${eyebrowClasses("ink")}`}
           >
             {categoryLabelOrGap(key)}
           </li>

@@ -2,6 +2,8 @@ import type { MatchupSide, ScheduleCoverage } from "@/lib/api";
 import { CATEGORIES } from "@/components/categories";
 import { CONTRACT_KEY_BY_LABEL } from "@/components/dashboard/categoryKeys";
 import { formatCategoryTotal } from "./format";
+import { emptyStateClasses, noticeClasses, noticeDotClasses } from "@/components/dashboard/layout/layoutTokens";
+import { columnHeaderClasses, numericClasses, proseClasses, subheadingClasses } from "@/components/dashboard/layout/typography";
 
 // each reason means something different to the user — never collapse these
 // into one generic "no opponent" message
@@ -38,16 +40,23 @@ export default function OpponentEmptyState({
 
   return (
     <div>
-      <p className="border border-dashed border-rule px-4 py-6 text-center text-ink/80">{copy}</p>
+      <p className={emptyStateClasses()}>{copy}</p>
 
       <div className="mt-4">
-        <p className="font-mono text-xs uppercase tracking-wide text-ink/70">
+        <p className={subheadingClasses()}>
           {mine.name}&apos;s projected totals this week
         </p>
         {coverage.ok ? (
           // relative: keeps the sr-only caption clipped inside this scroll
-          // container instead of escaping to the initial containing block
-          <div className="relative mt-2 overflow-x-auto border border-rule">
+          // container instead of escaping to the initial containing block.
+          // tabIndex + named region: keyboard scroll access once the table
+          // overflows (WCAG 2.1.1) -- see RosterTable for the full reasoning
+          <div
+            className="relative mt-2 overflow-x-auto border border-rule"
+            tabIndex={0}
+            role="region"
+            aria-label={`${mine.name}'s projected category totals`}
+          >
             <table className="w-full min-w-[560px] border-collapse text-left">
               <caption className="sr-only">{mine.name}&apos;s projected category totals</caption>
               <thead>
@@ -56,7 +65,7 @@ export default function OpponentEmptyState({
                     <th
                       key={cat}
                       scope="col"
-                      className="whitespace-nowrap border-r border-rule px-2 py-2 text-center font-mono text-[11px] font-normal tracking-wide text-ink/70 last:border-r-0"
+                      className={`whitespace-nowrap border-r border-rule px-3 py-2 text-center ${columnHeaderClasses()} last:border-r-0`}
                     >
                       {cat}
                     </th>
@@ -68,7 +77,7 @@ export default function OpponentEmptyState({
                   {CATEGORIES.map((cat) => (
                     <td
                       key={cat}
-                      className="whitespace-nowrap border-r border-rule px-2 py-3 text-center font-mono text-sm text-ink last:border-r-0"
+                      className={`whitespace-nowrap border-r border-rule px-3 py-3 text-center ${numericClasses()} last:border-r-0`}
                     >
                       {formatCategoryTotal(cat, mine.projection.totals[CONTRACT_KEY_BY_LABEL[cat]])}
                     </td>
@@ -78,7 +87,8 @@ export default function OpponentEmptyState({
             </table>
           </div>
         ) : (
-          <p className="mt-2 border-l-4 border-amber bg-ink/[0.03] px-3 py-2 text-sm text-ink">
+          <p className={`mt-2 ${noticeClasses()} ${proseClasses()}`}>
+            <span className={noticeDotClasses("warn")} aria-hidden="true" />
             Schedule data is missing for this week, so those totals would show as zero — not shown
             as a real projection. This should fill in once the schedule next syncs.
           </p>

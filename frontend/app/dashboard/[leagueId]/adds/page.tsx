@@ -23,6 +23,8 @@ import Panel from "@/components/dashboard/layout/Panel";
 import StatRow from "@/components/dashboard/layout/StatRow";
 import StatTile from "@/components/dashboard/layout/StatTile";
 import { deriveAddsStats } from "@/components/dashboard/stats/deriveListStats";
+import { proseClasses } from "@/components/dashboard/layout/typography";
+import { noticeClasses, noticeDotClasses, pageStackClasses } from "@/components/dashboard/layout/layoutTokens";
 
 type Status = "loading" | "ready" | "error";
 
@@ -96,8 +98,8 @@ export default function AddsPage() {
     <main className="min-w-0 w-full">
       <PageHeader title="Adds" />
 
-      <div className="mt-4 space-y-4 px-6 sm:px-10">
-        <p className="max-w-2xl text-sm text-ink/80">
+      <div className={pageStackClasses()}>
+        <p className={proseClasses("muted")}>
           Free agents ranked by how much they&apos;d actually help this roster this week — not a
           rest-of-season ranking.
         </p>
@@ -194,7 +196,7 @@ function AddsContent({
               supplies its own inner padding; AddsTable does not. */}
           <Panel title="Ranked candidates" headingId="candidates-heading">
             {adds.candidates.length >= ADDS_LIMIT && (
-              <p className="text-sm text-ink/80">
+              <p className={proseClasses("muted")}>
                 Showing the top {ADDS_LIMIT} — more free agents may clear the bar.
               </p>
             )}
@@ -204,8 +206,9 @@ function AddsContent({
             {adds.window_basis === "full_week" && (
               <p
                 role="status"
-                className="mt-3 border-l-4 border-amber bg-ink/[0.03] px-4 py-3 text-sm text-ink"
+                className={`mt-3 ${noticeClasses()} ${proseClasses()}`}
               >
+                <span className={noticeDotClasses("warn")} aria-hidden="true" />
                 {FULL_WEEK_COPY[windowDirection]}
               </p>
             )}

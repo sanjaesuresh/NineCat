@@ -26,6 +26,14 @@ import Panel from "@/components/dashboard/layout/Panel";
 import StatRow from "@/components/dashboard/layout/StatRow";
 import StatTile from "@/components/dashboard/layout/StatTile";
 import { deriveTradesStats } from "@/components/dashboard/stats/deriveListStats";
+import { emptyStateClasses, pageStackClasses } from "@/components/dashboard/layout/layoutTokens";
+import {
+  captionClasses,
+  controlClasses,
+  proseClasses,
+  subheadingClasses,
+  uiTextClasses,
+} from "@/components/dashboard/layout/typography";
 
 type Status = "loading" | "ready" | "error";
 
@@ -147,12 +155,12 @@ export default function TradesPage() {
         title="Trades"
         actions={
           opponents.length > 0 ? (
-            <label className="flex items-center gap-2 font-mono text-xs uppercase tracking-wide text-ink/70">
+            <label className={`flex items-center gap-2 ${controlClasses("muted")}`}>
               Trade partner
               <select
                 value={selectedTeamId ?? ""}
                 onChange={(event) => handlePartnerChange(Number(event.target.value))}
-                className="border border-ink bg-paper px-2 py-1.5 font-mono text-xs text-ink"
+                className={`border border-ink bg-paper px-3 py-1.5 ${uiTextClasses()}`}
               >
                 {opponents.map((team) => (
                   <option key={team.team_id} value={team.team_id}>
@@ -165,8 +173,8 @@ export default function TradesPage() {
         }
       />
 
-      <div className="mt-4 space-y-4 px-6 sm:px-10">
-        <p className="max-w-2xl text-sm text-ink/80">
+      <div className={pageStackClasses()}>
+        <p className={proseClasses("muted")}>
           Two-sided trades built from what each roster has spare and what it actually needs.
           Advisory only — NineCat never proposes anything to anyone but you.
         </p>
@@ -200,7 +208,7 @@ export default function TradesPage() {
 
         {status === "ready" && opponents.length === 0 && (
           <Panel title="Trades status">
-            <p className="border border-dashed border-rule px-4 py-6 text-center text-ink/80">
+            <p className={emptyStateClasses()}>
               {myTeamId === null
                 ? "Your team isn't linked in this league yet, so there's nobody to compare against."
                 : "No other team has synced into this league yet — a trade needs two rosters."}
@@ -264,7 +272,7 @@ function TradesContent({
       {/* freshness is shown always, not only when stale: this page advises a
           decision the user cannot undo, so how old the rosters are is part of
           the advice. Matchup and Adds both do the same. */}
-      <p className="font-mono text-xs uppercase tracking-wide text-ink/70">
+      <p className={captionClasses()}>
         Rosters as of {formatSyncedAt(trades.synced_at)}
       </p>
 
@@ -277,7 +285,7 @@ function TradesContent({
           regex (`/Proposed trades with /`, no level pinned) -- Panel renders
           it verbatim as this section's h2, so the two must never diverge */}
       <Panel title={`Proposed trades with ${partnerName}`} headingId="proposals-heading">
-        <p className="text-sm text-ink/80">Ranked by how much they fix your weakest categories.</p>
+        <p className={proseClasses("muted")}>Ranked by how much they fix your weakest categories.</p>
 
         <div className="mt-3">
           <ValueBasisNotice
@@ -316,7 +324,7 @@ function TradesContent({
             </ol>
           </>
         ) : (
-          <p className="mt-4 border border-dashed border-rule px-4 py-6 text-center text-ink/80">
+          <p className={`mt-4 ${emptyStateClasses()}`}>
             {emptyProposalCopy(trades)}
           </p>
         )}
@@ -329,7 +337,7 @@ function TradesContent({
           the big board's table supplies its own inner padding instead, which
           SideStrengths does not */}
       <Panel title="What each roster has spare" headingId="strengths-heading">
-        <p className="max-w-2xl text-sm text-ink/80">
+        <p className={proseClasses("muted")}>
           A category is only tradeable surplus when more than one player carries it. Strong on one
           player&apos;s back is fragile — trading them collapses the category rather than trimming
           it.
@@ -338,13 +346,13 @@ function TradesContent({
             column's width force a horizontal scroll on an ordinary desktop */}
         <div className="mt-4 space-y-6">
           <div>
-            <h3 className="font-mono text-xs uppercase tracking-wide text-ink">Your roster</h3>
+            <h3 className={subheadingClasses()}>Your roster</h3>
             <div className="mt-2">
               <SideStrengths side={trades.mine} players={trades.players} />
             </div>
           </div>
           <div>
-            <h3 className="font-mono text-xs uppercase tracking-wide text-ink">{partnerName}</h3>
+            <h3 className={subheadingClasses()}>{partnerName}</h3>
             <div className="mt-2">
               <SideStrengths side={trades.theirs} players={trades.players} />
             </div>

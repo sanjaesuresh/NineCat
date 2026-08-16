@@ -2,6 +2,8 @@ import type { MatchupCategoryVerdict } from "@/lib/api";
 import { LABEL_BY_CONTRACT_KEY } from "@/components/dashboard/categoryKeys";
 import { formatCategoryTotal, formatMargin } from "./format";
 import VerdictBadge from "./VerdictBadge";
+import { captionClasses, eyebrowClasses, headingClasses, uiTextClasses } from "@/components/dashboard/layout/typography";
+import { emptyStateClasses } from "@/components/dashboard/layout/layoutTokens";
 
 /**
  * The close categories, ordered most-flippable-first (backend's `focus`
@@ -18,7 +20,7 @@ export default function FocusCategories({
 }) {
   if (focus.length === 0) {
     return (
-      <p className="border border-dashed border-rule px-4 py-6 text-center text-ink/80">
+      <p className={emptyStateClasses()}>
         No categories are close enough to be worth targeting this week.
       </p>
     );
@@ -28,7 +30,7 @@ export default function FocusCategories({
 
   return (
     <div>
-      <p className="mb-3 text-xs text-ink/70">Ranked most flippable first.</p>
+      <p className={`mb-3 ${captionClasses()}`}>Ranked most flippable first.</p>
       {/* caps at 2 columns, not 3 -- this panel now sits at half page width
           (lg:grid-cols-2 on the outer page grid), so a viewport-based
           lg:grid-cols-3 here would triple the inner grid at the exact
@@ -41,14 +43,14 @@ export default function FocusCategories({
           const label = LABEL_BY_CONTRACT_KEY[key] ?? key;
           return (
             <li key={key} className="border border-rule p-3">
-              <p className="font-mono text-[0.65rem] uppercase tracking-wide text-ink/70">
+              <p className={eyebrowClasses()}>
                 #{i + 1}
               </p>
               <div className="mt-1 flex items-center justify-between gap-2">
-                <span className="font-display text-lg text-ink">{label}</span>
+                <span className={headingClasses()}>{label}</span>
                 <VerdictBadge verdict={cv.verdict} />
               </div>
-              <p className="mt-1 font-mono text-xs text-ink/80">
+              <p className={`mt-1 ${uiTextClasses("muted")}`}>
                 You {formatCategoryTotal(label, cv.mine)} · Them {formatCategoryTotal(label, cv.theirs)} ·{" "}
                 {formatMargin(label, cv.margin)}
               </p>

@@ -8,6 +8,7 @@ import { formatSyncedAt } from "@/components/dashboard/format";
 import LogoutButton from "@/components/dashboard/LogoutButton";
 import { buildNavItems, isActiveNavItem } from "./navItems";
 import { buildLeagueOptions } from "./leagueOptions";
+import { captionClasses, controlClasses, eyebrowClasses, uiTextClasses } from "./typography";
 
 // selector for the trap/initial-focus queries below -- covers every element
 // this rail can realistically contain: links, the rail's non-link buttons
@@ -129,10 +130,13 @@ export default function Sidebar({
   }
 
   // inline-flex + py-1.5 pads each link's hit area to a ~24px target (WCAG
-  // 2.2 2.5.8)
+  // 2.2 2.5.8). Condensed sentence case, not uppercase mono: this rail sits
+  // directly under the site masthead, which is the one place allowed to shout
   const linkClass = (active: boolean) =>
-    `inline-flex items-center py-1.5 font-mono text-xs uppercase tracking-wide underline decoration-rule underline-offset-4 ${
-      active ? "text-ink decoration-ink" : "text-ink/80 hover:text-ink hover:decoration-ink"
+    `inline-flex items-center py-1.5 underline decoration-rule underline-offset-4 ${
+      active
+        ? `${controlClasses()} decoration-ink`
+        : `${controlClasses("muted")} hover:text-ink hover:decoration-ink`
     }`;
 
   // moves focus to the drawer's first focusable element exactly once per
@@ -198,7 +202,7 @@ export default function Sidebar({
       <div className="flex items-center justify-between gap-2">
         <Link
           href="/dashboard"
-          className="font-display text-lg uppercase tracking-[0.01em] text-ink no-underline transition-opacity hover:opacity-80 focus-visible:opacity-80"
+          className="font-display text-section uppercase text-ink no-underline transition-opacity hover:opacity-80 focus-visible:opacity-80"
         >
           NINE<span className="text-red-ink">CAT</span>
           {/* accessible name must contain the visible label (WCAG 2.5.3) --
@@ -220,19 +224,20 @@ export default function Sidebar({
           <button
             type="button"
             onClick={onCloseDrawer}
-            className="inline-flex items-center border border-ink-muted px-2 py-1 font-mono text-xs uppercase tracking-wide text-ink hover:border-ink"
+            className={`inline-flex items-center border border-ink-muted px-2 py-1 hover:border-ink ${controlClasses()}`}
           >
-            <span aria-hidden="true">×</span>
+            {/* hand-drawn inline svg for the same reason as the shell's
+                hamburger: a text "×" has no stroke voice and shifts per OS */}
+            <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" aria-hidden="true">
+              <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" />
+            </svg>
             <span className="sr-only">Close navigation</span>
           </button>
         )}
       </div>
 
       <div className="mt-6">
-        <label
-          htmlFor="league-switcher"
-          className="font-mono text-[11px] uppercase tracking-wide text-ink-muted"
-        >
+        <label htmlFor="league-switcher" className={eyebrowClasses()}>
           League
         </label>
         <select
@@ -243,7 +248,7 @@ export default function Sidebar({
           onKeyDown={(event) => {
             if (event.key === "Enter") commitLeagueChange(event.currentTarget.value);
           }}
-          className="mt-1 w-full border border-ink-muted bg-transparent px-2 py-1.5 font-body text-sm text-ink"
+          className={`mt-1.5 w-full border border-ink-muted bg-transparent px-3 py-1.5 ${uiTextClasses()}`}
         >
           {leagueOptions.map((league) => (
             <option key={league.id} value={league.id} disabled={league.disabled}>
@@ -274,7 +279,7 @@ export default function Sidebar({
       </nav>
 
       <div className="mt-6 border-t border-rule pt-3">
-        <p className="font-mono text-[11px] uppercase tracking-wide text-ink-muted">
+        <p className={captionClasses()}>
           {currentLeague ? `Synced ${formatSyncedAt(currentLeague.synced_at)}` : "Synced —"}
         </p>
         <div className="mt-2">

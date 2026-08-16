@@ -1,3 +1,5 @@
+import { eyebrowClasses, uiTextClasses } from "@/components/dashboard/layout/typography";
+
 // Same pill shape as InjuryBadge: border + dot carry the color, text stays
 // full-contrast ink — accent color never carries meaning on its own, so this
 // reads correctly even for someone who can't distinguish the border color.
@@ -24,12 +26,12 @@ function isVerdict(v: string | null | undefined): v is keyof typeof TONE {
 /** Renders the backend's 4-value category verdict. Unknown/missing verdicts render as a plain dash, never silently as one of the four. */
 export default function VerdictBadge({ verdict }: { verdict: string | null | undefined }) {
   if (!isVerdict(verdict)) {
-    return <span className="font-mono text-xs text-ink/70">—</span>;
+    return <span className={uiTextClasses("muted")}>—</span>;
   }
   const { label, border, dot } = TONE[verdict];
   return (
     <span
-      className={`inline-flex w-fit items-center gap-1.5 border px-1.5 py-0.5 font-mono text-[0.65rem] uppercase tracking-wide text-ink ${border}`}
+      className={`inline-flex w-fit items-center gap-1.5 border px-1.5 py-0.5 ${eyebrowClasses("ink")} ${border}`}
     >
       <span className={`h-1.5 w-1.5 rounded-full ${dot}`} aria-hidden="true" />
       {label}

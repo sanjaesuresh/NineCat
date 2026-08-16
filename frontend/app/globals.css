@@ -88,6 +88,72 @@
   --font-mono: var(--font-space-mono);
 }
 
+/*
+ * Type scale — named for ROLE, not for size, so a component says what a piece
+ * of text IS and the scale decides how big that is. Nine steps, because the
+ * old dashboard had 212 size declarations with 197 of them at 14px or smaller
+ * and only 15 above 16px: hierarchy had nowhere to live and was carried by
+ * weight and colour instead.
+ *
+ * Every step ships its own line-height. That is the point of defining these
+ * here rather than reaching for text-xs/text-sm: Tailwind's per-size default
+ * leading is a fallback, and relying on it is how the dashboard ended up with
+ * exactly 7 explicit leading declarations across the whole surface. A caller
+ * cannot pick a size here without also getting a deliberate leading, so
+ * "unmanaged line height" stops being a thing review has to police.
+ *
+ * No step declares a font-weight: Anton ships a single 400 cut, so a scale
+ * step that set 600 would make any display-font text render as faux bold.
+ * Weight lives in the typography.ts helpers instead, which know which family
+ * they are pairing with.
+ *
+ * One deliberate gap: the projected-score hero number keeps Tailwind's stock
+ * `text-5xl` rather than getting a named step. e2e/matchup.spec.ts:85 locates
+ * that element by literal class ("p.font-display.text-5xl") and that spec is
+ * immutable, so the class is a contract. Nothing is lost -- v4's text-5xl is
+ * already 3rem with line-height 1, exactly what a named step would have said.
+ *
+ * --text-eyebrow is the ONLY step that carries letter-spacing, and it is the
+ * only step meant to be paired with `uppercase`. Uppercase + tracking on
+ * everything is what made this read as an admin console; keeping both bundled
+ * into one role means using them is a deliberate act.
+ *
+ * Not in @theme inline (unlike the colours above) because these are literal
+ * values, not references to :root custom properties -- there is nothing to
+ * inline through.
+ */
+@theme {
+  --text-headline: 2rem; /* 32px -- page h1, Anton */
+  --text-headline--line-height: 1.02;
+  --text-headline--letter-spacing: -0.01em;
+
+  --text-figure: 1.5rem; /* 24px -- stat-tile values, Anton */
+  --text-figure--line-height: 1.05;
+
+  --text-section: 1.125rem; /* 18px -- panel and section titles, condensed */
+  --text-section--line-height: 1.3;
+
+  --text-prose: 0.9375rem; /* 15px -- notices, explanations, empty states */
+  --text-prose--line-height: 1.6;
+
+  --text-ui: 0.875rem; /* 14px -- nav, buttons, controls, text table cells */
+  --text-ui--line-height: 1.4;
+
+  /* same 14px as --text-ui but tighter: a column of figures wants to read as a
+     block, not as prose, and 1.4 leading on a 44px table row wastes the room */
+  --text-data: 0.875rem;
+  --text-data--line-height: 1.15;
+
+  --text-caption: 0.8125rem; /* 13px -- sub-lines, meta, table column headers */
+  --text-caption--line-height: 1.45;
+
+  /* 12px rather than 13: uppercase condensed reads optically larger than
+     sentence case at the same size, so this sits level with --text-caption */
+  --text-eyebrow: 0.75rem;
+  --text-eyebrow--line-height: 1.2;
+  --text-eyebrow--letter-spacing: 0.08em;
+}
+
 body {
   background: var(--paper);
   color: var(--ink);
@@ -143,6 +209,23 @@ body {
       var(--arc-line, var(--rule)) var(--arc-r2, 62%),
       transparent calc(var(--arc-r2, 62%) + 1.5px)
     );
+}
+
+/* surface washes — the two translucent backdrops the dashboard actually uses,
+   named so the ad-hoc opacity ladder (bg-ink/[0.03] ×15, bg-court/[0.05],
+   bg-court/[0.06]) can't regrow. Appended as their own :root/@theme blocks
+   (like --ease-out-quart above) rather than edited into the originals; CSS
+   merges :root blocks and Tailwind v4 merges @theme blocks. Literal rgba, not
+   color-mix over the ink tokens, following --rule's precedent for translucent
+   values. */
+:root {
+  --wash: rgba(232, 223, 198, 0.03); /* 3% ink over paper — the quiet notice/de-emphasis surface, one step below --panel */
+  --court-wash: rgba(133, 169, 220, 0.06); /* 6% court over paper — top-pick highlight fill; collapses the old /[0.05] and /[0.06] pair to one value */
+}
+
+@theme inline {
+  --color-wash: var(--wash);
+  --color-court-wash: var(--court-wash);
 }
 
 /* respect reduced-motion preference for every hover/press/reveal transition

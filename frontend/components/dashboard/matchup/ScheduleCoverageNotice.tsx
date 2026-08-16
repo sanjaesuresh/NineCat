@@ -1,5 +1,7 @@
 import type { ScheduleCoverage } from "@/lib/api";
 import { formatGamesCount } from "@/components/dashboard/format";
+import { captionClasses, proseClasses } from "@/components/dashboard/layout/typography";
+import { noticeClasses, noticeDotClasses } from "@/components/dashboard/layout/layoutTokens";
 
 /**
  * Shown INSTEAD of the projected scoreboard when schedule_coverage.ok is
@@ -22,19 +24,22 @@ export default function ScheduleCoverageNotice({
   withheld?: string;
 }) {
   return (
-    <div role="status" className="border-l-4 border-amber bg-ink/[0.03] px-4 py-4">
-      <p className="text-ink">
-        Schedule data is missing for this week, so a projection would show every category as
-        zero. We&apos;re not showing that as {withheld}.
-      </p>
-      <p className="mt-2 text-sm text-ink/80">
-        This should fill in once the league&apos;s schedule data next syncs.
-      </p>
-      <p className="mt-2 font-mono text-xs uppercase tracking-wide text-ink/70">
-        Games found this week — You: {formatGamesCount(coverage.mine_games)}
-        {coverage.opponent_games !== null &&
-          ` · Opponent: ${formatGamesCount(coverage.opponent_games)}`}
-      </p>
+    <div role="status" className={noticeClasses()}>
+      <span className={noticeDotClasses("warn")} aria-hidden="true" />
+      <div className="min-w-0">
+        <p className="text-ink">
+          Schedule data is missing for this week, so a projection would show every category as
+          zero. We&apos;re not showing that as {withheld}.
+        </p>
+        <p className={`mt-2 ${proseClasses("muted")}`}>
+          This should fill in once the league&apos;s schedule data next syncs.
+        </p>
+        <p className={`mt-2 ${captionClasses()}`}>
+          Games found this week — You: {formatGamesCount(coverage.mine_games)}
+          {coverage.opponent_games !== null &&
+            ` · Opponent: ${formatGamesCount(coverage.opponent_games)}`}
+        </p>
+      </div>
     </div>
   );
 }

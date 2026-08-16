@@ -1,5 +1,6 @@
 import type { WeekRange } from "@/lib/api";
 import { formatWeekRange, formatSlotDay } from "@/components/dashboard/matchup/format";
+import { captionClasses } from "@/components/dashboard/layout/typography";
 
 /**
  * "Week N · date range [(dates estimated)] · Data as of ..." line, shared by
@@ -17,10 +18,10 @@ export default function WeekDateLine({
   asOf: string;
 }) {
   return (
-    <p className="font-mono text-xs uppercase tracking-wide text-ink/70">
+    <p className={captionClasses()}>
       Week {week} · {formatWeekRange(weekRange.start_date, weekRange.end_date)}
       {weekRange.is_derived && (
-        <span className="ml-2 normal-case text-ink/70">
+        <span className="ml-2 normal-case text-ink-muted">
           (dates estimated — not confirmed by Yahoo)
         </span>
       )}

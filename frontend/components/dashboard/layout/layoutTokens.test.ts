@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  controlMotionClasses,
+  noticeClasses,
+  noticeDotClasses,
+  pageStackClasses,
   panelClasses,
   panelHeadingId,
   statRowClasses,
@@ -9,11 +13,11 @@ import {
 
 describe("panelClasses", () => {
   it("includes a padding class by default", () => {
-    expect(panelClasses().split(" ")).toContain("p-4");
+    expect(panelClasses().split(" ")).toContain("p-5");
   });
 
   it("omits the padding class when flush", () => {
-    expect(panelClasses({ flush: true }).split(" ")).not.toContain("p-4");
+    expect(panelClasses({ flush: true }).split(" ")).not.toContain("p-5");
   });
 
   it("always includes the hairline border and panel background", () => {
@@ -39,6 +43,82 @@ describe("panelClasses", () => {
     const classes = panelClasses().split(" ");
     expect(classes).toContain("border-rule");
     expect(classes).not.toContain("border-alert");
+  });
+});
+
+describe("controlMotionClasses", () => {
+  it("pins the one recipe: colour transitions at 150ms on the shared easing token", () => {
+    const classes = controlMotionClasses().split(" ");
+    expect(classes).toContain("transition-colors");
+    expect(classes).toContain("duration-150");
+    // the landing's Hero ships the same easing -- dashboard and chrome must not drift
+    expect(classes).toContain("ease-[var(--ease-out-quart)]");
+  });
+
+  it("emits exactly one duration and one easing", () => {
+    const classes = controlMotionClasses().split(" ");
+    expect(classes.filter((c) => c.startsWith("duration-"))).toHaveLength(1);
+    expect(classes.filter((c) => c.startsWith("ease-"))).toHaveLength(1);
+  });
+
+  it("never animates transform -- a translate press is the bouncy-UI tell this system avoids", () => {
+    expect(controlMotionClasses()).not.toMatch(/transition-(all|transform)|translate|scale-/);
+  });
+
+  it("carries a press state, so touch (where hover never fires) still gets acknowledged", () => {
+    const classes = controlMotionClasses().split(" ");
+    expect(classes).toContain("active:brightness-75");
+    // exactly one active signal, and it is a colour step, never a movement
+    expect(classes.filter((c) => c.startsWith("active:"))).toHaveLength(1);
+  });
+});
+
+describe("noticeClasses", () => {
+  it("draws a full hairline border, never a side stripe", () => {
+    const classes = noticeClasses().split(" ");
+    expect(classes).toContain("border");
+    expect(classes).toContain("border-rule");
+    // the border-l-4 stripe is the anti-pattern this helper retired
+    expect(noticeClasses()).not.toMatch(/border-l-/);
+  });
+
+  it("carries no tone colour on the container -- severity lives in the dot", () => {
+    expect(noticeClasses()).not.toMatch(/border-(alert|amber|court)/);
+  });
+
+  it("uses the named wash surface, not an ad-hoc opacity value", () => {
+    const classes = noticeClasses().split(" ");
+    expect(classes).toContain("bg-wash");
+    expect(noticeClasses()).not.toMatch(/bg-ink\//);
+  });
+
+  it("bakes in its padding, like panelClasses", () => {
+    expect(noticeClasses()).toMatch(/\bpx-\d/);
+    expect(noticeClasses()).toMatch(/\bpy-\d/);
+  });
+});
+
+describe("noticeDotClasses", () => {
+  it("emits exactly one tone fill per call, matching the requested tone", () => {
+    expect(noticeDotClasses("info").split(" ")).toContain("bg-court");
+    expect(noticeDotClasses("warn").split(" ")).toContain("bg-amber");
+    expect(noticeDotClasses("error").split(" ")).toContain("bg-alert");
+    for (const tone of ["info", "warn", "error"] as const) {
+      const fills = noticeDotClasses(tone)
+        .split(" ")
+        .filter((c) => c.startsWith("bg-"));
+      expect(fills, tone).toHaveLength(1);
+    }
+  });
+
+  it("is the shared dot shape -- round, 6px, non-shrinking", () => {
+    for (const tone of ["info", "warn", "error"] as const) {
+      const classes = noticeDotClasses(tone).split(" ");
+      expect(classes, tone).toContain("rounded-full");
+      expect(classes, tone).toContain("h-1.5");
+      expect(classes, tone).toContain("w-1.5");
+      expect(classes, tone).toContain("shrink-0");
+    }
   });
 });
 
@@ -81,13 +161,29 @@ describe("statRowClasses", () => {
   });
 });
 
+describe("pageStackClasses", () => {
+  it("keeps the shared horizontal inset and panel rhythm", () => {
+    const classes = pageStackClasses().split(" ");
+    expect(classes).toContain("space-y-4");
+    expect(classes).toContain("px-6");
+    expect(classes).toContain("sm:px-10");
+  });
+
+  it("sits one rung tighter under the header than panels sit to each other", () => {
+    // mt-3 (12px) against space-y-4 (16px) is the deliberate rhythm variation;
+    // a regression back to mt-4 restores the flagged uniform spacing
+    expect(pageStackClasses().split(" ")).toContain("mt-3");
+    expect(pageStackClasses()).not.toContain("mt-4");
+  });
+});
+
 describe("statTileClasses", () => {
   it("always includes the hairline border", () => {
     expect(statTileClasses().split(" ")).toContain("border-rule");
   });
 
-  it("always includes the standard 16px padding", () => {
-    expect(statTileClasses().split(" ")).toContain("p-4");
+  it("always includes the standard 20px padding", () => {
+    expect(statTileClasses().split(" ")).toContain("p-5");
   });
 });
 
@@ -95,12 +191,12 @@ describe("tableRowClasses", () => {
   const ROW_COUNT = 4;
 
   it("always includes the fixed row-height class, including first and last", () => {
-    expect(tableRowClasses(0, { rowCount: ROW_COUNT }).split(" ")).toContain("h-9");
-    expect(tableRowClasses(1, { rowCount: ROW_COUNT }).split(" ")).toContain("h-9");
-    expect(tableRowClasses(2, { rowCount: ROW_COUNT }).split(" ")).toContain("h-9");
+    expect(tableRowClasses(0, { rowCount: ROW_COUNT }).split(" ")).toContain("h-11");
+    expect(tableRowClasses(1, { rowCount: ROW_COUNT }).split(" ")).toContain("h-11");
+    expect(tableRowClasses(2, { rowCount: ROW_COUNT }).split(" ")).toContain("h-11");
     expect(
       tableRowClasses(ROW_COUNT - 1, { rowCount: ROW_COUNT }).split(" "),
-    ).toContain("h-9");
+    ).toContain("h-11");
   });
 
   it("has the separator class on a middle row", () => {

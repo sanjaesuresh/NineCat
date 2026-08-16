@@ -8,6 +8,8 @@ import LeaguePickerCard from "@/components/dashboard/LeaguePickerCard";
 import ErrorState from "@/components/dashboard/ErrorState";
 import LogoutButton from "@/components/dashboard/LogoutButton";
 import { SkeletonCard } from "@/components/dashboard/Skeletons";
+import { captionClasses, controlClasses, proseClasses } from "@/components/dashboard/layout/typography";
+import { controlMotionClasses } from "@/components/dashboard/layout/layoutTokens";
 
 type Status = "loading" | "syncing" | "empty" | "picker" | "error";
 
@@ -93,7 +95,7 @@ export default function DashboardHome() {
   return (
     <main className="mx-auto min-w-0 w-full max-w-4xl px-6 py-14 sm:px-10 sm:py-20">
       <div className="flex items-baseline justify-between gap-4">
-        <h1 className="font-display text-3xl text-ink">Your leagues</h1>
+        <h1 className="font-display text-headline text-ink">Your leagues</h1>
         <LogoutButton />
       </div>
 
@@ -102,7 +104,7 @@ export default function DashboardHome() {
           <p role="status" className="sr-only">
             {status === "syncing" ? "Syncing leagues…" : "Loading leagues…"}
           </p>
-          <p className="font-mono text-xs uppercase tracking-wide text-ink/70" aria-hidden="true">
+          <p className={captionClasses()} aria-hidden="true">
             {status === "syncing" ? "Syncing with Yahoo…" : "Loading…"}
           </p>
           <SkeletonCard />
@@ -118,21 +120,21 @@ export default function DashboardHome() {
 
       {status === "empty" && (
         <div className="mt-8 border border-dashed border-rule px-6 py-10 text-center">
-          <p className="text-ink/90">
+          <p className={proseClasses()}>
             No leagues synced yet. If your Yahoo season hasn&apos;t started, this is
             expected — check back once your league is live.
           </p>
           <button
             type="button"
             onClick={runSync}
-            className="mt-5 border-2 border-ink bg-ink px-5 py-2.5 font-mono text-sm uppercase tracking-wide text-paper transition-colors hover:bg-paper hover:text-ink"
+            className={`mt-5 border-2 border-ink bg-ink px-5 py-2.5 font-condensed text-ui font-semibold text-paper hover:bg-paper hover:text-ink ${controlMotionClasses()}`}
           >
             Sync again
           </button>
           <p className="mt-4">
             <Link
               href="/"
-              className="font-mono text-xs uppercase tracking-wide text-ink/70 underline decoration-rule underline-offset-4 hover:text-ink hover:decoration-ink"
+              className={`underline decoration-rule underline-offset-4 hover:text-ink hover:decoration-ink ${controlClasses("muted")}`}
             >
               Back to NineCat
             </Link>

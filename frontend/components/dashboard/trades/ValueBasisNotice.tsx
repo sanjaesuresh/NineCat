@@ -1,3 +1,5 @@
+import { captionClasses, proseClasses } from "@/components/dashboard/layout/typography";
+import { noticeClasses, noticeDotClasses } from "@/components/dashboard/layout/layoutTokens";
 // LeagueTradesResponse.value_basis. Typed as an explicit union for the same
 // reason every other token map on the dashboard is: a new basis landing on the
 // backend without a matching disclosure here must be a compile error, because
@@ -36,31 +38,34 @@ export default function ValueBasisNotice({
   hasProposals: boolean;
 }) {
   return (
-    <div className="border-l-4 border-amber bg-ink/[0.03] px-4 py-3 text-sm text-ink">
-      <p>
-        Nothing here models whether the other manager would accept. Both sides have to improve a
-        real weakness for a trade to appear, but these are ranked by what they do for{" "}
-        <em>your</em> build — not by how likely they are to be agreed.
-      </p>
-      <p className="mt-2">
-        {isValueBasisToken(valueBasis)
-          ? VALUE_BASIS_COPY[valueBasis]
-          : `Unrecognized value basis (${valueBasis}) — this disclosure needs a translation.`}
-      </p>
-      {hasProposals && (
-        <p className="mt-2 text-ink/80">
-          Net category swing is the change in your summed category z-scores — positive means your
-          nine-category totals improve overall. It is a relative measure, not a rating out of ten.
+    <div className={noticeClasses()}>
+      <span className={noticeDotClasses("warn")} aria-hidden="true" />
+      <div className={`min-w-0 ${proseClasses()}`}>
+        <p>
+          Nothing here models whether the other manager would accept. Both sides have to improve a
+          real weakness for a trade to appear, but these are ranked by what they do for{" "}
+          <em>your</em> build — not by how likely they are to be agreed.
         </p>
-      )}
-      <p className="mt-2 text-ink/80">
-        Not modelled at all: rest-of-season schedule, playoff weeks, injury risk beyond games
-        played.
-      </p>
-      <p className="mt-2 font-mono text-xs uppercase tracking-wide text-ink/80">
-        {evaluated.toLocaleString()} combination{evaluated === 1 ? "" : "s"} examined
-        {truncated && " · stopped early, so this is not the whole search space"}
-      </p>
+        <p className="mt-2">
+          {isValueBasisToken(valueBasis)
+            ? VALUE_BASIS_COPY[valueBasis]
+            : `Unrecognized value basis (${valueBasis}) — this disclosure needs a translation.`}
+        </p>
+        {hasProposals && (
+          <p className={`mt-2 ${proseClasses("muted")}`}>
+            Net category swing is the change in your summed category z-scores — positive means your
+            nine-category totals improve overall. It is a relative measure, not a rating out of ten.
+          </p>
+        )}
+        <p className={`mt-2 ${proseClasses("muted")}`}>
+          Not modelled at all: rest-of-season schedule, playoff weeks, injury risk beyond games
+          played.
+        </p>
+        <p className={`mt-2 ${captionClasses()}`}>
+          {evaluated.toLocaleString()} combination{evaluated === 1 ? "" : "s"} examined
+          {truncated && " · stopped early, so this is not the whole search space"}
+        </p>
+      </div>
     </div>
   );
 }

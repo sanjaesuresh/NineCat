@@ -1,3 +1,4 @@
+import { captionClasses } from "@/components/dashboard/layout/typography";
 /**
  * One player's model-written reasoning, marked as model-written.
  *
@@ -31,11 +32,11 @@ export default function ModelReasoning({
 
   return (
     <div className="mt-2 border-l-2 border-court/60 pl-2.5">
-      <p className="font-mono text-[0.6rem] uppercase tracking-wide text-ink/60">
+      <p className={captionClasses()}>
         Claude&apos;s read
         {disagrees ? ` · ranks this #${modelRank}` : ""}
       </p>
-      <p className="mt-0.5 text-xs leading-snug text-ink/80">{reasoning}</p>
+      <p className={`mt-0.5 ${captionClasses()}`}>{reasoning}</p>
     </div>
   );
 }

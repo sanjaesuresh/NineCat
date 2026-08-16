@@ -1,6 +1,8 @@
 import type { DraftPuntSuggestion } from "@/lib/api";
 import { LABEL_BY_CONTRACT_KEY } from "@/components/dashboard/categoryKeys";
 import { formatZScore } from "@/components/dashboard/format";
+import { captionClasses, proseClasses, subheadingClasses } from "@/components/dashboard/layout/typography";
+import { controlMotionClasses, emptyStateClasses, noticeClasses, noticeDotClasses } from "@/components/dashboard/layout/layoutTokens";
 
 // canonical-order arrays compare by value, not by reference/order, since
 // both `applied`/`pendingPunt` and each suggestion's `punt` are already
@@ -37,7 +39,7 @@ export default function PuntSuggestions({
 }) {
   if (suggestions.length === 0) {
     return (
-      <p className="border border-dashed border-rule px-4 py-6 text-center text-ink/80">
+      <p className={emptyStateClasses()}>
         No punt suggestions yet — claim a team in this league, or draft a few players in the
         mock draft below, to see build-based punt strategies.
       </p>
@@ -47,7 +49,8 @@ export default function PuntSuggestions({
   return (
     <div>
       {error && (
-        <p role="alert" className="mb-3 border-l-4 border-alert bg-ink/[0.03] px-3 py-2 text-sm text-ink">
+        <p role="alert" className={`mb-3 ${noticeClasses()} ${proseClasses()}`}>
+          <span className={noticeDotClasses("error")} aria-hidden="true" />
           {error}
         </p>
       )}
@@ -62,10 +65,10 @@ export default function PuntSuggestions({
           const labels = s.punt.map((key) => LABEL_BY_CONTRACT_KEY[key] ?? key);
           return (
             <li key={s.punt.join(",")} className={`border p-3 ${isApplied ? "border-court" : "border-rule"}`}>
-              <p className="font-display text-base leading-tight text-ink">
+              <p className={subheadingClasses()}>
                 Punt {labels.join(" + ")}
               </p>
-              <p className="mt-1 font-mono text-[0.65rem] uppercase tracking-wide text-ink/70">
+              <p className={`mt-1 ${captionClasses()}`}>
                 Weakest category: {LABEL_BY_CONTRACT_KEY[s.weakest] ?? s.weakest} (
                 {formatZScore(s.weakest_mean)})
               </p>
@@ -75,7 +78,7 @@ export default function PuntSuggestions({
                 aria-busy={isPending}
                 onClick={() => (isApplied ? onClear() : onSelect(s.punt))}
                 aria-pressed={isApplied}
-                className={`mt-3 min-h-[2.25rem] w-full border-2 px-3 py-1.5 font-mono text-xs uppercase tracking-wide transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-60 ${
+                className={`mt-3 min-h-[2.25rem] w-full border-2 px-3 py-1.5 font-condensed text-ui font-semibold ${controlMotionClasses()} disabled:cursor-not-allowed disabled:opacity-60 ${
                   isApplied
                     ? "border-court bg-court text-ink-fill hover:bg-paper hover:text-court"
                     : "border-ink text-ink hover:bg-ink hover:text-paper"

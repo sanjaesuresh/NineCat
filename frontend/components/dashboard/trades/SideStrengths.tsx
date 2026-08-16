@@ -2,6 +2,7 @@ import type { TradePlayerInfo, TradeSide } from "@/lib/api";
 import { CATEGORIES } from "@/components/categories";
 import { CONTRACT_KEY_BY_LABEL } from "@/components/dashboard/categoryKeys";
 import { classifyBuildLabel, formatZScore } from "@/components/dashboard/format";
+import { columnHeaderClasses, numericClasses, uiTextClasses } from "@/components/dashboard/layout/typography";
 
 const TONE_TEXT = { strong: "Strong", average: "Average", punt: "Punt" } as const;
 
@@ -27,22 +28,29 @@ export default function SideStrengths({
   const surplus = new Set(side.surplus);
   const deficit = new Set(side.deficit);
 
+  // tabIndex + named region: keyboard scroll access once the table overflows
+  // (WCAG 2.1.1) -- see RosterTable for the full reasoning. aria-label rather
+  // than a caption id because the trades page mounts one of these per side
+  const caption = "Category strengths, depth and fragility for this roster";
   return (
-    <div className="relative overflow-x-auto border border-rule">
+    <div
+      className="relative overflow-x-auto border border-rule"
+      tabIndex={0}
+      role="region"
+      aria-label={caption}
+    >
       {/* min-w kept modest deliberately: these two tables stack in one column
           (see the page) precisely because side-by-side at this width forces a
           horizontal scroll on an ordinary desktop */}
       <table className="w-full min-w-[440px] border-collapse text-left">
-        <caption className="sr-only">
-          Category strengths, depth and fragility for this roster
-        </caption>
+        <caption className="sr-only">{caption}</caption>
         <thead>
           <tr className="border-b-2 border-ink">
             {["Cat", "Build", "Mean z", "Depth", "Top share", "Trade role"].map((heading) => (
               <th
                 key={heading}
                 scope="col"
-                className="whitespace-nowrap px-2 py-2 font-mono text-[11px] font-normal tracking-wide text-ink/70"
+                className={`whitespace-nowrap px-3 py-2 ${columnHeaderClasses()}`}
               >
                 {heading}
               </th>
@@ -61,24 +69,24 @@ export default function SideStrengths({
               <tr key={label} className="border-b border-rule last:border-b-0">
                 <th
                   scope="row"
-                  className="whitespace-nowrap px-2 py-2 text-left font-mono text-xs font-normal text-ink"
+                  className={`whitespace-nowrap px-3 py-2 text-left ${uiTextClasses()}`}
                 >
                   {label}
                 </th>
-                <td className="whitespace-nowrap px-2 py-2 font-mono text-xs text-ink">
+                <td className={`whitespace-nowrap px-3 py-2 ${uiTextClasses()}`}>
                   {tone === null ? "No data" : TONE_TEXT[tone]}
                 </td>
-                <td className="whitespace-nowrap px-2 py-2 font-mono text-xs text-ink/80">
+                <td className={`whitespace-nowrap px-3 py-2 ${numericClasses("muted")}`}>
                   {formatZScore(strength?.mean)}
                 </td>
-                <td className="whitespace-nowrap px-2 py-2 font-mono text-xs text-ink/80">
+                <td className={`whitespace-nowrap px-3 py-2 ${numericClasses("muted")}`}>
                   {strength?.depth ?? "—"}
                 </td>
-                <td className="whitespace-nowrap px-2 py-2 text-xs text-ink/80">
+                <td className={`whitespace-nowrap px-3 py-2 ${uiTextClasses("muted")}`}>
                   {topName}
                   {strength ? ` (${Math.round(strength.top_share * 100)}%)` : ""}
                 </td>
-                <td className="px-2 py-2 text-xs text-ink">
+                <td className={`px-3 py-2 ${uiTextClasses()}`}>
                   {surplus.has(key) ? (
                     "Tradeable surplus"
                   ) : strength?.fragile ? (

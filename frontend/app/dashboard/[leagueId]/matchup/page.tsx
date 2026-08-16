@@ -29,6 +29,8 @@ import Panel from "@/components/dashboard/layout/Panel";
 import StatRow from "@/components/dashboard/layout/StatRow";
 import StatTile from "@/components/dashboard/layout/StatTile";
 import { deriveMatchupStats } from "@/components/dashboard/stats/deriveMatchupStats";
+import { subheadingClasses } from "@/components/dashboard/layout/typography";
+import { emptyStateClasses, pageStackClasses } from "@/components/dashboard/layout/layoutTokens";
 
 type Status = "loading" | "ready" | "error";
 
@@ -86,7 +88,7 @@ export default function MatchupPage() {
     <main className="min-w-0 w-full">
       <PageHeader title="Matchup" />
 
-      <div className="mt-4 space-y-4 px-6 sm:px-10">
+      <div className={pageStackClasses()}>
         {status === "loading" && (
           <div aria-busy="true">
             <p role="status" className="sr-only">
@@ -217,7 +219,7 @@ function MatchupContent({
           {canCompare && comparison ? (
             <FocusCategories focus={comparison.focus} categories={comparison.categories} />
           ) : (
-            <p className="border border-dashed border-rule px-4 py-6 text-center text-ink/80">
+            <p className={emptyStateClasses()}>
               {blockedReason === "no_opponent"
                 ? "Focus categories need a known opponent."
                 : "Focus categories need real schedule data for this week."}
@@ -228,19 +230,19 @@ function MatchupContent({
         <Panel title="Category builds" headingId="builds-heading" className="min-w-0">
           <div className="space-y-4">
             <div>
-              <p className="mb-2 font-mono text-xs uppercase tracking-wide text-ink/70">
+              <p className={`mb-2 ${subheadingClasses()}`}>
                 {matchup.mine.name}
               </p>
               <BuildProfile profile={matchup.mine.build_profile} />
             </div>
             <div>
-              <p className="mb-2 font-mono text-xs uppercase tracking-wide text-ink/70">
+              <p className={`mb-2 ${subheadingClasses()}`}>
                 {opponent ? opponent.name : "Opponent"}
               </p>
               {opponent ? (
                 <BuildProfile profile={opponent.build_profile} />
               ) : (
-                <p className="border border-dashed border-rule px-4 py-6 text-center text-ink/80">
+                <p className={emptyStateClasses()}>
                   No opponent build available.
                 </p>
               )}
@@ -256,7 +258,7 @@ function MatchupContent({
             "we have no schedule", the same false-confidence failure one
             section up, so this is gated on the same blockedReason */}
         {blockedReason === "no_schedule" ? (
-          <p className="border border-dashed border-rule px-4 py-6 text-center text-ink/80">
+          <p className={emptyStateClasses()}>
             The add-schedule optimizer needs real game data for this week — it will fill in once
             the schedule next syncs.
           </p>
