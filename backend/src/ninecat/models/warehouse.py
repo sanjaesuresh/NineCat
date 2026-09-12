@@ -54,6 +54,13 @@ class NbaGame(Base):
     )
 
 
+# the dev-login seed's fake players live in this nba_person_id block (no real
+# nba_api id ever lands here). lives on the model, not in the auth seeder,
+# because warehouse code (id mapping) and the api layer both need to treat
+# these rows as invisible-to-real-data without importing the seeder
+DEV_POOL_NBA_PERSON_IDS = range(900001, 900200)
+
+
 class NbaPlayer(Base):
     """An NBA player, keyed by NBA.com's own person id (stable across team changes)."""
 

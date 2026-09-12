@@ -13,6 +13,7 @@ from pathlib import Path
 
 from ninecat.yahoo.parsers import (
     parse_draft_results,
+    parse_league_metadata,
     parse_scoreboard,
     parse_standings,
     parse_user_teams,
@@ -219,3 +220,50 @@ def test_parse_standings_preseason_fixture_pins_real_rank_zero_shape():
     assert entries[0].wins == 0
     assert entries[0].losses == 0
     assert entries[0].ties == 0
+
+
+def test_parse_league_metadata_reads_the_merged_league_header():
+    # league/{key} responses (and every league sub-resource) carry the merged
+    # metadata dict at league[0]; historical leagues aren't listed by the
+    # current-game user_leagues call, so backfill fetches this directly
+    raw = {
+        "fantasy_content": {
+            "league": [
+                {
+                    "league_key": "466.l.99999",
+                    "name": "Old League",
+                    "season": "2025",
+                    "scoring_type": "head",
+                    "num_teams": 10,
+                    "end_week": "19",
+                }
+            ]
+        }
+    }
+    info = parse_league_metadata(raw)
+    assert info.league_key == "466.l.99999"
+    assert info.name == "Old League"
+    assert info.season == "2025"
+    assert info.scoring_type == "head"
+    assert info.num_teams == 10
+    # end_week bounds the backfill walk -- yahoo answers an out-of-range week
+    # with no scoreboard section at all (live-verified), so walking blind past
+    # the end raises instead of returning empty
+    assert info.end_week == 19
+
+
+def test_parse_league_metadata_tolerates_missing_end_week():
+    raw = {
+        "fantasy_content": {
+            "league": [
+                {
+                    "league_key": "466.l.99999",
+                    "name": "Old League",
+                    "season": "2025",
+                    "scoring_type": "head",
+                    "num_teams": 10,
+                }
+            ]
+        }
+    }
+    assert parse_league_metadata(raw).end_week is None

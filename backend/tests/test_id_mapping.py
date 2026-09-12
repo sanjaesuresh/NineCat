@@ -188,3 +188,39 @@ def test_map_yahoo_players_dedupes_duplicate_player_key_in_single_call(db_sessio
         .all()
     )
     assert len(rows) == 1
+
+
+def test_map_yahoo_players_never_matches_dev_pool_players(db_session):
+    # the dev-login seed's fake players carry real star names (ascii), which
+    # made every star AMBIGUOUS against the real (diacritic) row and left
+    # them unmatched -- found live when the wp4 backtest reported 5+ unmapped
+    # per team-week, all stars. dev players must be invisible to matching.
+    real = NbaPlayer(nba_person_id=203999, full_name="Nikola Jokić")
+    fake = NbaPlayer(nba_person_id=900103, full_name="Nikola Jokic")
+    db_session.add_all([real, fake])
+    db_session.flush()
+
+    result = map_yahoo_players(db_session, [_roster_entry("466.p.5352", "Nikola Jokic")])
+    db_session.flush()
+
+    row = db_session.execute(
+        select(PlayerIdMap).where(PlayerIdMap.yahoo_player_key == "466.p.5352")
+    ).scalar_one()
+    assert row.nba_player_id == real.id
+    assert result.unmatched == []
+
+
+def test_map_yahoo_players_leaves_dev_only_names_unmatched(db_session):
+    # a name that exists ONLY as a dev player must record unmatched, never
+    # map a real yahoo key onto a fake player
+    fake = NbaPlayer(nba_person_id=900104, full_name="Only A Dev Player")
+    db_session.add(fake)
+    db_session.flush()
+
+    map_yahoo_players(db_session, [_roster_entry("466.p.7777", "Only A Dev Player")])
+    db_session.flush()
+
+    row = db_session.execute(
+        select(PlayerIdMap).where(PlayerIdMap.yahoo_player_key == "466.p.7777")
+    ).scalar_one()
+    assert row.nba_player_id is None

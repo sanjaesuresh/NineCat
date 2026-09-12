@@ -20,6 +20,7 @@ from ninecat.yahoo.parsers import (
     TeamInfo,
     UserTeamInfo,
     parse_draft_results,
+    parse_league_metadata,
     parse_league_settings,
     parse_league_teams,
     parse_scoreboard,
@@ -42,6 +43,10 @@ SCOREBOARD_CACHE_TTL_SECONDS = 15 * 60
 # scheduler), so 20s just means N open tabs still cost Yahoo at most one call
 # per 20s window -- respectful of Yahoo's rate limits without staling a live pick
 DRAFT_CACHE_TTL_SECONDS = 20
+# a completed historical week's roster never changes -- unlike ROSTER_CACHE_TTL_SECONDS
+# (the "current" roster, which does), so a backtest re-run over the same season
+# is effectively free after the first pass
+ROSTER_HISTORICAL_CACHE_TTL_SECONDS = 30 * 24 * 60 * 60
 
 
 class _GatewayLike(Protocol):
@@ -68,6 +73,12 @@ class YahooClient:
         )
         return parse_user_teams(raw)
 
+    def get_league_info(self, league_key: str) -> LeagueInfo:
+        # direct metadata fetch: the user_leagues listing is scoped to the
+        # current game, so historical (renew-chain) leagues need this instead
+        raw = self._gateway.get(f"league/{league_key}", SETTINGS_CACHE_TTL_SECONDS)
+        return parse_league_metadata(raw)
+
     def get_league_settings(self, league_key: str) -> LeagueSettings:
         raw = self._gateway.get(f"league/{league_key}/settings", SETTINGS_CACHE_TTL_SECONDS)
         return parse_league_settings(raw)
@@ -78,6 +89,16 @@ class YahooClient:
 
     def get_team_roster(self, team_key: str) -> list[RosterEntry]:
         raw = self._gateway.get(f"team/{team_key}/roster", ROSTER_CACHE_TTL_SECONDS)
+        return parse_team_roster(raw)
+
+    def get_team_roster_for_week(self, team_key: str, week: int) -> list[RosterEntry]:
+        # yahoo's roster resource accepts ;week=N to return that week's actual
+        # lineup, unlike get_team_roster (always "current") -- what a backtest
+        # needs to reconstruct a historical matchup's real roster; same response
+        # shape, so the existing parser is reused unchanged
+        raw = self._gateway.get(
+            f"team/{team_key}/roster;week={week}", ROSTER_HISTORICAL_CACHE_TTL_SECONDS
+        )
         return parse_team_roster(raw)
 
     def get_standings(self, league_key: str) -> list[StandingEntry]:

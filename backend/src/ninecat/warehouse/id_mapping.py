@@ -20,7 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
-from ninecat.models.warehouse import NbaPlayer, PlayerIdMap
+from ninecat.models.warehouse import DEV_POOL_NBA_PERSON_IDS, NbaPlayer, PlayerIdMap
 from ninecat.yahoo.parsers import RosterEntry
 
 # trailing generational-suffix tokens stripped during normalization, so
@@ -102,8 +102,17 @@ def map_yahoo_players(session: Session, yahoo_players: Sequence[RosterEntry]) ->
 
     # load every NbaPlayer once and index by exact + normalized name, rather
     # than a query per yahoo entry -- cheap at league-roster scale (hundreds
-    # of players), and lets ambiguity be detected as "2+ entries in a bucket"
-    all_players = session.execute(select(NbaPlayer)).scalars().all()
+    # of players), and lets ambiguity be detected as "2+ entries in a bucket".
+    # dev-seed players are excluded outright: they carry real star names, so
+    # leaving them in made every star ambiguous and silently unmatched (found
+    # live in the wp4 backtest); a real yahoo key must never map onto a fake
+    all_players = session.execute(
+        select(NbaPlayer).where(
+            ~NbaPlayer.nba_person_id.between(
+                DEV_POOL_NBA_PERSON_IDS[0], DEV_POOL_NBA_PERSON_IDS[-1]
+            )
+        )
+    ).scalars().all()
     by_full_name: dict[str, list[NbaPlayer]] = defaultdict(list)
     by_normalized: dict[str, list[NbaPlayer]] = defaultdict(list)
     for player in all_players:

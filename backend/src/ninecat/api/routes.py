@@ -28,7 +28,8 @@ from ninecat.advisor import (
     build_advisor_client,
     explain,
 )
-from ninecat.auth.routes import DEV_LEAGUE_KEY, DEV_POOL_NBA_PERSON_IDS
+from ninecat.auth.routes import DEV_LEAGUE_KEY
+from ninecat.models.warehouse import DEV_POOL_NBA_PERSON_IDS
 from ninecat.auth.sessions import SESSION_COOKIE_NAME, current_user
 from ninecat.config import get_settings
 from ninecat.db import get_session

@@ -43,6 +43,9 @@ class LeagueInfo:
     season: str
     scoring_type: str
     num_teams: int
+    # only the direct metadata fetch (parse_league_metadata) fills this; the
+    # user_leagues listing doesn't carry it. bounds the week-results backfill
+    end_week: int | None = None
 
 
 @dataclass(frozen=True)
@@ -283,6 +286,33 @@ def parse_user_leagues(raw: dict) -> list[LeagueInfo]:
                 )
 
     return leagues
+
+
+def parse_league_metadata(raw: dict) -> LeagueInfo:
+    """The merged metadata header at fantasy_content.league[0].
+
+    Every league resource (settings, scoreboard, draftresults, or the bare
+    league/{key}) carries it. Needed directly because user_leagues is scoped
+    to the CURRENT game -- a completed historical league (live-verified
+    2026-09-13: the renew-chain league) never appears there.
+    """
+    fc = _get(raw, "fantasy_content", "fantasy_content")
+    league_list = _get(fc, "league", "fantasy_content.league")
+    attrs = league_list[0] if isinstance(league_list, list) else league_list
+    attrs_path = "fantasy_content.league[0]"
+    end_week_raw = attrs.get("end_week") if isinstance(attrs, dict) else None
+    return LeagueInfo(
+        league_key=_get(attrs, "league_key", attrs_path),
+        name=_get(attrs, "name", attrs_path),
+        season=str(_get(attrs, "season", attrs_path)),
+        scoring_type=_get(attrs, "scoring_type", attrs_path),
+        num_teams=_get_int(_get(attrs, "num_teams", attrs_path), f"{attrs_path}.num_teams"),
+        end_week=(
+            _get_int(end_week_raw, f"{attrs_path}.end_week")
+            if end_week_raw not in (None, "")
+            else None
+        ),
+    )
 
 
 # --- get_league_settings ---

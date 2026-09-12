@@ -8,6 +8,7 @@ from ninecat.yahoo.client import (
     DRAFT_CACHE_TTL_SECONDS,
     LEAGUES_CACHE_TTL_SECONDS,
     ROSTER_CACHE_TTL_SECONDS,
+    ROSTER_HISTORICAL_CACHE_TTL_SECONDS,
     SCOREBOARD_CACHE_TTL_SECONDS,
     SETTINGS_CACHE_TTL_SECONDS,
     STANDINGS_CACHE_TTL_SECONDS,
@@ -149,6 +150,25 @@ def test_get_team_roster_parses_injured_and_healthy_players():
     assert jokic.injury_status is None
     assert jokic.eligible_positions == ["C"]
     assert gateway.calls == [(f"team/{TEAM_KEY}/roster", ROSTER_CACHE_TTL_SECONDS)]
+
+
+# --- get_team_roster_for_week ---
+
+
+def test_get_team_roster_for_week_composes_week_filtered_path_with_long_ttl():
+    # reuses team_roster.json (already shaped as a week-3 roster response) --
+    # only the resource path and cache TTL differ from get_team_roster
+    gateway = _StubGateway({f"team/{TEAM_KEY}/roster;week={WEEK}": _load("team_roster.json")})
+    client = YahooClient(gateway)
+
+    roster = client.get_team_roster_for_week(TEAM_KEY, WEEK)
+
+    assert len(roster) == 2
+    lebron = next(r for r in roster if r.player_key == "466.p.5583")
+    assert lebron.name == "LeBron James"
+    assert gateway.calls == [
+        (f"team/{TEAM_KEY}/roster;week={WEEK}", ROSTER_HISTORICAL_CACHE_TTL_SECONDS)
+    ]
 
 
 # --- get_standings ---

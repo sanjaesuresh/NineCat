@@ -390,9 +390,6 @@ DEV_LEAGUE_SETTINGS_JSON = asdict(_DEV_LEAGUE_SETTINGS)
 # natural-key seed data for the three roster players; nba_person_id values live
 # in a 900000+ block that no real nba_api sync will ever produce, so a dev run
 # can never collide with real warehouse data
-# the whole seeded block, exported so the api layer can keep fake players off
-# real leagues' boards while the dev league still sees its own pool
-DEV_POOL_NBA_PERSON_IDS = range(900001, 900200)
 _DEV_PLAYERS = [
     {
         "person_id": 900001,
