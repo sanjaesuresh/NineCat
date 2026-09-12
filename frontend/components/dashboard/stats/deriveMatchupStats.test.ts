@@ -56,6 +56,7 @@ function matchup(overrides: Partial<LeagueMatchupResponse> = {}): LeagueMatchupR
     opponent: side({ team_id: 2, name: "Rival Team" }),
     opponent_reason: null,
     comparison: comparison([]),
+    live_totals: null,
     schedule_coverage: coverage(),
     streaming: null,
     stale: false,

@@ -117,6 +117,27 @@ test.describe("matchup monitor", () => {
       expect(VERDICT_LABELS).toContain(verdict);
     }
 
+    // --- live totals: the dev league's seeded scoreboard cache feeds
+    // live_totals, so every one of the 9 rows gets a "Live <value>"
+    // annotation under both projected numbers -- never a bare dash-only
+    // annotation, since the dev fixture reports a real value per side/category
+    const liveMineTexts = (
+      await board.locator("tbody tr td:nth-child(2)").allInnerTexts()
+    ).map((t) => t.trim());
+    const liveTheirsTexts = (
+      await board.locator("tbody tr td:nth-child(3)").allInnerTexts()
+    ).map((t) => t.trim());
+    expect(liveMineTexts).toHaveLength(9);
+    expect(liveTheirsTexts).toHaveLength(9);
+    for (const cellText of [...liveMineTexts, ...liveTheirsTexts]) {
+      const liveMatch = cellText.match(/Live (.+)$/);
+      expect(liveMatch).not.toBeNull();
+      const liveValue = liveMatch![1].trim();
+      // plausible non-empty value: a number (optionally with a trailing "%"),
+      // never the empty-unknown dash for this fixture, which reports every category
+      expect(liveValue).toMatch(/^\d+(\.\d+)?%?$/);
+    }
+
     // --- focus categories section renders (populated or the honest empty state)
     const focusSection = page.locator("section:has(#focus-heading)");
     await expect(focusSection).toBeVisible();

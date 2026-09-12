@@ -112,6 +112,22 @@ export interface MatchupComparisonResult {
   focus: string[];
 }
 
+export interface LiveCategoryTotal {
+  category: string;
+  // yahoo's real, currently-accruing count for this category so far this
+  // week -- null means yahoo hasn't reported this stat yet, NEVER render as 0
+  mine: number | null;
+  theirs: number | null;
+}
+
+// distinct from MatchupComparisonResult: that's the PROJECTED weekly totals,
+// this is yahoo's live scoreboard as of the last sync
+export interface LiveTotals {
+  // canonical CATEGORIES order, filtered to whatever the league's synced
+  // settings actually track
+  categories: LiveCategoryTotal[];
+}
+
 export interface ScheduleCoverage {
   mine_games: number;
   opponent_games: number | null;
@@ -164,6 +180,9 @@ export interface LeagueMatchupResponse extends Explained {
   opponent_reason: string | null;
   // null whenever opponent is null -- a comparison needs both sides
   comparison: MatchupComparisonResult | null;
+  // null when there's no opponent/matchup this week, or the league's
+  // settings never synced categories -- see LiveTotals for the shape
+  live_totals: LiveTotals | null;
   schedule_coverage: ScheduleCoverage;
   // null whenever opponent is null -- close_categories has no meaning without one
   streaming: StreamingPlan | null;

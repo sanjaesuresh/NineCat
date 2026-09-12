@@ -1,4 +1,4 @@
-import type { MatchupSide, MatchupComparisonResult } from "@/lib/api";
+import type { MatchupSide, MatchupComparisonResult, LiveTotals } from "@/lib/api";
 import { CATEGORIES } from "@/components/categories";
 import { CONTRACT_KEY_BY_LABEL } from "@/components/dashboard/categoryKeys";
 import VerdictBadge from "./VerdictBadge";
@@ -18,13 +18,22 @@ export default function ProjectedScoreboard({
   mine,
   opponent,
   comparison,
+  liveTotals,
 }: {
   mine: MatchupSide;
   opponent: MatchupSide;
   comparison: MatchupComparisonResult;
+  // null whenever yahoo has no live matchup to report -- see per-row handling below
+  liveTotals: LiveTotals | null;
 }) {
   const [mineWins, theirWins] = comparison.projected_score;
   const byCategory = new Map(comparison.categories.map((cv) => [cv.category, cv]));
+  // null (not an empty map) when there's nothing live to show, so the render
+  // below can gate the whole annotation on "live !== null" and add zero markup
+  // when live_totals is null -- exactly today's rendering, no dash-only noise
+  const liveByCategory = liveTotals
+    ? new Map(liveTotals.categories.map((row) => [row.category, row]))
+    : null;
 
   return (
     <div>
@@ -111,14 +120,28 @@ export default function ProjectedScoreboard({
             {CATEGORIES.map((label) => {
               const key = CONTRACT_KEY_BY_LABEL[label];
               const cv = byCategory.get(key);
+              // undefined (category missing from yahoo's live payload) reads
+              // identically to a per-side null below -- formatCategoryTotal
+              // already renders both as the "—" unknown marker, never a 0
+              const live = liveByCategory?.get(key);
               return (
                 <tr key={label} className="border-b border-rule last:border-b-0">
                   <td className={`px-3 py-2 ${uiTextClasses("muted")}`}>{label}</td>
                   <td className={`border-l border-rule px-3 py-2 text-right ${numericClasses()}`}>
-                    {cv ? formatCategoryTotal(label, cv.mine) : "—"}
+                    <div>{cv ? formatCategoryTotal(label, cv.mine) : "—"}</div>
+                    {liveByCategory && (
+                      <div className={`mt-0.5 ${captionClasses()}`}>
+                        Live {formatCategoryTotal(label, live?.mine)}
+                      </div>
+                    )}
                   </td>
                   <td className={`border-l border-rule px-3 py-2 text-right ${numericClasses()}`}>
-                    {cv ? formatCategoryTotal(label, cv.theirs) : "—"}
+                    <div>{cv ? formatCategoryTotal(label, cv.theirs) : "—"}</div>
+                    {liveByCategory && (
+                      <div className={`mt-0.5 ${captionClasses()}`}>
+                        Live {formatCategoryTotal(label, live?.theirs)}
+                      </div>
+                    )}
                   </td>
                   <td className="border-l border-rule px-3 py-2">
                     <VerdictBadge verdict={cv?.verdict} />

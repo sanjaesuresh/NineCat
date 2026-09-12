@@ -190,7 +190,12 @@ function MatchupContent({
         )}
         {blockedReason === "no_schedule" && <ScheduleCoverageNotice coverage={coverage} />}
         {canCompare && opponent && comparison && (
-          <ProjectedScoreboard mine={matchup.mine} opponent={opponent} comparison={comparison} />
+          <ProjectedScoreboard
+            mine={matchup.mine}
+            opponent={opponent}
+            comparison={comparison}
+            liveTotals={matchup.live_totals}
+          />
         )}
         {blockedReason === null && !canCompare && (
           <ErrorState
