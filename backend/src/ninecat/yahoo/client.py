@@ -12,6 +12,7 @@ from typing import Protocol
 
 from ninecat.yahoo.parsers import (
     DraftResultsPage,
+    FreeAgentEntry,
     LeagueInfo,
     LeagueSettings,
     Matchup,
@@ -21,6 +22,7 @@ from ninecat.yahoo.parsers import (
     UserTeamInfo,
     parse_draft_results,
     parse_league_metadata,
+    parse_league_players,
     parse_league_settings,
     parse_league_teams,
     parse_scoreboard,
@@ -47,6 +49,16 @@ DRAFT_CACHE_TTL_SECONDS = 20
 # (the "current" roster, which does), so a backtest re-run over the same season
 # is effectively free after the first pass
 ROSTER_HISTORICAL_CACHE_TTL_SECONDS = 30 * 24 * 60 * 60
+# free agency moves at daily scale, not by the minute (unlike ROSTER_CACHE_TTL_SECONDS's
+# hour) -- this is a nightly-scan resource, so a several-hour TTL is plenty fresh
+FREE_AGENTS_CACHE_TTL_SECONDS = 6 * 60 * 60
+# yahoo's league players collection pages 25 at a time; this is yahoo's own page size,
+# not a tunable choice
+FREE_AGENTS_PAGE_SIZE = 25
+# a pre-draft league's "all available" pool is close to the entire player universe --
+# hundreds of pages -- and this is a background sync, not a UI wait, but it still must
+# not be able to loop forever against a misbehaving/mocked gateway
+FREE_AGENTS_MAX_PAGES = 40
 
 
 class _GatewayLike(Protocol):
@@ -118,3 +130,28 @@ class YahooClient:
     def get_draft_results(self, league_key: str) -> DraftResultsPage:
         raw = self._gateway.get(f"league/{league_key}/draftresults", DRAFT_CACHE_TTL_SECONDS)
         return parse_draft_results(raw)
+
+    def get_league_players(self, league_key: str, status: str = "A") -> list[FreeAgentEntry]:
+        """Walks the league players collection filtered by availability
+        status, returning every entry across all pages.
+
+        status="A" is yahoo's own "all available" filter (FA + waivers
+        combined); ;out=ownership is what actually distinguishes the two per
+        player (see parse_league_players). Yahoo exposes no total-count
+        header here, so pages are walked until one comes back short of a
+        full page (the last page) or empty, bounded by FREE_AGENTS_MAX_PAGES
+        regardless so a misbehaving gateway can't loop forever.
+        """
+        entries: list[FreeAgentEntry] = []
+        for page in range(FREE_AGENTS_MAX_PAGES):
+            start = page * FREE_AGENTS_PAGE_SIZE
+            path = (
+                f"league/{league_key}/players"
+                f";status={status};start={start};count={FREE_AGENTS_PAGE_SIZE};out=ownership"
+            )
+            raw = self._gateway.get(path, FREE_AGENTS_CACHE_TTL_SECONDS)
+            page_entries = parse_league_players(raw)
+            entries.extend(page_entries)
+            if len(page_entries) < FREE_AGENTS_PAGE_SIZE:
+                break
+        return entries

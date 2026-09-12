@@ -6,14 +6,20 @@ from datetime import datetime, timezone
 
 from apscheduler.schedulers.base import BaseScheduler
 from apscheduler.triggers.cron import CronTrigger
+from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
+from ninecat.auth.routes import DEV_LEAGUE_KEY
 from ninecat.config import get_settings
 from ninecat.db import get_engine
+from ninecat.models import League, Team, YahooToken
 from ninecat.models.jobs import JobRun
+from ninecat.sync.free_agents import sync_league_free_agents
 from ninecat.warehouse.nba_schedule import sync_schedule
 from ninecat.warehouse.player_positions import sync_player_index, sync_player_positions
 from ninecat.warehouse.player_stats import sync_player_averages
+from ninecat.yahoo.client import YahooClient
+from ninecat.yahoo.gateway import YahooGateway
 
 logger = logging.getLogger(__name__)
 
@@ -86,16 +92,68 @@ def run_job(job_name: str, fn: Callable[[Session], None]) -> None:
         session.close()
 
 
+def _leagues_with_yahoo_user(session: Session) -> list[tuple[League, int]]:
+    """One (league, user_id) pair per real (non-dev) league that has at least
+    one linked user with a stored yahoo token.
+
+    Any such user's client can sync the league-wide free-agent snapshot --
+    it's not user-scoped data -- so the first linked user found per league is
+    used rather than syncing the same league once per user who happens to
+    share it. The dev league is excluded: it has no real yahoo data behind it.
+    """
+    rows = session.execute(
+        select(League, Team.user_id)
+        .join(Team, Team.league_id == League.id)
+        .join(YahooToken, YahooToken.user_id == Team.user_id)
+        .where(League.yahoo_league_key != DEV_LEAGUE_KEY)
+    ).all()
+    by_league_id: dict[int, tuple[League, int]] = {}
+    for league, user_id in rows:
+        by_league_id.setdefault(league.id, (league, user_id))
+    return list(by_league_id.values())
+
+
+def _sync_free_agents(session: Session) -> None:
+    """Refresh the free-agent snapshot for every real league with a live
+    yahoo link.
+
+    Wrapped per-league (not just once for the whole step, unlike the other
+    steps above): this genuinely loops over many independent leagues, so one
+    league's gateway failure (a revoked token, a yahoo outage) must not stop
+    the scan of every other league.
+    """
+    for league, user_id in _leagues_with_yahoo_user(session):
+        try:
+            client = YahooClient(YahooGateway(session, user_id))
+            result = sync_league_free_agents(session, client, league)
+            logger.info(
+                "sync_free_agents league=%s wrote %d (%d unmapped)",
+                league.yahoo_league_key,
+                result.wrote,
+                result.unmapped,
+            )
+        except Exception:
+            logger.exception(
+                "nightly_warehouse_sync: sync_free_agents failed for league=%s, continuing",
+                league.yahoo_league_key,
+            )
+
+
 def nightly_warehouse_sync(session: Session) -> None:
-    """Sync the current season's NBA schedule, then player averages, then positions.
+    """Sync the current season's NBA schedule, then player averages, then
+    positions, then every real league's free-agent snapshot.
 
     Order matters twice over: sync_player_averages links each player to the
     NbaTeam row sync_schedule creates, so the schedule must be synced first;
-    and sync_player_positions runs LAST so any player the averages sync just
-    created gets a position in the same run rather than waiting a full day.
-    A position-sync failure is caught here (not left to propagate to run_job)
-    so it can't roll back the schedule/averages work that already succeeded --
-    it's logged and the job still reports success.
+    and sync_player_positions runs before free agents so a rookie free agent
+    created this same run already has a position by the time the snapshot
+    write needs one. free_agents runs LAST -- it's the only step scoped to
+    individual leagues rather than the whole warehouse, and depends on
+    everything above (schedule/averages/positions) already existing for
+    id-mapping and stat-basis purposes downstream. A position-sync failure is
+    caught here (not left to propagate to run_job) so it can't roll back the
+    schedule/averages work that already succeeded -- it's logged and the job
+    still reports success.
 
     Each step's row count is logged at INFO, always (not just on zero) --
     JobRun itself only tracks running/success/failed, and `fn` here has no
@@ -143,6 +201,13 @@ def nightly_warehouse_sync(session: Session) -> None:
         logger.exception(
             "nightly_warehouse_sync: sync_player_positions failed, continuing"
         )
+    # non-fatal at the step level too (see module docstring); _sync_free_agents
+    # itself is already non-fatal per-league, so this only guards against a
+    # failure in the league-selection query itself (e.g. the db going away)
+    try:
+        _sync_free_agents(session)
+    except Exception:
+        logger.exception("nightly_warehouse_sync: sync_free_agents step failed, continuing")
 
 
 def register_jobs(scheduler: BaseScheduler) -> BaseScheduler:

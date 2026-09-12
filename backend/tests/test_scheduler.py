@@ -11,6 +11,7 @@ second fresh session opened the same way to both verify and clean up.
 """
 
 import logging
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -28,7 +29,8 @@ from ninecat.config import get_settings
 from ninecat.db import get_engine
 from ninecat.jobs.scheduler import nightly_warehouse_sync, register_jobs, run_job
 from ninecat.main import create_app
-from ninecat.models import JobRun, NbaTeam
+from ninecat.models import JobRun, League, NbaTeam, Team, User, YahooToken
+from ninecat.sync.free_agents import FreeAgentSyncResult
 from ninecat.warehouse.player_positions import PositionSyncResult
 
 
@@ -384,6 +386,149 @@ def test_nightly_warehouse_sync_position_sync_failure_is_non_fatal(monkeypatch, 
     finally:
         _cleanup_job_run(job_name)
         _cleanup_nba_team(nba_team_id)
+
+
+# --- sync_free_agents step (WP5) ---
+
+
+def _stub_first_four_steps(monkeypatch, calls: list[str] | None = None) -> None:
+    """Stubs schedule/averages/index/positions to no-ops (optionally recording
+    into `calls`), isolating a test to just the free-agents step."""
+    record = (lambda name: calls.append(name)) if calls is not None else (lambda name: None)
+    monkeypatch.setattr(
+        "ninecat.jobs.scheduler.sync_schedule", lambda session, season: record("schedule") or 0
+    )
+    monkeypatch.setattr(
+        "ninecat.jobs.scheduler.sync_player_averages",
+        lambda session, season: record("averages") or 0,
+    )
+    monkeypatch.setattr(
+        "ninecat.jobs.scheduler.sync_player_index", lambda session, season: record("index") or 0
+    )
+    monkeypatch.setattr(
+        "ninecat.jobs.scheduler.sync_player_positions",
+        lambda session, season: record("positions") or PositionSyncResult(),
+    )
+
+
+def test_nightly_warehouse_sync_runs_free_agents_last(monkeypatch):
+    calls: list[str] = []
+    _stub_first_four_steps(monkeypatch, calls)
+    league = SimpleNamespace(id=1, yahoo_league_key="466.l.99")
+    monkeypatch.setattr(
+        "ninecat.jobs.scheduler._leagues_with_yahoo_user", lambda session: [(league, 7)]
+    )
+    monkeypatch.setattr(
+        "ninecat.jobs.scheduler.sync_league_free_agents",
+        lambda session, client, lg: calls.append("free_agents")
+        or FreeAgentSyncResult(fetched=1, wrote=1, unmapped=0),
+    )
+
+    nightly_warehouse_sync(session=object())
+
+    # free_agents runs after positions -- it's the only step scoped to
+    # individual leagues, and depends on everything above already existing
+    assert calls == ["schedule", "averages", "index", "positions", "free_agents"]
+
+
+def test_nightly_warehouse_sync_logs_free_agent_counts_per_league(monkeypatch, caplog):
+    _stub_first_four_steps(monkeypatch)
+    league = SimpleNamespace(id=1, yahoo_league_key="466.l.99")
+    monkeypatch.setattr(
+        "ninecat.jobs.scheduler._leagues_with_yahoo_user", lambda session: [(league, 7)]
+    )
+    monkeypatch.setattr(
+        "ninecat.jobs.scheduler.sync_league_free_agents",
+        lambda session, client, lg: FreeAgentSyncResult(fetched=10, wrote=8, unmapped=2),
+    )
+
+    with caplog.at_level(logging.INFO, logger="ninecat.jobs.scheduler"):
+        nightly_warehouse_sync(session=object())
+
+    assert "sync_free_agents league=466.l.99 wrote 8 (2 unmapped)" in caplog.text
+
+
+def test_nightly_warehouse_sync_free_agents_failure_for_one_league_is_non_fatal(
+    monkeypatch, caplog
+):
+    """One league's sync raising must not stop the scan of the others, and
+    must not fail the job -- mirrors sync_player_index's own non-fatal rule,
+    but per-league since this step genuinely loops over many leagues."""
+    _stub_first_four_steps(monkeypatch)
+    boom_league = SimpleNamespace(id=1, yahoo_league_key="466.l.boom")
+    ok_league = SimpleNamespace(id=2, yahoo_league_key="466.l.ok")
+    monkeypatch.setattr(
+        "ninecat.jobs.scheduler._leagues_with_yahoo_user",
+        lambda session: [(boom_league, 7), (ok_league, 8)],
+    )
+
+    synced: list[str] = []
+
+    def _sync(session, client, lg):
+        if lg.yahoo_league_key == "466.l.boom":
+            raise RuntimeError("boom-free-agents")
+        synced.append(lg.yahoo_league_key)
+        return FreeAgentSyncResult(fetched=0, wrote=0, unmapped=0)
+
+    monkeypatch.setattr("ninecat.jobs.scheduler.sync_league_free_agents", _sync)
+
+    with caplog.at_level(logging.ERROR, logger="ninecat.jobs.scheduler"):
+        nightly_warehouse_sync(session=object())  # must not raise
+
+    assert "boom-free-agents" in caplog.text
+    assert synced == ["466.l.ok"]
+
+
+def test_leagues_with_yahoo_user_skips_dev_league_and_dedupes_by_league(db_session):
+    """_leagues_with_yahoo_user must exclude the dev league (no real yahoo
+    data behind it) and return exactly one (league, user_id) pair even when
+    two linked users share the same real league."""
+    from ninecat.auth.routes import DEV_LEAGUE_KEY
+    from ninecat.jobs.scheduler import _leagues_with_yahoo_user
+
+    def _seed_user_with_token(guid: str) -> User:
+        user = User(yahoo_guid=guid, display_name=guid)
+        db_session.add(user)
+        db_session.flush()
+        db_session.add(
+            YahooToken(
+                user_id=user.id,
+                encrypted_refresh_token="enc",
+                access_token_expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+            )
+        )
+        db_session.flush()
+        return user
+
+    real_league = League(
+        yahoo_league_key="466.l.real", name="Real League", season=2026, num_teams=2,
+        scoring_type="head", settings_json={},
+    )  # fmt: skip
+    dev_league = League(
+        yahoo_league_key=DEV_LEAGUE_KEY, name="Dev League", season=2026, num_teams=2,
+        scoring_type="head", settings_json={},
+    )  # fmt: skip
+    db_session.add_all([real_league, dev_league])
+    db_session.flush()
+
+    user_a = _seed_user_with_token("guid-fa-a")
+    user_b = _seed_user_with_token("guid-fa-b")
+    dev_user = _seed_user_with_token("guid-fa-dev")
+    db_session.add_all(
+        [
+            Team(league_id=real_league.id, yahoo_team_key="466.l.real.t.1", name="A", user_id=user_a.id),
+            Team(league_id=real_league.id, yahoo_team_key="466.l.real.t.2", name="B", user_id=user_b.id),
+            Team(league_id=dev_league.id, yahoo_team_key=f"{DEV_LEAGUE_KEY}.t.1", name="Dev", user_id=dev_user.id),
+        ]
+    )  # fmt: skip
+    db_session.flush()
+
+    pairs = _leagues_with_yahoo_user(db_session)
+
+    assert len(pairs) == 1
+    league, user_id = pairs[0]
+    assert league.yahoo_league_key == "466.l.real"
+    assert user_id in (user_a.id, user_b.id)
 
 
 # --- scheduler_enabled gate ---

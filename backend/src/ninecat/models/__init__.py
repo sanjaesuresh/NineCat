@@ -3,6 +3,7 @@ from ninecat.models.cache import YahooApiCache
 from ninecat.models.core import (
     FantasyWeek,
     League,
+    LeagueFreeAgent,
     RosterSlot,
     Standing,
     Team,
@@ -25,6 +26,7 @@ __all__ = [
     "FantasyWeek",
     "JobRun",
     "League",
+    "LeagueFreeAgent",
     "NbaGame",
     "NbaPlayer",
     "NbaTeam",

@@ -5,8 +5,10 @@ import { describe, expect, it } from "vitest";
 import { CONTRACT_KEY_BY_LABEL, categoryLabelOrGap } from "@/components/dashboard/categoryKeys";
 import {
   OPPONENT_REASON_TOKENS,
+  POOL_BASIS_TOKENS,
   STATIC_REASON_TOKENS,
   describeOpponentReason,
+  describePoolBasisNote,
   describeReason,
 } from "./tokens";
 
@@ -65,6 +67,33 @@ describe("describeOpponentReason", () => {
   });
 });
 
+describe("describePoolBasisNote", () => {
+  it("translates both known bases and never leaks the raw token", () => {
+    for (const token of POOL_BASIS_TOKENS) {
+      const text = describePoolBasisNote(token, "2025-12-01T00:00:00Z");
+      expect(text).not.toContain("Unrecognized");
+      expect(text).not.toContain("live_free_agents");
+      expect(text).not.toContain("draftable_pool");
+    }
+  });
+
+  it("flags an unknown basis instead of silently guessing", () => {
+    expect(describePoolBasisNote("brand_new_basis", null)).toContain("Unrecognized pool basis");
+  });
+
+  it("folds in the free-agent sync time only on the live basis", () => {
+    const live = describePoolBasisNote("live_free_agents", "2025-12-01T00:00:00Z");
+    expect(live).toContain("real free-agent list");
+    expect(live).not.toContain("never"); // formatSyncedAt's null fallback shouldn't leak in with a real timestamp
+
+    // draftable_pool never carries a sync time (free_agents_synced_at is
+    // always null on that basis) -- the copy must not reference one at all
+    const demo = describePoolBasisNote("draftable_pool", null);
+    expect(demo).toContain("demo pool");
+    expect(demo).not.toContain("synced");
+  });
+});
+
 describe("cross-language contract", () => {
   // the Adds token vocabulary spans two backend modules; without this pin a
   // reworded token falls through to the "Unrecognized" fallback silently.
@@ -75,5 +104,6 @@ describe("cross-language contract", () => {
 
     const routes = backendSource("src/ninecat/api/routes.py");
     for (const token of OPPONENT_REASON_TOKENS) expect(routes).toContain(`"${token}"`);
+    for (const token of POOL_BASIS_TOKENS) expect(routes).toContain(`"${token}"`);
   });
 });

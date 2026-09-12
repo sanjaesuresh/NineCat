@@ -9,6 +9,7 @@
 // token humanized into fluent-looking copy) has shipped twice in this
 // project already.
 import { LABEL_BY_CONTRACT_KEY } from "@/components/dashboard/categoryKeys";
+import { formatSyncedAt } from "@/components/dashboard/format";
 
 // AddsCandidate.reasons' two non-category tokens (engine.waivers
 // REASON_SCHEDULE_DRIVEN / REASON_SEASON_AVERAGE_FALLBACK). "category:<key>"
@@ -83,4 +84,34 @@ function isOpponentReasonToken(token: string): token is OpponentReasonToken {
 export function describeOpponentReason(token: string): string {
   if (isOpponentReasonToken(token)) return OPPONENT_REASON_LABEL[token];
   return `Unrecognized status (${token}) — this note needs a translation.`;
+}
+
+// LeagueAddsResponse.pool_basis (WP5, backend/src/ninecat/api/routes.py's
+// _league_free_agent_snapshot) -- which pool the candidates list above was
+// actually drawn from. Explicit union for the same reason as every other
+// token map here: a new basis landing on the backend must fail to compile,
+// not silently render as one of these two.
+export const POOL_BASIS_TOKENS = ["live_free_agents", "draftable_pool"] as const;
+type PoolBasisToken = (typeof POOL_BASIS_TOKENS)[number];
+
+function isPoolBasisToken(token: string): token is PoolBasisToken {
+  return (POOL_BASIS_TOKENS as readonly string[]).includes(token);
+}
+
+/**
+ * One-line disclosure of where the candidate list came from. Pure (no JSX)
+ * so it's unit-testable directly and PoolBasisNotice.tsx stays a thin
+ * wrapper -- same split as describeReason/describeOpponentReason above.
+ * Never renders the raw "live_free_agents"/"draftable_pool" tokens.
+ * freeAgentsSyncedAt only matters on the live branch -- draftable_pool has
+ * no free-agent sync to date, so the caller passes null there.
+ */
+export function describePoolBasisNote(poolBasis: string, freeAgentsSyncedAt: string | null): string {
+  if (!isPoolBasisToken(poolBasis)) {
+    return `Unrecognized pool basis (${poolBasis}) — this disclosure needs a translation.`;
+  }
+  if (poolBasis === "live_free_agents") {
+    return `Candidates come from the league's real free-agent list, synced ${formatSyncedAt(freeAgentsSyncedAt)}.`;
+  }
+  return "Candidates come from a seeded demo pool of draftable players, not the league's real free-agent list.";
 }

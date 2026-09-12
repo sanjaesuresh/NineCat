@@ -6,6 +6,9 @@ import pytest
 
 from ninecat.yahoo.client import (
     DRAFT_CACHE_TTL_SECONDS,
+    FREE_AGENTS_CACHE_TTL_SECONDS,
+    FREE_AGENTS_MAX_PAGES,
+    FREE_AGENTS_PAGE_SIZE,
     LEAGUES_CACHE_TTL_SECONDS,
     ROSTER_CACHE_TTL_SECONDS,
     ROSTER_HISTORICAL_CACHE_TTL_SECONDS,
@@ -104,6 +107,108 @@ def test_get_league_settings_parses_nine_categories_to_flagged_negative_and_posi
     il_plus = next(rp for rp in settings.roster_positions if rp.position == "IL+")
     assert il_plus.count == 2
     assert gateway.calls == [(f"league/{LEAGUE_KEY}/settings", SETTINGS_CACHE_TTL_SECONDS)]
+
+
+# --- get_league_players (free agents / waivers) ---
+
+
+def _players_page_raw(count: int, start: int) -> dict:
+    """One page's worth of a league/players response, `count` distinct
+    players numbered from `start` -- mirrors the real shape parse_league_players
+    expects (attrs as a list of single-key dicts, ownership as a trailing
+    sibling list element), without hand-writing 25 near-identical fixture rows."""
+    players = []
+    for i in range(count):
+        player_key = f"{LEAGUE_KEY.split('.')[0]}.p.{start + i}"
+        players.append(
+            {
+                "player": [
+                    [
+                        {"player_key": player_key},
+                        {"name": {"full": f"Free Agent {start + i}"}},
+                        {"editorial_team_abbr": "MIA"},
+                        {"eligible_positions": [{"position": "PG"}]},
+                    ],
+                    {"ownership": [{"ownership_type": "freeagents"}]},
+                ]
+            }
+        )
+    return {
+        "fantasy_content": {
+            "league": [{"league_key": LEAGUE_KEY}, {"players": players}]
+        }
+    }
+
+
+def test_get_league_players_walks_pages_and_stops_on_a_short_page():
+    # a full first page (25) triggers a second fetch; a short second page (10)
+    # stops the walk there rather than fetching a third, empty one
+    gateway = _StubGateway(
+        {
+            f"league/{LEAGUE_KEY}/players;status=A;start=0;count=25;out=ownership": _players_page_raw(
+                FREE_AGENTS_PAGE_SIZE, 0
+            ),
+            f"league/{LEAGUE_KEY}/players;status=A;start=25;count=25;out=ownership": _players_page_raw(
+                10, 25
+            ),
+        }
+    )
+    client = YahooClient(gateway)
+
+    entries = client.get_league_players(LEAGUE_KEY)
+
+    assert len(entries) == FREE_AGENTS_PAGE_SIZE + 10
+    assert entries[0].player_key == f"{LEAGUE_KEY.split('.')[0]}.p.0"
+    assert entries[-1].player_key == f"{LEAGUE_KEY.split('.')[0]}.p.34"
+    assert gateway.calls == [
+        (
+            f"league/{LEAGUE_KEY}/players;status=A;start=0;count=25;out=ownership",
+            FREE_AGENTS_CACHE_TTL_SECONDS,
+        ),
+        (
+            f"league/{LEAGUE_KEY}/players;status=A;start=25;count=25;out=ownership",
+            FREE_AGENTS_CACHE_TTL_SECONDS,
+        ),
+    ]
+
+
+def test_get_league_players_stops_at_zero_entries_without_an_extra_call():
+    gateway = _StubGateway(
+        {
+            f"league/{LEAGUE_KEY}/players;status=A;start=0;count=25;out=ownership": _players_page_raw(
+                0, 0
+            )
+        }
+    )
+    client = YahooClient(gateway)
+
+    entries = client.get_league_players(LEAGUE_KEY)
+
+    assert entries == []
+    assert len(gateway.calls) == 1
+
+
+class _AlwaysFullPageGateway:
+    """A gateway stub that always returns a full (never-short) page -- proves
+    the walk is bounded even when nothing ever signals "last page"."""
+
+    def __init__(self):
+        self.call_count = 0
+
+    def get(self, resource_path: str, cache_ttl_seconds: int) -> dict:
+        self.call_count += 1
+        start = self.call_count * FREE_AGENTS_PAGE_SIZE  # arbitrary, unused by the fixture
+        return _players_page_raw(FREE_AGENTS_PAGE_SIZE, start)
+
+
+def test_get_league_players_is_bounded_by_max_pages_even_without_a_short_page():
+    gateway = _AlwaysFullPageGateway()
+    client = YahooClient(gateway)
+
+    entries = client.get_league_players(LEAGUE_KEY)
+
+    assert gateway.call_count == FREE_AGENTS_MAX_PAGES
+    assert len(entries) == FREE_AGENTS_MAX_PAGES * FREE_AGENTS_PAGE_SIZE
 
 
 # --- get_league_teams ---

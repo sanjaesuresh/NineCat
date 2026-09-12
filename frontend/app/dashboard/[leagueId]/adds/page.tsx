@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import {
   getLeagueAdds,
   refreshLeague,
+  postAddsRefresh,
   isUnauthorized,
   ApiError,
   type LeagueAddsResponse,
@@ -18,6 +19,7 @@ import WeekDateLine from "@/components/dashboard/WeekDateLine";
 import ExplanationsNotice from "@/components/dashboard/advisor/ExplanationsNotice";
 import RankingBasis from "@/components/dashboard/adds/RankingBasis";
 import AddsTable from "@/components/dashboard/adds/AddsTable";
+import PoolBasisNotice from "@/components/dashboard/adds/PoolBasisNotice";
 import PageHeader from "@/components/dashboard/layout/PageHeader";
 import Panel from "@/components/dashboard/layout/Panel";
 import StatRow from "@/components/dashboard/layout/StatRow";
@@ -94,6 +96,14 @@ export default function AddsPage() {
     await load();
   }
 
+  // separate from handleRefresh above: this resyncs Yahoo's free-agent
+  // snapshot specifically (a different backend endpoint/resource), not the
+  // general league sync StaleBanner triggers, so it gets its own action
+  async function handleRefreshFreeAgents() {
+    await postAddsRefresh(leagueId);
+    await load();
+  }
+
   return (
     <main className="min-w-0 w-full">
       <PageHeader title="Adds" />
@@ -131,7 +141,13 @@ export default function AddsPage() {
           </Panel>
         )}
 
-        {status === "ready" && adds && <AddsContent adds={adds} onRefresh={handleRefresh} />}
+        {status === "ready" && adds && (
+          <AddsContent
+            adds={adds}
+            onRefresh={handleRefresh}
+            onRefreshFreeAgents={handleRefreshFreeAgents}
+          />
+        )}
       </div>
     </main>
   );
@@ -140,9 +156,11 @@ export default function AddsPage() {
 function AddsContent({
   adds,
   onRefresh,
+  onRefreshFreeAgents,
 }: {
   adds: LeagueAddsResponse;
   onRefresh: () => Promise<void>;
+  onRefreshFreeAgents: () => Promise<void>;
 }) {
   const windowDirection = describeWindowDirection(
     adds.as_of,
@@ -158,6 +176,16 @@ function AddsContent({
       {adds.stale && <StaleBanner syncedAt={adds.synced_at} onRefresh={onRefresh} />}
 
       <WeekDateLine week={adds.week} weekRange={adds.week_range} asOf={adds.as_of} />
+
+      {/* unconditional, above the schedule_coverage branch below: this must
+          still read correctly whether that branch renders the ranked table,
+          the schedule-coverage notice, or (live basis, pre-season) zero
+          candidates -- none of those are the pool-basis disclosure's concern */}
+      <PoolBasisNotice
+        poolBasis={adds.pool_basis}
+        freeAgentsSyncedAt={adds.free_agents_synced_at}
+        onRefresh={onRefreshFreeAgents}
+      />
 
       {/* schedule_coverage.ok false means this roster's (and/or the
           opponent's) games for the week couldn't be counted. It gates BOTH

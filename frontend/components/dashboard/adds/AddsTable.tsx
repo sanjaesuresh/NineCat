@@ -19,8 +19,9 @@ import { describeReason } from "./tokens";
  * Ranked free-agent candidates. Follows BigBoardTable's table conventions
  * exactly (overflow wrapper + relative, min-w, border-b-2 header, monospace
  * reserved for the numeric columns, sr-only caption, SZN AVG badge for
- * stat_basis fallback) so this reads as the same box-score motif as the draft
- * board rather than a new pattern.
+ * stat_basis fallback, same badge reused for a live-basis "Waivers" tag) so
+ * this reads as the same box-score motif as the draft board rather than a
+ * new pattern.
  *
  * An empty `candidates` array is a real, deliberately-designed answer here
  * (see AddsCandidate/score_waiver_candidates: a candidate that doesn't
@@ -147,6 +148,13 @@ export default function AddsTable({
                       {candidate.stat_basis === "season_average" && (
                         <span className={`border border-rule px-1.5 py-0.5 ${eyebrowClasses()}`}>
                           SZN AVG
+                        </span>
+                      )}
+                      {/* only meaningful on the live_free_agents basis -- Yahoo's own
+                          "W" (waivers, not immediately addable) vs "FA" (free agent) */}
+                      {candidate.waiver_status === "W" && (
+                        <span className={`border border-rule px-1.5 py-0.5 ${eyebrowClasses()}`}>
+                          Waivers
                         </span>
                       )}
                     </span>

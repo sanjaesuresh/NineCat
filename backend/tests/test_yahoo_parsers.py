@@ -14,6 +14,7 @@ from pathlib import Path
 from ninecat.yahoo.parsers import (
     parse_draft_results,
     parse_league_metadata,
+    parse_league_players,
     parse_scoreboard,
     parse_standings,
     parse_user_teams,
@@ -267,3 +268,95 @@ def test_parse_league_metadata_tolerates_missing_end_week():
         }
     }
     assert parse_league_metadata(raw).end_week is None
+
+
+# --- parse_league_players (free agents / waivers) ---
+
+
+def _player_node(player_key: str, name: str, ownership: dict | None = None) -> dict:
+    """One league/players entry, structurally matching real yahoo's shape
+    (live-verified 2026-09-13): attrs as a list of single-key dicts, and
+    ownership (when present) as a trailing sibling whose value is a PLAIN
+    dict -- {"ownership": {"ownership_type": "freeagents"}} -- not another
+    single-key-dict list like team/player attrs."""
+    attrs = [
+        {"player_key": player_key},
+        {"player_id": player_key.split(".")[-1]},
+        {"name": {"full": name}},
+        {"editorial_team_abbr": "MIA"},
+        {"eligible_positions": [{"position": "PG"}]},
+    ]
+    player: list = [attrs]
+    if ownership is not None:
+        player.append({"ownership": dict(ownership)})
+    return {"player": player}
+
+
+def _raw_with_players(players: list[dict]) -> dict:
+    return {
+        "fantasy_content": {
+            "league": [
+                {"league_key": "466.l.12345", "name": "Nine Cat Nation"},
+                {"players": players},
+            ]
+        }
+    }
+
+
+def test_parse_league_players_reads_free_agent_and_waiver_status():
+    raw = _raw_with_players(
+        [
+            _player_node("466.p.9001", "Bench Guy A", ownership={"ownership_type": "freeagents"}),
+            _player_node(
+                "466.p.9002",
+                "Bench Guy B",
+                ownership={"ownership_type": "waivers", "waiver_date": "2026-09-20"},
+            ),
+        ]
+    )
+
+    entries = parse_league_players(raw)
+
+    assert len(entries) == 2
+    assert entries[0].player_key == "466.p.9001"
+    assert entries[0].name == "Bench Guy A"
+    assert entries[0].status == "FA"
+    assert entries[0].waiver_date is None
+    assert entries[0].eligible_positions == ["PG"]
+    assert entries[1].status == "W"
+    assert entries[1].waiver_date == date(2026, 9, 20)
+
+
+def test_parse_league_players_defaults_to_fa_when_ownership_absent():
+    # status=A already filtered to available players -- omitting ownership
+    # entirely (a lighter query, or an older yahoo response shape) must not
+    # raise, and "not on waivers" is the honest default
+    raw = _raw_with_players([_player_node("466.p.9003", "No Ownership Guy")])
+
+    entries = parse_league_players(raw)
+
+    assert entries[0].status == "FA"
+    assert entries[0].waiver_date is None
+
+
+def test_parse_league_players_tolerates_count_dict_collection_shape():
+    # players collection as {"0": ..., "count": N} rather than a plain array --
+    # the same two-shapes-for-one-collection quirk _collection_items exists for
+    raw = {
+        "fantasy_content": {
+            "league": [
+                {"league_key": "466.l.12345"},
+                {
+                    "players": {
+                        "0": _player_node("466.p.9004", "Count Shape Guy"),
+                        "count": 1,
+                    }
+                },
+            ]
+        }
+    }
+
+    entries = parse_league_players(raw)
+
+    assert len(entries) == 1
+    assert entries[0].player_key == "466.p.9004"

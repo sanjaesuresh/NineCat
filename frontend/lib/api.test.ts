@@ -8,6 +8,7 @@ import {
   getLeagueTrades,
   getMe,
   isUnauthorized,
+  postAddsRefresh,
   postDraftRecommend,
   refreshLeague,
 } from "./api";
@@ -303,6 +304,8 @@ describe("api client", () => {
       schedule_coverage: { mine_games: 6, opponent_games: null, ok: true },
       stale: false,
       synced_at: "x",
+      pool_basis: "draftable_pool",
+      free_agents_synced_at: null,
     };
     const fetchMock = vi.fn().mockResolvedValue(mockResponse({ ok: true, status: 200, json: payload }));
     vi.stubGlobal("fetch", fetchMock);
@@ -328,6 +331,8 @@ describe("api client", () => {
       schedule_coverage: { mine_games: 6, opponent_games: 5, ok: true },
       stale: false,
       synced_at: "x",
+      pool_basis: "live_free_agents",
+      free_agents_synced_at: "2025-11-18T00:00:00Z",
     };
     const fetchMock = vi.fn().mockResolvedValue(mockResponse({ ok: true, status: 200, json: payload }));
     vi.stubGlobal("fetch", fetchMock);
@@ -347,6 +352,38 @@ describe("api client", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(getLeagueAdds(999)).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("postAddsRefresh POSTs to the adds/refresh endpoint and returns parsed JSON", async () => {
+    const payload = { fetched: 180, wrote: 172, unmapped: 8, synced_at: "2025-12-01T00:00:00Z" };
+    const fetchMock = vi.fn().mockResolvedValue(mockResponse({ ok: true, status: 200, json: payload }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await postAddsRefresh(7);
+
+    expect(result).toEqual(payload);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/leagues/7/adds/refresh",
+      expect.objectContaining({ method: "POST", cache: "no-store" })
+    );
+  });
+
+  it("postAddsRefresh surfaces 401 yahoo_reauth_required as ApiError", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      mockResponse({ ok: false, status: 401, json: { detail: "yahoo_reauth_required" } })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(postAddsRefresh(7)).rejects.toMatchObject({ status: 401 });
+  });
+
+  it("postAddsRefresh surfaces 503 yahoo_unavailable as ApiError", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      mockResponse({ ok: false, status: 503, json: { detail: "yahoo_unavailable" } })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(postAddsRefresh(7)).rejects.toMatchObject({ status: 503 });
   });
 
   it("getLeagueTrades hits the trades endpoint with only team_id when opts omitted", async () => {

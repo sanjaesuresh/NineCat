@@ -24,6 +24,7 @@ function candidate(overrides: Partial<AddsCandidate> & { player_key: string }): 
     categories_helped: [],
     stat_basis: "projection",
     reasons: [],
+    waiver_status: null,
     ...overrides,
   };
 }
@@ -43,6 +44,8 @@ function adds(overrides: Partial<LeagueAddsResponse> = {}): LeagueAddsResponse {
     explanations: null,
     explanations_available: false,
     explanations_reason: null,
+    pool_basis: "draftable_pool",
+    free_agents_synced_at: null,
     ...overrides,
   };
 }

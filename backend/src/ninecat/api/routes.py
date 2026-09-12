@@ -8,6 +8,7 @@ judgment, is the source of truth for what the frontend expects.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 
@@ -61,6 +62,7 @@ from ninecat.engine import (
 from ninecat.models import (
     FantasyWeek,
     League,
+    LeagueFreeAgent,
     NbaPlayer,
     NbaTeam,
     PlayerIdMap,
@@ -73,7 +75,14 @@ from ninecat.models import (
     YahooApiCache,
     YahooToken,
 )
+from ninecat.sync.free_agents import sync_league_free_agents
 from ninecat.sync.league_sync import sync_league_detail, sync_user_leagues
+from ninecat.sync.week_results import (
+    _DISPLAY_NAME_TO_CATEGORY,
+    _parse_team_totals,
+    _totals_projection,
+    _upsert_week_result,
+)
 from ninecat.warehouse.fantasy_weeks import resolve_week, week_date_range
 from ninecat.warehouse.id_mapping import map_yahoo_players
 from ninecat.warehouse.nba_schedule import games_in_range
@@ -83,6 +92,8 @@ from ninecat.yahoo.gateway import YahooAuthError, YahooGateway, YahooUnavailable
 from ninecat.yahoo.parsers import UserTeamInfo, parse_draft_results
 
 router = APIRouter()
+
+logger = logging.getLogger(__name__)
 
 _HEADSHOT_URL_TEMPLATE = "https://cdn.nba.com/headshots/nba/latest/1040x760/{nba_person_id}.png"
 
@@ -499,6 +510,32 @@ def _league_stale_and_synced_at(league: League) -> tuple[bool, str]:
         else datetime.now(timezone.utc).isoformat()
     )
     return stale, synced_at
+
+
+def _league_free_agent_snapshot(
+    db: Session, league: League
+) -> tuple[str, dict[int, str], str | None]:
+    """The adds endpoint's source switch: whether a live LeagueFreeAgent
+    snapshot exists for `league`, and if so, what it says.
+
+    Returns (pool_basis, status_by_nba_player_id, free_agents_synced_at).
+    An empty snapshot table for this league (never synced -- the dev league,
+    or a real league whose first sync hasn't run yet) is indistinguishable
+    from "no rows" either way, so both degrade to the "draftable_pool"
+    fallback identically; there is no separate "synced but empty" state to
+    represent given the delete-then-insert replace sync/free_agents.py uses.
+    """
+    rows = db.execute(
+        select(LeagueFreeAgent).where(LeagueFreeAgent.league_id == league.id)
+    ).scalars().all()
+    if not rows:
+        return "draftable_pool", {}, None
+    status_by_player_id = {row.nba_player_id: row.status for row in rows}
+    # every row in one sync shares effectively the same synced_at (all written
+    # in the same transaction); max() is defensive against clock skew rather
+    # than expecting real variance
+    free_agents_synced_at = max(row.synced_at for row in rows).isoformat()
+    return "live_free_agents", status_by_player_id, free_agents_synced_at
 
 
 # --- GET /api/me ---
@@ -1561,7 +1598,11 @@ def _resolve_week_and_opponent(
     """Resolve the target fantasy week and this team's opponent from a single
     scoreboard call -- shared by /matchup and /adds so week resolution, date
     persistence, and opponent identification can never diverge between the
-    two pages. Returns (target_week, week_range, opponent_team, opponent_reason).
+    two pages. Returns (target_week, week_range, opponent_team, opponent_reason,
+    my_matchup); my_matchup is the raw scoreboard Matchup (carrying both sides'
+    live category_totals) so /matchup can build live scores and observe a
+    completed week without a second scoreboard call -- None whenever
+    opponent_reason is set for a reason other than "team not synced".
     """
     scoreboard_unavailable = False
     try:
@@ -1616,7 +1657,109 @@ def _resolve_week_and_opponent(
             if opponent_team is None:
                 opponent_reason = OPPONENT_REASON_TEAM_NOT_SYNCED
 
-    return target_week, week_range, opponent_team, opponent_reason
+    return target_week, week_range, opponent_team, opponent_reason, my_matchup
+
+
+def _stat_id_to_category(league: League) -> dict[int, str]:
+    """yahoo stat_id -> canonical category key for this league, reusing
+    week_results' display-name table so live totals and the completed-week
+    writer can never translate the same stat differently. Built from
+    league.settings_json (already-synced, no extra Yahoo call) rather than a
+    live get_league_settings -- empty for a never-synced league, which callers
+    read as "no live data available" rather than guessing at stat_ids.
+    """
+    raw_categories = (league.settings_json or {}).get("categories") or []
+    stat_id_to_category: dict[int, str] = {}
+    for raw in raw_categories:
+        try:
+            stat_id = int(raw["stat_id"])
+            category = _DISPLAY_NAME_TO_CATEGORY.get(raw["display_name"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if category is not None:
+            stat_id_to_category[stat_id] = category
+    return stat_id_to_category
+
+
+def _live_category_totals(
+    category_totals: dict[int, str], stat_id_to_category: dict[int, str]
+) -> dict[str, float]:
+    """Partial per-category translation of one team's live scoreboard totals.
+
+    Unlike week_results._parse_team_totals (which requires all nine, since a
+    completed week must be complete to count), a live week fills in category
+    by category as games are played -- one unparseable/untranslatable value
+    just drops that category rather than the whole side, so an in-progress
+    week degrades to fewer known categories, never to none.
+    """
+    live: dict[str, float] = {}
+    for stat_id, raw_value in category_totals.items():
+        category = stat_id_to_category.get(stat_id)
+        if category is None or raw_value in ("", "-"):
+            continue
+        try:
+            live[category] = float(raw_value)
+        except ValueError:
+            continue
+    return live
+
+
+def _observe_completed_week(
+    db: Session,
+    league: League,
+    my_team: Team,
+    opponent_team: Team | None,
+    my_matchup,
+    week_range,
+    stat_id_to_category: dict[int, str],
+) -> None:
+    """Opportunistic WeekResult persistence: once a page load's scoreboard
+    fetch reveals a week that has fully ended, record it with week_results'
+    own upsert/compare helpers -- this is where a completed week is FIRST seen
+    outside the historical backfill, per the WP6 plan. No-ops on anything
+    short of "both sides' totals are complete and the week is over"; the
+    caller wraps this in a catch-all so a persistence hiccup never fails the
+    page (see its call site).
+    """
+    if my_matchup is None or opponent_team is None or len(my_matchup.teams) != 2:
+        return
+    if week_range.end_date >= date.today():
+        return  # week still live or in the future -- nothing completed to record yet
+
+    totals_by_key = {
+        t.team_key: _parse_team_totals(t.category_totals, stat_id_to_category)
+        for t in my_matchup.teams
+    }
+    mine_totals = totals_by_key.get(my_team.yahoo_team_key)
+    theirs_totals = totals_by_key.get(opponent_team.yahoo_team_key)
+    if mine_totals is None or theirs_totals is None:
+        return  # incomplete/unparseable totals -- yahoo hasn't finalized this week yet
+
+    comparison = compare_matchup(_totals_projection(mine_totals), _totals_projection(theirs_totals))
+    mine_wins, their_wins = comparison.projected_score
+    if mine_wins == their_wins:
+        mine_result = their_result = "tie"
+    elif mine_wins > their_wins:
+        mine_result, their_result = "win", "loss"
+    else:
+        mine_result, their_result = "loss", "win"
+
+    _upsert_week_result(
+        db,
+        league_id=league.id,
+        team_id=my_team.id,
+        week=my_matchup.week,
+        category_totals=mine_totals,
+        result=mine_result,
+    )
+    _upsert_week_result(
+        db,
+        league_id=league.id,
+        team_id=opponent_team.id,
+        week=my_matchup.week,
+        category_totals=theirs_totals,
+        result=their_result,
+    )
 
 
 def _resolve_stream_window(week_range, resolved_as_of: date) -> tuple[date, date, str]:
@@ -1654,11 +1797,13 @@ def league_matchup(
     if my_team is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Team not found")
 
-    # one scoreboard call answers two questions: which week (week=None means
-    # "whatever week is current" to Yahoo, mirroring /overview) and who the
-    # opponent is (the other team_key in my_team's matchup for that week) --
-    # shared with /adds via _resolve_week_and_opponent
-    target_week, week_range, opponent_team, opponent_reason = _resolve_week_and_opponent(
+    # one scoreboard call answers three questions: which week (week=None means
+    # "whatever week is current" to Yahoo, mirroring /overview), who the
+    # opponent is (the other team_key in my_team's matchup for that week), and
+    # (my_matchup) both sides' live category totals for WP6's live scores and
+    # completed-week observation below -- shared with /adds via
+    # _resolve_week_and_opponent
+    target_week, week_range, opponent_team, opponent_reason, my_matchup = _resolve_week_and_opponent(
         db, client, league, my_team, week
     )
 
@@ -1705,6 +1850,62 @@ def league_matchup(
     # exactly what an unsynced/stale schedule looks like (see matchup.py's own
     # 0-0-excluded-from-close comment for the same failure mode)
     schedule_ok = mine_games > 0 and (opponent_side is None or (opponent_games or 0) > 0)
+
+    # live scores: my_matchup's category_totals are yahoo's real, currently-
+    # accruing per-category counts for this matchup -- a separate concept from
+    # comparison_out's PROJECTED totals above. Translated via the same
+    # stat_id->category table the completed-week writer uses below, so the two
+    # can never drift. None (not zeroes) whenever there's no opponent, no
+    # matchup, or the league's settings haven't synced categories yet.
+    stat_id_to_category = _stat_id_to_category(league)
+    live_out: dict | None = None
+    if my_matchup is not None and opponent_team is not None and stat_id_to_category:
+        mine_totals_raw = next(
+            (t.category_totals for t in my_matchup.teams if t.team_key == my_team.yahoo_team_key),
+            None,
+        )
+        theirs_totals_raw = next(
+            (
+                t.category_totals
+                for t in my_matchup.teams
+                if t.team_key == opponent_team.yahoo_team_key
+            ),
+            None,
+        )
+        mine_live = (
+            _live_category_totals(mine_totals_raw, stat_id_to_category)
+            if mine_totals_raw is not None
+            else {}
+        )
+        theirs_live = (
+            _live_category_totals(theirs_totals_raw, stat_id_to_category)
+            if theirs_totals_raw is not None
+            else {}
+        )
+        if mine_live or theirs_live:
+            live_out = {
+                "categories": [
+                    {"category": cat, "mine": mine_live.get(cat), "theirs": theirs_live.get(cat)}
+                    for cat in CATEGORIES
+                    if cat in stat_id_to_category.values()
+                ]
+            }
+
+    # opportunistic: a page load that reveals a completed week is the first
+    # (and, until Yahoo access lands broadly, only) place a real week's result
+    # is observed outside the historical backfill -- never allowed to fail the
+    # page, since this is a side effect of viewing the matchup, not the point
+    # of the request
+    try:
+        _observe_completed_week(
+            db, league, my_team, opponent_team, my_matchup, week_range, stat_id_to_category
+        )
+    except Exception:
+        logger.exception(
+            "matchup completed-week observation failed (league_id=%s week=%s)",
+            league.id,
+            target_week,
+        )
 
     # as_of defaults to the real wall clock -- the sensible default for "what
     # days are left to stream" in live use. Callers viewing a specific week
@@ -1806,6 +2007,7 @@ def league_matchup(
         "opponent": _side_out(opponent_side) if opponent_side is not None else None,
         "opponent_reason": opponent_reason,
         "comparison": comparison_out,
+        "live_totals": live_out,
         **_explanations_out(outcome),
         "schedule_coverage": {
             "mine_games": _round2(mine_games),
@@ -1913,8 +2115,9 @@ def league_adds(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Team not found")
 
     # same week/opponent resolution the matchup endpoint uses -- see
-    # _resolve_week_and_opponent's docstring
-    target_week, week_range, opponent_team, opponent_reason = _resolve_week_and_opponent(
+    # _resolve_week_and_opponent's docstring. /adds has no use for the raw
+    # matchup (that's WP6's /matchup-only live totals/completed-week wiring)
+    target_week, week_range, opponent_team, opponent_reason, _my_matchup = _resolve_week_and_opponent(
         db, client, league, my_team, week
     )
 
@@ -1962,6 +2165,18 @@ def league_adds(
     candidates = _waiver_candidates(
         db, rows, league_rostered, internal_id_to_nba_id, stream_start, stream_end
     )
+
+    # live snapshot wins over the seeded/draftable pool when one exists for
+    # this league -- same seed-yields-to-real pattern as projection source
+    # resolution and dev-pool exclusion. No snapshot (never synced, or the
+    # dev league, which never gets one) falls back to exactly today's
+    # league-wide-unrostered pool.
+    pool_basis, live_status_by_player_id, free_agents_synced_at = _league_free_agent_snapshot(
+        db, league
+    )
+    if pool_basis == "live_free_agents":
+        candidates = [c for c in candidates if int(c.player_key) in live_status_by_player_id]
+
     scores = score_waiver_candidates(
         candidates, close_categories, roster_zscores, punt=frozenset(punt), limit=limit
     )
@@ -1986,6 +2201,10 @@ def league_adds(
                 "categories_helped": list(s.categories_helped),
                 "stat_basis": s.stat_basis,
                 "reasons": list(s.reasons),
+                # yahoo's own FA/W string when the live snapshot is the pool
+                # basis, so the page can label a waiver-status add; None on
+                # the draftable-pool fallback, where there's no such status
+                "waiver_status": live_status_by_player_id.get(pid),
             }
         )
 
@@ -2019,6 +2238,49 @@ def league_adds(
         },
         "stale": stale,
         "synced_at": synced_at,
+        # honest about which pool the candidates were drawn from -- "live_free_agents"
+        # (a synced LeagueFreeAgent snapshot exists) or "draftable_pool" (today's
+        # pool-minus-rostered fallback, e.g. the dev league or a never-synced real one)
+        "pool_basis": pool_basis,
+        # distinct from the league-level "synced_at" above (that's the roster/
+        # settings sync's own timestamp) -- None on the draftable_pool fallback,
+        # since there is no free-agent sync to date
+        "free_agents_synced_at": free_agents_synced_at,
+    }
+
+
+# --- POST /api/leagues/{league_id}/adds/refresh ---
+
+
+@router.post("/api/leagues/{league_id}/adds/refresh")
+def league_adds_refresh(
+    league_id: int,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_session),
+    client: YahooClient = Depends(get_yahoo_client),
+) -> dict:
+    """On-demand free-agent rescan for one league (the Adds page's refresh
+    affordance). Rate-limited by the gateway's own cache TTL rather than a
+    client-side loop -- a rapid double-click just replays the cached page.
+    """
+    league = _get_owned_league(db, user, league_id)
+    try:
+        result = sync_league_free_agents(db, client, league)
+    except YahooAuthError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="yahoo_reauth_required"
+        ) from exc
+    except YahooUnavailableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="yahoo_unavailable"
+        ) from exc
+    db.flush()
+    _, _, free_agents_synced_at = _league_free_agent_snapshot(db, league)
+    return {
+        "fetched": result.fetched,
+        "wrote": result.wrote,
+        "unmapped": result.unmapped,
+        "synced_at": free_agents_synced_at,
     }
 
 

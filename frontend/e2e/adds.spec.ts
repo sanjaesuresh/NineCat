@@ -56,9 +56,6 @@ test.describe("adds", () => {
     await expect(page.getByText(/Week \d+ ·/)).toBeVisible();
     await expect(page.getByText(/Data as of /)).toBeVisible();
 
-    // the seeded demo week (2025-12-01..07) is in the past, so the backend
-    // clamps as_of into the week and reports window_basis "full_week" -- the
-    // page must say these aren't adds that are still actionable, in the
     // the seeded demo week is never the real current week (it's pinned to a
     // fixed fantasy week of the configured season), so the page must say so --
     // which direction depends on today's real date, so accept either honest copy
@@ -108,5 +105,21 @@ test.describe("adds", () => {
     for (const token of FORBIDDEN_RAW_TOKENS) {
       expect(pageText).not.toContain(token);
     }
+  });
+
+  // WP5: the dev league never gets a synced free-agent snapshot (no linked
+  // Yahoo token), so its adds response is always pool_basis "draftable_pool"
+  // -- this is the one basis this stack can honestly e2e without a real
+  // Yahoo token. Live-basis UI (the real free-agent note, the "Refresh free
+  // agents" action) is unverifiable here; see WP5 plan verification notes.
+  test("dev league's draftable-pool basis shows the demo-pool note with no refresh action", async ({
+    page,
+  }) => {
+    await devLoginAndOpenAddsTab(page);
+
+    await expect(
+      page.getByText(/Candidates come from a seeded demo pool of draftable players/),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Refresh free agents" })).toHaveCount(0);
   });
 });

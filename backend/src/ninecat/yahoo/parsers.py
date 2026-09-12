@@ -90,6 +90,20 @@ class RosterEntry:
 
 
 @dataclass(frozen=True)
+class FreeAgentEntry:
+    """One player from the league players collection filtered to available
+    (free agent + waivers) status -- WP5's live waiver-scan input."""
+
+    player_key: str
+    name: str
+    # yahoo's own availability string: "FA" (free agent) or "W" (on waivers)
+    status: str
+    # set only when status == "W"; None for a plain free agent
+    waiver_date: date | None
+    eligible_positions: list[str]
+
+
+@dataclass(frozen=True)
 class StandingEntry:
     team_key: str
     name: str
@@ -469,6 +483,79 @@ def parse_team_roster(raw: dict) -> list[RosterEntry]:
                 # when a player has an injury designation (INJ, GTD, O, DTD, ...)
                 injury_status=attrs.get("status"),
                 nba_team_abbr=_get(attrs, "editorial_team_abbr", f"{player_path}.player"),
+            )
+        )
+
+    return entries
+
+
+# --- get_league_players (free agents / waivers) ---
+
+
+def parse_league_players(raw: dict) -> list[FreeAgentEntry]:
+    """Parses one page of the league players collection (fetched with
+    ;status=A;out=ownership -- see client.get_league_players). Mirrors
+    parse_team_roster's shape-tolerant walk; ownership is the sub-resource
+    that actually carries FA-vs-waivers, so it's read the same way
+    selected_position is read there (an optional trailing list element
+    alongside the merged attrs), defaulting to "FA" when yahoo omits it
+    entirely -- status=A already filtered to available players, so "not on
+    waivers" is the safe default rather than raising on an optional resource.
+    """
+    fc = _get(raw, "fantasy_content", "fantasy_content")
+    league_list = _get(fc, "league", "fantasy_content.league")
+    players_section = _find_section(league_list, "players", "fantasy_content.league")
+
+    entries: list[FreeAgentEntry] = []
+    for i, player_wrap in enumerate(
+        _collection_items(players_section, "fantasy_content.league.players")
+    ):
+        player_path = f"fantasy_content.league.players[{i}]"
+        player = _get(player_wrap, "player", player_path)
+        attrs_list = player[0] if isinstance(player, list) else player
+        attrs = _merge_attrs(attrs_list, f"{player_path}.player")
+
+        name_dict = _get(attrs, "name", f"{player_path}.player")
+        name = _get(name_dict, "full", f"{player_path}.player.name")
+        eligible_positions = [
+            p.get("position")
+            for p in _collection_items(
+                attrs.get("eligible_positions", []), f"{player_path}.player.eligible_positions"
+            )
+        ]
+
+        status = "FA"
+        waiver_date = None
+        # unlike selected_position (always present on a roster), ownership is
+        # optional here -- find it by hand instead of _find_section, which
+        # raises when the key is missing
+        ownership_section = next(
+            (item["ownership"] for item in player if isinstance(item, dict) and "ownership" in item),
+            None,
+        ) if isinstance(player, list) else None
+        if ownership_section is not None:
+            # live-verified 2026-09-13: ownership arrives as a PLAIN dict
+            # ({"ownership_type": "freeagents"}), unlike team/player attrs;
+            # tolerate a list-of-dicts variant too rather than betting on one
+            ownership_attrs = (
+                ownership_section
+                if isinstance(ownership_section, dict)
+                else _merge_attrs(ownership_section, f"{player_path}.player.ownership")
+            )
+            if ownership_attrs.get("ownership_type") == "waivers":
+                status = "W"
+                waiver_date = _optional_date(
+                    ownership_attrs.get("waiver_date"),
+                    f"{player_path}.player.ownership.waiver_date",
+                )
+
+        entries.append(
+            FreeAgentEntry(
+                player_key=_get(attrs, "player_key", f"{player_path}.player"),
+                name=name,
+                status=status,
+                waiver_date=waiver_date,
+                eligible_positions=eligible_positions,
             )
         )
 

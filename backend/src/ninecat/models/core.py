@@ -140,6 +140,40 @@ class RosterSlot(Base):
     )
 
 
+class LeagueFreeAgent(Base):
+    """One player currently available (free agent or on waivers) in a league.
+
+    A full per-league SNAPSHOT, not history: sync/free_agents.py replaces the
+    whole set on every sync (same delete-then-insert pattern as RosterSlot,
+    for the same reason -- a player claimed off waivers since the last sync
+    has no upsert key to diff against, so replacing is no harder than
+    diffing and is simplest to get right).
+    """
+
+    __tablename__ = "league_free_agents"
+    # one row per player per league: the sync's delete-then-insert replace
+    # relies on this to make a leftover duplicate impossible either way
+    __table_args__ = (UniqueConstraint("league_id", "nba_player_id"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    league_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("leagues.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    # CASCADE: a free-agent snapshot row has no meaning once its player is gone
+    nba_player_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("nba_players.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    # yahoo's own availability string ("FA" or "W") rather than a bool -- keeps
+    # yahoo's vocabulary intact for a future waiver-priority feature to key off
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    # set only when status == "W" (the date a waiver claim clears); nullable
+    # for plain free agents, who have no such date
+    waiver_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    synced_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+
 class FantasyWeek(Base):
     """A league's fantasy week date range, parsed from Yahoo or derived when absent.
 

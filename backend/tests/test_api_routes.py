@@ -20,8 +20,10 @@ from ninecat.api.routes import (
 )
 from ninecat.auth.routes import (
     _DEV_POOL_PLAYERS,
+    DEMO_WEEK_NUMBER,
     DEV_LEAGUE_KEY,
     DEV_OTHER_TEAM_KEY,
+    DEV_TEAM_KEY,
     _get_or_create_nba_player,
     _get_or_create_projection,
     _get_or_create_season_average,
@@ -33,6 +35,7 @@ from ninecat.db import get_session
 from ninecat.engine import CATEGORIES
 from ninecat.models import (
     League,
+    LeagueFreeAgent,
     NbaPlayer,
     NbaTeam,
     PlayerIdMap,
@@ -42,14 +45,17 @@ from ninecat.models import (
     Standing,
     Team,
     User,
+    WeekResult,
     YahooToken,
 )
+from ninecat.sync.week_results import _DISPLAY_NAME_TO_CATEGORY
 from ninecat.warehouse.nba_schedule import sync_schedule
 from ninecat.yahoo.gateway import YahooAuthError, YahooUnavailableError
 from ninecat.yahoo.parsers import (
     CategoryInfo,
     DraftPick,
     DraftResultsPage,
+    FreeAgentEntry,
     LeagueInfo,
     LeagueSettings,
     Matchup,
@@ -85,9 +91,11 @@ class _StubYahooClient:
         roster_by_team=None,
         scoreboard_by_league=None,
         draft_results_by_league=None,
+        free_agents_by_league=None,
         raise_on_leagues=None,
         raise_on_scoreboard=None,
         raise_on_draft_results=None,
+        raise_on_league_players=None,
     ):
         self._user_leagues = user_leagues or []
         self._user_teams = user_teams or []
@@ -97,9 +105,11 @@ class _StubYahooClient:
         self._roster_by_team = roster_by_team or {}
         self._scoreboard_by_league = scoreboard_by_league or {}
         self._draft_results_by_league = draft_results_by_league or {}
+        self._free_agents_by_league = free_agents_by_league or {}
         self._raise_on_leagues = raise_on_leagues
         self._raise_on_scoreboard = raise_on_scoreboard
         self._raise_on_draft_results = raise_on_draft_results
+        self._raise_on_league_players = raise_on_league_players
 
     def get_user_leagues(self):
         if self._raise_on_leagues is not None:
@@ -130,6 +140,11 @@ class _StubYahooClient:
         if self._raise_on_draft_results is not None:
             raise self._raise_on_draft_results
         return self._draft_results_by_league[league_key]
+
+    def get_league_players(self, league_key, status="A"):
+        if self._raise_on_league_players is not None:
+            raise self._raise_on_league_players
+        return self._free_agents_by_league.get(league_key, [])
 
 
 def _make_settings() -> LeagueSettings:
@@ -2086,14 +2101,27 @@ def _seed_full_matchup(
     with_schedule: bool = True,
     week_start: date | None = None,
     week_end: date | None = None,
+    mine_category_totals: dict[int, str] | None = None,
+    theirs_category_totals: dict[int, str] | None = None,
+    with_category_settings: bool = False,
 ):
     """A league with a guard-heavy "mine" roster and a big-heavy "rival"
     roster (deliberately different category shapes, per the plan's mandatory
     fan-plausibility test), each with a real NBA team assigned so the
     schedule wires through end to end. Returns (league, team, rival, stub).
+
+    with_category_settings (WP6): populates league.settings_json["categories"]
+    with the same nine-cat shape _make_settings() uses, so live-score
+    translation has a stat_id->category table to read -- opt-in and defaulted
+    off so every existing caller's settings_json stays exactly {"max_weekly_adds": 3}.
     """
     league, team, rival = _seed_league_with_team(db_session, user)
     league.settings_json = {"max_weekly_adds": 3}
+    if with_category_settings:
+        league.settings_json["categories"] = [
+            {"stat_id": i + 1, "name": name, "display_name": name, "is_negative": name == "TO"}
+            for i, name in enumerate(["FG%", "FT%", "3PTM", "PTS", "REB", "AST", "ST", "BLK", "TO"])
+        ]
     db_session.flush()
 
     team_internal_id_by_abbr = _seed_matchup_schedule(db_session) if with_schedule else {}
@@ -2129,9 +2157,15 @@ def _seed_full_matchup(
                 Matchup(
                     week=MATCHUP_WEEK,
                     teams=[
-                        MatchupTeam(team_key=TEAM_KEY, name="My Team", category_totals={}),
-                        MatchupTeam(team_key=RIVAL_TEAM_KEY, name="Rival", category_totals={}),
-                    ],
+                        MatchupTeam(
+                            team_key=TEAM_KEY, name="My Team",
+                            category_totals=mine_category_totals or {},
+                        ),
+                        MatchupTeam(
+                            team_key=RIVAL_TEAM_KEY, name="Rival",
+                            category_totals=theirs_category_totals or {},
+                        ),
+                    ],  # fmt: skip
                     week_start=week_start,
                     week_end=week_end,
                 )
@@ -2167,9 +2201,12 @@ def test_matchup_projects_both_sides_and_compares(db_session):
     body = response.json()
     assert set(body.keys()) == {
         "week", "week_range", "as_of", "mine", "opponent", "opponent_reason",
-        "comparison", "explanations", "explanations_available", "explanations_reason",
+        "comparison", "live_totals", "explanations", "explanations_available", "explanations_reason",
         "schedule_coverage", "streaming", "stale", "synced_at",
     }  # fmt: skip
+    # this fixture's category_totals are all {} (no live scoreboard totals),
+    # so live_totals is honestly absent rather than a fabricated all-null shape
+    assert body["live_totals"] is None
     # this fixture's streaming plan has no slots, so there is nothing to rank
     # and the empty-shortlist check short-circuits BEFORE the no-key one --
     # the reason names what actually stopped it, not the first plausible cause
@@ -2479,6 +2516,206 @@ def test_matchup_fan_plausibility_guards_beat_bigs_in_ast_and_tpm(db_session):
     assert theirs["blk"] > mine["blk"]
 
 
+# --- WP6: live opponent and scoreboard sync ---
+
+
+def test_matchup_stat_id_translation_reuses_week_results_table():
+    """Pins reuse, not a fork: routes.py must import the exact same
+    display-name->category dict week_results.py's completed-week writer uses,
+    not an independently maintained copy that could silently drift."""
+    from ninecat.api.routes import _DISPLAY_NAME_TO_CATEGORY as routes_table
+
+    assert routes_table is _DISPLAY_NAME_TO_CATEGORY
+
+
+def test_matchup_live_totals_translated_from_stat_ids(db_session):
+    """A real league's live matchup: opponent, live per-category totals (both
+    complete and partial), and yahoo's real week dates all come from one
+    scoreboard fetch."""
+    user = _seed_user(db_session)
+    league, _team, _rival, stub = _seed_full_matchup(
+        db_session,
+        user,
+        week_start=MATCHUP_WEEK_START,
+        week_end=MATCHUP_WEEK_END,
+        with_category_settings=True,
+        # stat_id 3 (tpm) deliberately "-" (yahoo's not-yet-played marker) on
+        # my side, and stat_id 7 (stl) missing outright on theirs -- proves
+        # live totals fill in PER CATEGORY rather than all-or-nothing
+        mine_category_totals={1: ".480", 2: ".820", 3: "-", 4: "310", 5: "40", 6: "55", 7: "10", 8: "5", 9: "22"},
+        theirs_category_totals={1: ".500", 2: ".700", 3: "8", 4: "290", 5: "50", 6: "30", 8: "9", 9: "28"},
+    )
+    client = _authed_client(db_session, user, stub)
+
+    response = client.get(f"/api/leagues/{league.id}/matchup")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["opponent"] is not None
+    assert body["opponent_reason"] is None
+    assert body["week_range"] == {
+        "start_date": MATCHUP_WEEK_START.isoformat(),
+        "end_date": MATCHUP_WEEK_END.isoformat(),
+        "is_derived": False,
+    }
+    live = body["live_totals"]
+    assert live is not None
+    by_category = {row["category"]: row for row in live["categories"]}
+    assert by_category["fg_pct"] == {"category": "fg_pct", "mine": 0.48, "theirs": 0.5}
+    assert by_category["ft_pct"] == {"category": "ft_pct", "mine": 0.82, "theirs": 0.7}
+    assert by_category["pts"] == {"category": "pts", "mine": 310.0, "theirs": 290.0}
+    assert by_category["reb"] == {"category": "reb", "mine": 40.0, "theirs": 50.0}
+    assert by_category["ast"] == {"category": "ast", "mine": 55.0, "theirs": 30.0}
+    assert by_category["blk"] == {"category": "blk", "mine": 5.0, "theirs": 9.0}
+    assert by_category["tov"] == {"category": "tov", "mine": 22.0, "theirs": 28.0}
+    # honest absence, never a fabricated 0.0
+    assert by_category["tpm"] == {"category": "tpm", "mine": None, "theirs": 8.0}
+    assert by_category["stl"] == {"category": "stl", "mine": 10.0, "theirs": None}
+    # the seeded league's projected totals must still be present alongside
+    # the new live field -- live is an addition, not a replacement
+    assert body["comparison"] is not None
+
+
+def test_matchup_no_matchup_this_week_preserves_reason_and_omits_live_totals(db_session):
+    user = _seed_user(db_session)
+    league, _team, _rival = _seed_league_with_team(db_session, user)
+    # scoreboard has a matchup, but neither team_key is my_team's -- the real
+    # shape of an off-season/bye week rather than an empty list
+    stub = _StubYahooClient(
+        scoreboard_by_league={
+            LEAGUE_KEY: [
+                Matchup(
+                    week=3,
+                    teams=[
+                        MatchupTeam(team_key="466.l.1.t.9", name="Someone Else", category_totals={}),
+                        MatchupTeam(team_key="466.l.1.t.10", name="Another", category_totals={}),
+                    ],
+                )
+            ]
+        }
+    )
+    client = _authed_client(db_session, user, stub)
+
+    response = client.get(f"/api/leagues/{league.id}/matchup")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["opponent"] is None
+    assert body["opponent_reason"] == "no_matchup_this_week"
+    assert body["comparison"] is None
+    assert body["live_totals"] is None
+
+
+def test_matchup_dev_league_scoreboard_cache_fallback_includes_live_totals(
+    db_session, monkeypatch: pytest.MonkeyPatch
+):
+    """The dev user has no stored Yahoo token: a real YahooGateway resource
+    call would refresh-and-401. dev-login pre-warms the scoreboard cache
+    (auth/routes._warm_scoreboard_cache) keyed with the gateway's own
+    _path_hash, so /matchup must resolve the real opponent and live totals
+    from that cache without ever reaching YahooAuthError -- the exact
+    dev-fallback path this WP must not disturb. Uses the real get_yahoo_client
+    dependency (no stub override) so this actually exercises YahooGateway.
+    """
+    monkeypatch.setenv("DEV_AUTH_ENABLED", "true")
+    get_settings.cache_clear()
+
+    app = FastAPI()
+    app.include_router(auth_router)
+    app.include_router(router)
+    app.dependency_overrides[get_session] = lambda: db_session
+    client = _test_client(app)
+
+    assert client.post("/api/auth/dev-login").status_code == 204
+
+    league = db_session.execute(
+        select(League).where(League.yahoo_league_key == DEV_LEAGUE_KEY)
+    ).scalar_one()
+
+    response = client.get(f"/api/leagues/{league.id}/matchup")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["week"] == DEMO_WEEK_NUMBER
+    assert body["opponent"] is not None
+    assert body["opponent_reason"] is None
+
+    # values pinned to _warm_scoreboard_cache's canned dev-vs-rival line,
+    # stat_id order FG% FT% 3PTM PTS REB AST ST BLK TO
+    live = body["live_totals"]
+    assert live is not None
+    by_category = {row["category"]: row for row in live["categories"]}
+    assert by_category["pts"] == {"category": "pts", "mine": 612.0, "theirs": 598.0}
+    assert by_category["tov"] == {"category": "tov", "mine": 68.0, "theirs": 54.0}
+    assert by_category["ast"] == {"category": "ast", "mine": 178.0, "theirs": 112.0}
+
+
+def _completed_week_stub(mine_totals: dict[int, str], theirs_totals: dict[int, str]) -> "_StubYahooClient":
+    return _StubYahooClient(
+        scoreboard_by_league={
+            LEAGUE_KEY: [
+                Matchup(
+                    week=1,
+                    teams=[
+                        MatchupTeam(team_key=TEAM_KEY, name="My Team", category_totals=mine_totals),
+                        MatchupTeam(team_key=RIVAL_TEAM_KEY, name="Rival", category_totals=theirs_totals),
+                    ],
+                    # both well in the past relative to any real wall clock this
+                    # suite runs under -- the "week has ended" condition WP6 wires
+                    week_start=date(2020, 1, 1),
+                    week_end=date(2020, 1, 7),
+                )
+            ]
+        }
+    )
+
+
+# team A wins 6 of 9 (including TO once inverted: fewer raw turnovers is worse
+# for a positive-signed category, so this stat_id set is picked to make mine's
+# raw 30 BEAT theirs' raw 40 after inversion)
+_COMPLETED_MINE_TOTALS = {1: ".500", 2: ".800", 3: "10", 4: "300", 5: "100", 6: "60", 7: "20", 8: "10", 9: "30"}
+_COMPLETED_THEIRS_TOTALS = {1: ".450", 2: ".750", 3: "8", 4: "280", 5: "90", 6: "50", 7: "18", 8: "8", 9: "40"}
+
+
+def test_matchup_completed_week_observation_writes_week_result_once(db_session):
+    """Opportunistic persistence: a page load whose scoreboard shows a week
+    that's already ended upserts WeekResult for both teams via week_results'
+    own writer, exactly once per team even across repeated page loads."""
+    user = _seed_user(db_session)
+    league, team, rival = _seed_league_with_team(db_session, user)
+    league.settings_json = {
+        "categories": [
+            {"stat_id": i + 1, "name": name, "display_name": name, "is_negative": name == "TO"}
+            for i, name in enumerate(["FG%", "FT%", "3PTM", "PTS", "REB", "AST", "ST", "BLK", "TO"])
+        ]
+    }
+    db_session.flush()
+    stub = _completed_week_stub(_COMPLETED_MINE_TOTALS, _COMPLETED_THEIRS_TOTALS)
+    client = _authed_client(db_session, user, stub)
+
+    first = client.get(f"/api/leagues/{league.id}/matchup")
+    assert first.status_code == 200
+
+    rows = db_session.execute(select(WeekResult).where(WeekResult.league_id == league.id)).scalars().all()
+    assert len(rows) == 2
+    mine_row = next(r for r in rows if r.team_id == team.id)
+    theirs_row = next(r for r in rows if r.team_id == rival.id)
+    assert mine_row.result == "win"
+    assert theirs_row.result == "loss"
+    assert mine_row.category_totals["pts"] == 300.0
+    assert mine_row.category_totals["tov"] == 30.0
+
+    # a second page load for the same completed week must upsert in place,
+    # not duplicate -- re-run the same request against the same fixture
+    second = client.get(f"/api/leagues/{league.id}/matchup")
+    assert second.status_code == 200
+
+    rows_after = (
+        db_session.execute(select(WeekResult).where(WeekResult.league_id == league.id)).scalars().all()
+    )
+    assert len(rows_after) == 2
+
+
 # --- GET /api/leagues/{league_id}/adds ---
 
 
@@ -2510,7 +2747,12 @@ def test_adds_shape_no_free_agents(db_session):
         "week", "week_range", "as_of", "window_basis", "close_categories",
         "opponent_reason", "candidates", "explanations", "explanations_available",
         "explanations_reason", "schedule_coverage", "stale", "synced_at",
+        "pool_basis", "free_agents_synced_at",
     }  # fmt: skip
+    # no LeagueFreeAgent snapshot seeded -- today's draftable-pool fallback,
+    # honestly labeled
+    assert body["pool_basis"] == "draftable_pool"
+    assert body["free_agents_synced_at"] is None
     assert body["week"] == MATCHUP_WEEK
     assert body["week_range"] == {
         "start_date": MATCHUP_WEEK_START.isoformat(),
@@ -2863,6 +3105,155 @@ def test_adds_fan_plausibility_favors_blocks_need_over_zero_block_guard(db_sessi
     assert body["candidates"][0]["player_key"] == str(big_add.id), (
         "a blocks-needy roster's top add must not be a guard who provides zero blocks"
     )
+
+
+# --- adds source switch: live LeagueFreeAgent snapshot vs. draftable pool ---
+
+
+def test_adds_prefers_live_snapshot_and_intersects_the_candidate_pool(db_session):
+    """When a snapshot exists, candidates are restricted to it (fa2, a
+    perfectly good draftable free agent NOT in the snapshot, must be
+    excluded) and the snapshot's own status/synced_at flow through."""
+    user = _seed_user(db_session)
+    league, _team, fa1, fa2, stub = _seed_adds_stream_fixture(db_session, user)
+    db_session.add(
+        LeagueFreeAgent(league_id=league.id, nba_player_id=fa1.id, status="W", waiver_date=date(2026, 9, 20))
+    )
+    db_session.flush()
+    client = _authed_client(db_session, user, stub)
+
+    response = client.get(
+        f"/api/leagues/{league.id}/adds", params={"as_of": MATCHUP_WEEK_START.isoformat()}
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["pool_basis"] == "live_free_agents"
+    assert body["free_agents_synced_at"] is not None
+    candidate_keys = {c["player_key"] for c in body["candidates"]}
+    assert candidate_keys == {str(fa1.id)}
+    fa1_candidate = next(c for c in body["candidates"] if c["player_key"] == str(fa1.id))
+    assert fa1_candidate["waiver_status"] == "W"
+
+
+def test_adds_falls_back_to_draftable_pool_when_no_snapshot_exists(db_session):
+    user = _seed_user(db_session)
+    league, _team, fa1, fa2, stub = _seed_adds_stream_fixture(db_session, user)
+    client = _authed_client(db_session, user, stub)
+
+    response = client.get(
+        f"/api/leagues/{league.id}/adds", params={"as_of": MATCHUP_WEEK_START.isoformat()}
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["pool_basis"] == "draftable_pool"
+    assert body["free_agents_synced_at"] is None
+    candidate_keys = {c["player_key"] for c in body["candidates"]}
+    # unlike the snapshot test above, both free agents are eligible here --
+    # today's exact fallback behavior, unrestricted by any snapshot
+    assert candidate_keys == {str(fa1.id), str(fa2.id)}
+    assert all(c["waiver_status"] is None for c in body["candidates"])
+
+
+# --- POST /api/leagues/{league_id}/adds/refresh ---
+
+
+def test_adds_refresh_writes_a_new_snapshot_and_returns_its_summary(db_session):
+    user = _seed_user(db_session)
+    league, _team, fa1, _fa2, _stub = _seed_adds_stream_fixture(db_session, user)
+    stub = _StubYahooClient(
+        free_agents_by_league={
+            LEAGUE_KEY: [
+                FreeAgentEntry(
+                    player_key="466.p.fa1", name="Better One Game", status="FA",
+                    waiver_date=None, eligible_positions=["SG"],
+                )
+            ]
+        }
+    )  # fmt: skip
+    client = _authed_client(db_session, user, stub)
+
+    response = client.post(f"/api/leagues/{league.id}/adds/refresh")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body == {"fetched": 1, "wrote": 1, "unmapped": 0, "synced_at": body["synced_at"]}
+    assert body["synced_at"] is not None
+    row = db_session.execute(
+        select(LeagueFreeAgent).where(LeagueFreeAgent.league_id == league.id)
+    ).scalar_one()
+    assert row.nba_player_id == fa1.id
+    assert row.status == "FA"
+
+
+def test_adds_refresh_404_for_foreign_league(db_session):
+    user = _seed_user(db_session, guid="guid-a", name="A")
+    other = _seed_user(db_session, guid="guid-b", name="B")
+    league, _team, _rival = _seed_league_with_team(db_session, other)
+
+    client = _authed_client(db_session, user)
+    response = client.post(f"/api/leagues/{league.id}/adds/refresh")
+
+    assert response.status_code == 404
+
+
+def test_adds_refresh_yahoo_auth_error_returns_401(db_session):
+    user = _seed_user(db_session)
+    league, _team, _rival = _seed_league_with_team(db_session, user)
+    stub = _StubYahooClient(raise_on_league_players=YahooAuthError("no token"))
+    client = _authed_client(db_session, user, stub)
+
+    response = client.post(f"/api/leagues/{league.id}/adds/refresh")
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "yahoo_reauth_required"
+
+
+def test_adds_refresh_yahoo_unavailable_returns_503(db_session):
+    user = _seed_user(db_session)
+    league, _team, _rival = _seed_league_with_team(db_session, user)
+    stub = _StubYahooClient(
+        raise_on_league_players=YahooUnavailableError(stale_payload=None, synced_at=None)
+    )
+    client = _authed_client(db_session, user, stub)
+
+    response = client.post(f"/api/leagues/{league.id}/adds/refresh")
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "yahoo_unavailable"
+
+
+# --- max_weekly_adds honesty (plan task 5) ---
+
+
+def test_league_max_weekly_adds_reads_the_real_synced_settings_value(db_session):
+    """Closes the gap between test_league_sync.py (proves sync_league_detail
+    WRITES settings_json from real Yahoo LeagueSettings) and the streaming
+    plan tests (prove adds_used/adds_reserved respect a hand-set
+    settings_json) -- neither connects the two. This does: a real
+    sync_league_detail call against Yahoo's actual field name/shape, then
+    the same _league_max_weekly_adds helper the adds/matchup flow reads."""
+    from ninecat.api.routes import _league_max_weekly_adds
+    from ninecat.sync.league_sync import sync_league_detail
+
+    user = _seed_user(db_session)
+    league, _team, _rival = _seed_league_with_team(db_session, user)
+    real_settings_client = _StubYahooClient(
+        settings_by_league={LEAGUE_KEY: _make_settings()},
+        teams_by_league={LEAGUE_KEY: []},
+        standings_by_league={LEAGUE_KEY: []},
+        roster_by_team={},
+    )
+
+    sync_league_detail(db_session, real_settings_client, league.id)
+    db_session.flush()
+
+    # _make_settings()'s own real value (4), not a test-chosen round number --
+    # proves the field actually round-trips end to end, not just that some
+    # value made it through
+    assert league.settings_json["max_weekly_adds"] == 4
+    assert _league_max_weekly_adds(league) == 4
 
 
 # --- GET /api/leagues/{league_id}/trades ---

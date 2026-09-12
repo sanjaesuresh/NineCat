@@ -320,6 +320,9 @@ export interface AddsCandidate {
   // structured tokens, e.g. "category:<key>" | "schedule_driven" |
   // "season_average_fallback", never English prose
   reasons: string[];
+  // Yahoo's own FA/W string, only meaningful on the live_free_agents basis --
+  // null on draftable_pool, where there's no such status to report (WP5)
+  waiver_status: "FA" | "W" | null;
 }
 
 export interface LeagueAddsResponse extends Explained {
@@ -338,6 +341,23 @@ export interface LeagueAddsResponse extends Explained {
   schedule_coverage: ScheduleCoverage;
   stale: boolean;
   synced_at: string;
+  // which pool the candidates above were drawn from -- a synced Yahoo
+  // free-agent snapshot, or today's seeded-pool-minus-rostered fallback (WP5)
+  pool_basis: "live_free_agents" | "draftable_pool";
+  // the free-agent snapshot's own sync time, distinct from the league-level
+  // synced_at above (that's the roster/settings sync); null on draftable_pool
+  free_agents_synced_at: string | null;
+}
+
+// --- POST /api/leagues/{id}/adds/refresh ---
+
+export interface AddsRefreshResponse {
+  fetched: number;
+  wrote: number;
+  unmapped: number;
+  // typed nullable defensively even though a successful sync always sets one --
+  // never assume a shape the backend hasn't guaranteed in its own type
+  synced_at: string | null;
 }
 
 // --- GET /api/leagues/{id}/trades ---
@@ -527,6 +547,14 @@ export function getLeagueAdds(
   if (opts?.limit !== undefined) params.set("limit", String(opts.limit));
   const qs = params.toString();
   return requestJson<LeagueAddsResponse>(`/api/leagues/${id}/adds${qs ? `?${qs}` : ""}`);
+}
+
+// on-demand rescan of Yahoo's free-agent list for one league (the Adds
+// page's "Refresh free agents" action, live basis only) -- 401
+// yahoo_reauth_required and 503 yahoo_unavailable are the two documented
+// failure modes callers should switch on
+export function postAddsRefresh(id: number): Promise<AddsRefreshResponse> {
+  return requestJson<AddsRefreshResponse>(`/api/leagues/${id}/adds/refresh`, { method: "POST" });
 }
 
 export function getLeagueTrades(
