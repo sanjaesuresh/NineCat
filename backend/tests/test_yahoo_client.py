@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from ninecat.yahoo.client import (
+    DRAFT_CACHE_TTL_SECONDS,
     LEAGUES_CACHE_TTL_SECONDS,
     ROSTER_CACHE_TTL_SECONDS,
     SCOREBOARD_CACHE_TTL_SECONDS,
@@ -13,7 +14,7 @@ from ninecat.yahoo.client import (
     TEAMS_CACHE_TTL_SECONDS,
     YahooClient,
 )
-from ninecat.yahoo.parsers import YahooParseError, parse_league_settings
+from ninecat.yahoo.parsers import YahooParseError, parse_draft_results, parse_league_settings
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures" / "yahoo"
 
@@ -243,6 +244,45 @@ def test_get_user_teams_derives_league_key_from_team_key_prefix():
     ]
 
 
+# --- get_draft_results ---
+
+
+def test_get_draft_results_active_draft_skips_pending_slot_and_uses_draft_ttl():
+    gateway = _StubGateway(
+        {f"league/{LEAGUE_KEY}/draftresults": _load("league_draftresults.json")}
+    )
+    client = YahooClient(gateway)
+
+    page = client.get_draft_results(LEAGUE_KEY)
+
+    assert page.draft_status == "draft"
+    assert page.num_teams == 10
+    # fixture has 8 draft_result entries but one (pick 5) has no player_key
+    # (a pending/unassigned slot) -- that slot must never surface as a pick
+    assert len(page.results) == 7
+    assert [p.pick for p in page.results] == [1, 2, 3, 4, 6, 7, 8]
+    assert page.results[0].round == 1
+    assert page.results[0].team_key == "466.l.12345.t.1"
+    assert page.results[0].player_key == "466.p.1001"
+    # team 466.l.12345.t.3 picked twice, once per round
+    t3_picks = [p.pick for p in page.results if p.team_key == "466.l.12345.t.3"]
+    assert t3_picks == [3, 8]
+    assert gateway.calls == [(f"league/{LEAGUE_KEY}/draftresults", DRAFT_CACHE_TTL_SECONDS)]
+
+
+def test_get_draft_results_predraft_has_empty_results():
+    gateway = _StubGateway(
+        {f"league/{LEAGUE_KEY}/draftresults": _load("league_draftresults_predraft.json")}
+    )
+    client = YahooClient(gateway)
+
+    page = client.get_draft_results(LEAGUE_KEY)
+
+    assert page.draft_status == "predraft"
+    assert page.num_teams == 10
+    assert page.results == []
+
+
 # --- malformed fixture -> clear YahooParseError, not a bare KeyError ---
 
 
@@ -254,6 +294,22 @@ def test_parse_league_settings_raises_clear_error_on_missing_stat_categories():
 
     # the error must name the missing key path, not just be a bare KeyError
     assert "stat_categories" in str(exc_info.value)
+
+
+def test_parse_draft_results_raises_clear_error_on_missing_draft_status():
+    raw = {
+        "fantasy_content": {
+            "league": [
+                {"league_key": "466.l.12345", "num_teams": "10"},
+                {"draft_results": {"count": 0}},
+            ]
+        }
+    }
+
+    with pytest.raises(YahooParseError) as exc_info:
+        parse_draft_results(raw)
+
+    assert "draft_status" in str(exc_info.value)
 
 
 # --- unset optional numeric settings ("" / "-1" sentinels) -> None ---

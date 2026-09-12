@@ -124,6 +124,27 @@ class UserTeamInfo:
     league_key: str
 
 
+@dataclass(frozen=True)
+class DraftPick:
+    """One completed draft pick. Pending/unassigned slots (no player_key yet)
+    never become a DraftPick -- parse_draft_results skips them entirely."""
+
+    pick: int
+    round: int
+    team_key: str
+    player_key: str
+
+
+@dataclass(frozen=True)
+class DraftResultsPage:
+    """WP3 live draft polling: one call's worth of draftresults, which carries
+    both the picks made so far and the league's draft_status (pre/active/post)."""
+
+    draft_status: str
+    num_teams: int
+    results: list[DraftPick]
+
+
 # --- shared unwrapping helpers ---
 
 
@@ -213,6 +234,11 @@ def _merge_attrs(items: list, path: str) -> dict:
         raise YahooParseError(path)
     merged: dict = {}
     for item in items:
+        # live-verified 2026-09-12: real yahoo pads absent attributes as empty
+        # lists interleaved with the attr dicts -- skip padding, but still
+        # refuse non-empty non-dicts (that would be data we'd silently drop)
+        if isinstance(item, list) and not item:
+            continue
         if not isinstance(item, dict):
             raise YahooParseError(path)
         merged.update(item)
@@ -446,9 +472,17 @@ def parse_standings(raw: dict) -> list[StandingEntry]:
             StandingEntry(
                 team_key=_get(attrs, "team_key", f"{team_path}.team"),
                 name=_get(attrs, "name", f"{team_path}.team"),
-                rank=_get_int(
-                    _get(team_standings, "rank", f"{team_path}.team.team_standings"),
-                    f"{team_path}.team.team_standings.rank",
+                # live-verified 2026-09-12: pre-season yahoo sends rank as ""
+                # -- 0 means "unranked yet"; a real rank is always >= 1
+                rank=(
+                    _get_int(rank_raw, f"{team_path}.team.team_standings.rank")
+                    if (
+                        rank_raw := _get(
+                            team_standings, "rank", f"{team_path}.team.team_standings"
+                        )
+                    )
+                    not in ("", None)
+                    else 0
                 ),
                 wins=_get_int(_get(outcome, "wins", outcome_path), f"{outcome_path}.wins"),
                 losses=_get_int(_get(outcome, "losses", outcome_path), f"{outcome_path}.losses"),
@@ -571,3 +605,48 @@ def parse_user_teams(raw: dict) -> list[UserTeamInfo]:
                 )
 
     return teams
+
+
+# --- get_draft_results ---
+
+
+def parse_draft_results(raw: dict) -> DraftResultsPage:
+    fc = _get(raw, "fantasy_content", "fantasy_content")
+    league_list = _get(fc, "league", "fantasy_content.league")
+    league_path = "fantasy_content.league"
+
+    # league[0] is plain merged metadata (draft_status/num_teams), same shape
+    # parse_user_leagues reads league_key/name from -- league attrs, unlike
+    # team/player attrs, arrive pre-merged and never need _merge_attrs
+    metadata = league_list[0] if isinstance(league_list, list) else league_list
+    metadata_path = f"{league_path}[0]"
+    draft_status = _get(metadata, "draft_status", metadata_path)
+    num_teams = _get_int(
+        _get(metadata, "num_teams", metadata_path), f"{metadata_path}.num_teams"
+    )
+
+    results_section = _find_section(league_list, "draft_results", league_path)
+    results_path = f"{league_path}.draft_results"
+
+    picks: list[DraftPick] = []
+    for i, result_wrap in enumerate(_collection_items(results_section, results_path)):
+        result_path = f"{results_path}[{i}]"
+        result = _get(result_wrap, "draft_result", result_path)
+        if not isinstance(result, dict):
+            raise YahooParseError(f"{result_path}.draft_result")
+        attrs_path = f"{result_path}.draft_result"
+        # an unassigned/pending slot carries no player_key at all (not null,
+        # just absent) -- skip it rather than fabricate a pick with no player
+        player_key = result.get("player_key")
+        if not player_key:
+            continue
+        picks.append(
+            DraftPick(
+                pick=_get_int(_get(result, "pick", attrs_path), f"{attrs_path}.pick"),
+                round=_get_int(_get(result, "round", attrs_path), f"{attrs_path}.round"),
+                team_key=_get(result, "team_key", attrs_path),
+                player_key=player_key,
+            )
+        )
+
+    return DraftResultsPage(draft_status=draft_status, num_teams=num_teams, results=picks)

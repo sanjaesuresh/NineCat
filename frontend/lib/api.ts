@@ -271,6 +271,38 @@ export interface DraftRecommendRequest {
   source?: string;
 }
 
+// --- GET /api/leagues/{id}/draft/live ---
+
+export interface DraftLivePick {
+  pick: number;
+  round: number;
+  team_key: string;
+  is_mine: boolean;
+  // internal id (same key the draft board uses) once mapped; null when Yahoo's
+  // player has no PlayerIdMap entry yet -- still a real pick, just unresolvable
+  // to a board row
+  player_key: string | null;
+  yahoo_player_key: string;
+}
+
+export interface DraftLiveUnmapped {
+  yahoo_player_key: string;
+  pick: number;
+}
+
+export interface DraftLiveResponse {
+  draft_status: "predraft" | "draft" | "postdraft";
+  draft_type: string | null;
+  num_teams: number;
+  my_team_key: string | null;
+  my_slot: number | null;
+  overall_pick: number;
+  picks: DraftLivePick[];
+  unmapped: DraftLiveUnmapped[];
+  stale: boolean;
+  synced_at: string;
+}
+
 // --- GET /api/leagues/{id}/adds ---
 
 export interface AddsCandidate {
@@ -534,6 +566,10 @@ export function postDraftRecommend(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+}
+
+export function getDraftLive(id: number): Promise<DraftLiveResponse> {
+  return requestJson<DraftLiveResponse>(`/api/leagues/${id}/draft/live`);
 }
 
 export function disconnectYahoo(): Promise<void> {

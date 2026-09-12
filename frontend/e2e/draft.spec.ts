@@ -37,6 +37,13 @@ async function devLoginAndOpenDraftTab(page: Page) {
 
   await draftLink.click();
   await page.waitForURL(/\/dashboard\/\d+\/draft$/);
+
+  // WP3 live-draft polling: the dev league has no Yahoo token, so the
+  // page's live probe (GET .../draft/live) gets a 401 and the page falls
+  // back to mock mode -- proven here by the mock-only slot picker actually
+  // rendering, not just by the absence of an error. Every test below still
+  // exercises the existing mock draft flow unchanged past this point.
+  await expect(page.getByLabel("Your slot")).toBeVisible();
 }
 
 test.describe("draft assistant", () => {

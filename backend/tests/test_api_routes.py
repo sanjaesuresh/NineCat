@@ -48,6 +48,8 @@ from ninecat.warehouse.nba_schedule import sync_schedule
 from ninecat.yahoo.gateway import YahooAuthError, YahooUnavailableError
 from ninecat.yahoo.parsers import (
     CategoryInfo,
+    DraftPick,
+    DraftResultsPage,
     LeagueInfo,
     LeagueSettings,
     Matchup,
@@ -82,8 +84,10 @@ class _StubYahooClient:
         standings_by_league=None,
         roster_by_team=None,
         scoreboard_by_league=None,
+        draft_results_by_league=None,
         raise_on_leagues=None,
         raise_on_scoreboard=None,
+        raise_on_draft_results=None,
     ):
         self._user_leagues = user_leagues or []
         self._user_teams = user_teams or []
@@ -92,8 +96,10 @@ class _StubYahooClient:
         self._standings_by_league = standings_by_league or {}
         self._roster_by_team = roster_by_team or {}
         self._scoreboard_by_league = scoreboard_by_league or {}
+        self._draft_results_by_league = draft_results_by_league or {}
         self._raise_on_leagues = raise_on_leagues
         self._raise_on_scoreboard = raise_on_scoreboard
+        self._raise_on_draft_results = raise_on_draft_results
 
     def get_user_leagues(self):
         if self._raise_on_leagues is not None:
@@ -119,6 +125,11 @@ class _StubYahooClient:
         if self._raise_on_scoreboard is not None:
             raise self._raise_on_scoreboard
         return self._scoreboard_by_league.get(league_key, [])
+
+    def get_draft_results(self, league_key):
+        if self._raise_on_draft_results is not None:
+            raise self._raise_on_draft_results
+        return self._draft_results_by_league[league_key]
 
 
 def _make_settings() -> LeagueSettings:
@@ -1354,6 +1365,191 @@ def test_draft_board_my_player_key_does_not_change_ranked_players(db_session):
     assert no_key.status_code == 200
     assert with_key.status_code == 200
     assert with_key.json()["players"] == no_key.json()["players"]
+
+
+# --- GET /api/leagues/{id}/draft/live ---
+
+
+def _seed_resolved_player(db_session, yahoo_player_key: str, nba_person_id: int, name: str) -> int:
+    """Minimal NbaPlayer + resolved PlayerIdMap row -- draft/live only needs the
+    yahoo_player_key -> nba_player_id link, not full averages/projections."""
+    player = NbaPlayer(nba_person_id=nba_person_id, full_name=name)
+    db_session.add(player)
+    db_session.flush()
+    db_session.add(
+        PlayerIdMap(
+            nba_player_id=player.id,
+            yahoo_player_key=yahoo_player_key,
+            yahoo_name=name,
+            match_method="exact",
+        )
+    )
+    db_session.flush()
+    return player.id
+
+
+def test_draft_live_active_draft_flags_mine_and_lists_unmapped(db_session):
+    user = _seed_user(db_session)
+    league, _team, _rival = _seed_league_with_team(db_session, user)
+
+    star_id = _seed_resolved_player(db_session, "466.p.1", 2544, "Star Player")
+    rival_pick_id = _seed_resolved_player(db_session, "466.p.2", 2545, "Rival Pick")
+    # 466.p.999 is deliberately never mapped -- the unmapped-picks path
+
+    stub = _StubYahooClient(
+        draft_results_by_league={
+            LEAGUE_KEY: DraftResultsPage(
+                draft_status="draft",
+                num_teams=10,
+                results=[
+                    DraftPick(pick=1, round=1, team_key=TEAM_KEY, player_key="466.p.1"),
+                    DraftPick(pick=2, round=1, team_key=RIVAL_TEAM_KEY, player_key="466.p.2"),
+                    DraftPick(pick=3, round=1, team_key=RIVAL_TEAM_KEY, player_key="466.p.999"),
+                ],
+            )
+        }
+    )
+    client = _authed_client(db_session, user, stub)
+    response = client.get(f"/api/leagues/{league.id}/draft/live")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert set(body.keys()) == {
+        "draft_status",
+        "draft_type",
+        "num_teams",
+        "my_team_key",
+        "my_slot",
+        "overall_pick",
+        "picks",
+        "unmapped",
+        "stale",
+        "synced_at",
+    }
+    assert body["draft_status"] == "draft"
+    assert body["draft_type"] is None
+    assert body["num_teams"] == 10
+    assert body["my_team_key"] == TEAM_KEY
+    assert body["my_slot"] == 1
+    assert body["overall_pick"] == 4
+    assert body["stale"] is False
+    datetime.fromisoformat(body["synced_at"])
+
+    picks = body["picks"]
+    assert [p["pick"] for p in picks] == [1, 2, 3]
+    assert picks[0] == {
+        "pick": 1,
+        "round": 1,
+        "team_key": TEAM_KEY,
+        "is_mine": True,
+        "player_key": str(star_id),
+        "yahoo_player_key": "466.p.1",
+    }
+    assert picks[1]["is_mine"] is False
+    assert picks[1]["player_key"] == str(rival_pick_id)
+    # the unmapped pick is still listed among picks (player_key null), but the
+    # mapped player_key set must not include it
+    assert picks[2]["is_mine"] is False
+    assert picks[2]["player_key"] is None
+    assert picks[2]["yahoo_player_key"] == "466.p.999"
+    mapped_player_keys = {p["player_key"] for p in picks if p["player_key"] is not None}
+    assert str(star_id) in mapped_player_keys
+    assert str(rival_pick_id) in mapped_player_keys
+
+    assert body["unmapped"] == [{"yahoo_player_key": "466.p.999", "pick": 3}]
+
+
+def test_draft_live_predraft_has_no_picks_and_no_slot(db_session):
+    user = _seed_user(db_session)
+    league, _team, _rival = _seed_league_with_team(db_session, user)
+
+    stub = _StubYahooClient(
+        draft_results_by_league={
+            LEAGUE_KEY: DraftResultsPage(draft_status="predraft", num_teams=10, results=[])
+        }
+    )
+    client = _authed_client(db_session, user, stub)
+    response = client.get(f"/api/leagues/{league.id}/draft/live")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["draft_status"] == "predraft"
+    assert body["picks"] == []
+    assert body["unmapped"] == []
+    assert body["overall_pick"] == 1
+    # the user's team is already linked (from league setup) even though no
+    # pick has been made yet -- my_team_key is known, my_slot isn't
+    assert body["my_team_key"] == TEAM_KEY
+    assert body["my_slot"] is None
+    assert body["stale"] is False
+
+
+def test_draft_live_auth_error_returns_401(db_session):
+    user = _seed_user(db_session)
+    league, _team, _rival = _seed_league_with_team(db_session, user)
+
+    stub = _StubYahooClient(raise_on_draft_results=YahooAuthError("bad token"))
+    client = _authed_client(db_session, user, stub)
+    response = client.get(f"/api/leagues/{league.id}/draft/live")
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "yahoo_reauth_required"
+
+
+def test_draft_live_unavailable_falls_back_to_stale_cached_payload(db_session):
+    user = _seed_user(db_session)
+    league, _team, _rival = _seed_league_with_team(db_session, user)
+    _seed_resolved_player(db_session, "466.p.1", 2544, "Star Player")
+
+    # raw yahoo-shaped payload (not a parsed DraftResultsPage) -- this is what
+    # the gateway hands back as YahooUnavailableError.stale_payload, and the
+    # route must run it through parse_draft_results itself
+    raw_stale_payload = {
+        "fantasy_content": {
+            "league": [
+                {"league_key": LEAGUE_KEY, "num_teams": "10", "draft_status": "draft"},
+                {
+                    "draft_results": [
+                        {
+                            "draft_result": {
+                                "pick": "1",
+                                "round": "1",
+                                "team_key": TEAM_KEY,
+                                "player_key": "466.p.1",
+                            }
+                        }
+                    ]
+                },
+            ]
+        }
+    }
+    stale_synced_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    stub = _StubYahooClient(
+        raise_on_draft_results=YahooUnavailableError(
+            stale_payload=raw_stale_payload, synced_at=stale_synced_at
+        )
+    )
+    client = _authed_client(db_session, user, stub)
+    response = client.get(f"/api/leagues/{league.id}/draft/live")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["stale"] is True
+    assert body["synced_at"] == stale_synced_at.isoformat()
+    assert body["draft_status"] == "draft"
+    assert len(body["picks"]) == 1
+    assert body["picks"][0]["is_mine"] is True
+
+
+def test_draft_live_404_for_foreign_league(db_session):
+    user = _seed_user(db_session, guid="guid-a", name="A")
+    other = _seed_user(db_session, guid="guid-b", name="B")
+    league, _team, _rival = _seed_league_with_team(db_session, other)
+
+    client = _authed_client(db_session, user)
+    response = client.get(f"/api/leagues/{league.id}/draft/live")
+
+    assert response.status_code == 404
 
 
 # --- POST /api/leagues/{id}/draft/recommend ---

@@ -24,3 +24,10 @@ adjusted against the real payloads at that point.
 | `league_scoreboard_current_week.json` | `league/{league_key}/scoreboard` (no `;week=`) | `get_scoreboard` with `week=None` |
 | `user_teams.json` | `users;use_login=1/games;game_keys=nba/teams` | `get_user_teams` |
 | `malformed_league_settings.json` | n/a — deliberately missing `stat_categories`/`scoring_type`/playoff keys, used only to test `YahooParseError` | error-path test |
+| `league_draftresults.json` | `league/{league_key}/draftresults` | `get_draft_results` |
+| `league_draftresults_predraft.json` | `league/{league_key}/draftresults` (draft not yet started) | `get_draft_results` |
+
+`league_draftresults.json` and `league_draftresults_predraft.json` are hand-built from
+Yahoo's documented draftresults shape only (phase-3 WP1's account access is still
+blocked), same caveat as above -- pending re-record from a live response as a
+named WP1 follow-up.

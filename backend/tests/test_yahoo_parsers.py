@@ -1,14 +1,20 @@
-"""Unit tests for yahoo/parsers.py's scoreboard week_start/week_end handling.
+"""Unit tests for yahoo/parsers.py edge cases: scoreboard week_start/week_end
+handling, and draft_results' pending-slot skip.
 
-Kept separate from test_yahoo_client.py's higher-level get_scoreboard tests
-(which exercise the shared fixture through the client) so the absent/malformed
-edge cases can use small hand-built payloads instead of editing the shared
-fixture for every case.
+Kept separate from test_yahoo_client.py's higher-level fixture-driven tests
+(which exercise the shared fixtures through the client) so these edge cases
+can use small hand-built payloads instead of editing a shared fixture for
+every case.
 """
 
 from datetime import date
 
-from ninecat.yahoo.parsers import parse_scoreboard
+from ninecat.yahoo.parsers import (
+    parse_draft_results,
+    parse_scoreboard,
+    parse_standings,
+    parse_user_teams,
+)
 
 
 def _raw_with_matchup(matchup_overrides: dict) -> dict:
@@ -68,3 +74,127 @@ def test_malformed_week_dates_degrade_to_none_without_raising():
 
     assert matchups[0].week_start is None
     assert matchups[0].week_end is None
+
+
+def _raw_draft_results(draft_result_overrides: list[dict]) -> dict:
+    return {
+        "fantasy_content": {
+            "league": [
+                {"league_key": "1.l.1", "num_teams": "2", "draft_status": "draft"},
+                {
+                    "draft_results": [
+                        {"draft_result": dr} for dr in draft_result_overrides
+                    ]
+                },
+            ]
+        }
+    }
+
+
+def test_pending_slot_without_player_key_is_skipped_not_fabricated():
+    # a not-yet-made pick omits player_key entirely (not null) -- it must never
+    # become a DraftPick, since there is nothing to report a player_key for
+    raw = _raw_draft_results(
+        [
+            {"pick": "1", "round": "1", "team_key": "1.l.1.t.1", "player_key": "1.p.1"},
+            {"pick": "2", "round": "1", "team_key": "1.l.1.t.2"},
+        ]
+    )
+
+    page = parse_draft_results(raw)
+
+    assert len(page.results) == 1
+    assert page.results[0].pick == 1
+    assert page.results[0].player_key == "1.p.1"
+
+
+def test_parse_user_teams_tolerates_empty_list_padding_in_team_attrs():
+    # live-verified 2026-09-12: real yahoo pads absent team attributes as
+    # empty LISTS interleaved with the single-key attr dicts -- the first
+    # real-league sync died on exactly this (guid fetch fine, team parse not)
+    raw = {
+        "fantasy_content": {
+            "users": {
+                "0": {
+                    "user": [
+                        {"guid": "SANITIZEDGUID1"},
+                        {
+                            "games": {
+                                "0": {
+                                    "game": [
+                                        {"game_key": "466", "code": "nba"},
+                                        {
+                                            "teams": {
+                                                "0": {
+                                                    "team": [
+                                                        [
+                                                            {"team_key": "466.l.12345.t.3"},
+                                                            [],
+                                                            {"name": "Team Alpha"},
+                                                            [],
+                                                        ]
+                                                    ]
+                                                },
+                                                "count": 1,
+                                            }
+                                        },
+                                    ]
+                                },
+                                "count": 1,
+                            }
+                        },
+                    ]
+                },
+                "count": 1,
+            }
+        }
+    }
+    teams = parse_user_teams(raw)
+    assert len(teams) == 1
+    assert teams[0].team_key == "466.l.12345.t.3"
+    assert teams[0].league_key == "466.l.12345"
+
+
+def test_parse_standings_treats_preseason_empty_rank_as_zero():
+    # live-verified 2026-09-12: before any games, yahoo sends rank as ""
+    # (and percentage as "") -- 0 means "unranked yet", not a parse failure
+    raw = {
+        "fantasy_content": {
+            "league": [
+                {"league_key": "466.l.12345"},
+                {
+                    "standings": [
+                        {
+                            "teams": {
+                                "0": {
+                                    "team": [
+                                        [
+                                            {"team_key": "466.l.12345.t.3"},
+                                            [],
+                                            {"name": "Team Alpha"},
+                                        ],
+                                        {
+                                            "team_standings": {
+                                                "rank": "",
+                                                "outcome_totals": {
+                                                    "wins": 0,
+                                                    "losses": 0,
+                                                    "ties": 0,
+                                                    "percentage": "",
+                                                },
+                                            }
+                                        },
+                                    ]
+                                },
+                                "count": 1,
+                            }
+                        }
+                    ]
+                },
+            ]
+        }
+    }
+    entries = parse_standings(raw)
+    assert len(entries) == 1
+    assert entries[0].rank == 0
+    assert entries[0].wins == 0

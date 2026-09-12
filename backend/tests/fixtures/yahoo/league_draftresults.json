@@ -1,0 +1,80 @@
+{
+  "fantasy_content": {
+    "league": [
+      {
+        "league_key": "466.l.12345",
+        "name": "Nine Cat Nation",
+        "num_teams": "10",
+        "draft_status": "draft"
+      },
+      {
+        "draft_results": {
+          "0": {
+            "draft_result": {
+              "pick": "1",
+              "round": "1",
+              "team_key": "466.l.12345.t.1",
+              "player_key": "466.p.1001"
+            }
+          },
+          "1": {
+            "draft_result": {
+              "pick": "2",
+              "round": "1",
+              "team_key": "466.l.12345.t.2",
+              "player_key": "466.p.1002"
+            }
+          },
+          "2": {
+            "draft_result": {
+              "pick": "3",
+              "round": "1",
+              "team_key": "466.l.12345.t.3",
+              "player_key": "466.p.1003"
+            }
+          },
+          "3": {
+            "draft_result": {
+              "pick": "4",
+              "round": "1",
+              "team_key": "466.l.12345.t.4",
+              "player_key": "466.p.9999"
+            }
+          },
+          "4": {
+            "draft_result": {
+              "pick": "5",
+              "round": "1",
+              "team_key": "466.l.12345.t.5"
+            }
+          },
+          "5": {
+            "draft_result": {
+              "pick": "6",
+              "round": "2",
+              "team_key": "466.l.12345.t.5",
+              "player_key": "466.p.1005"
+            }
+          },
+          "6": {
+            "draft_result": {
+              "pick": "7",
+              "round": "2",
+              "team_key": "466.l.12345.t.4",
+              "player_key": "466.p.1006"
+            }
+          },
+          "7": {
+            "draft_result": {
+              "pick": "8",
+              "round": "2",
+              "team_key": "466.l.12345.t.3",
+              "player_key": "466.p.1007"
+            }
+          },
+          "count": 8
+        }
+      }
+    ]
+  }
+}

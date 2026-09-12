@@ -68,6 +68,7 @@ from ninecat.models import (
     Standing,
     Team,
     User,
+    YahooApiCache,
     YahooToken,
 )
 from ninecat.sync.league_sync import sync_league_detail, sync_user_leagues
@@ -76,8 +77,8 @@ from ninecat.warehouse.id_mapping import map_yahoo_players
 from ninecat.warehouse.nba_schedule import games_in_range
 from ninecat.warehouse.projections import DEV_SEED_PROJECTION_SOURCE
 from ninecat.yahoo.client import YahooClient
-from ninecat.yahoo.gateway import YahooAuthError, YahooGateway, YahooUnavailableError
-from ninecat.yahoo.parsers import UserTeamInfo
+from ninecat.yahoo.gateway import YahooAuthError, YahooGateway, YahooUnavailableError, _path_hash
+from ninecat.yahoo.parsers import UserTeamInfo, parse_draft_results
 
 router = APIRouter()
 
@@ -907,6 +908,125 @@ def draft_board(
         "players": players_out,
         "punt_suggestions": punt_suggestions_out,
         "source": resolved_source,
+        "stale": stale,
+        "synced_at": synced_at,
+    }
+
+
+# --- GET /api/leagues/{league_id}/draft/live ---
+
+
+def _draft_results_synced_at(db: Session, user_id: int, league_key: str) -> str:
+    """draft/live's freshness must reflect the draftresults resource's OWN gateway
+    cache row (a 20s TTL), not `_league_stale_and_synced_at` (which only tracks the
+    periodic full-league sync and would read stale/None mid-draft) -- falls back to
+    now() when no cache row exists yet (e.g. a stubbed test client, which never
+    touches the real cache table)."""
+    path_hash = _path_hash(f"league/{league_key}/draftresults")
+    fetched_at = db.execute(
+        select(YahooApiCache.fetched_at).where(
+            YahooApiCache.user_id == user_id, YahooApiCache.path_hash == path_hash
+        )
+    ).scalar_one_or_none()
+    return (fetched_at or datetime.now(timezone.utc)).isoformat()
+
+
+@router.get("/api/leagues/{league_id}/draft/live")
+def draft_live(
+    league_id: int,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_session),
+    client: YahooClient = Depends(get_yahoo_client),
+) -> dict:
+    league = _get_owned_league(db, user, league_id)
+
+    stale = False
+    try:
+        page = client.get_draft_results(league.yahoo_league_key)
+        synced_at = _draft_results_synced_at(db, user.id, league.yahoo_league_key)
+    except YahooAuthError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="yahoo_reauth_required"
+        ) from exc
+    except YahooUnavailableError as exc:
+        # degrade to whatever the gateway had cached, flagged stale -- but with
+        # nothing ever cached for this league there is no draft state to show
+        if exc.stale_payload is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="yahoo_unavailable"
+            ) from exc
+        page = parse_draft_results(exc.stale_payload)
+        stale = True
+        synced_at = (
+            exc.synced_at.isoformat()
+            if exc.synced_at is not None
+            else datetime.now(timezone.utc).isoformat()
+        )
+
+    my_team = db.execute(
+        select(Team).where(Team.league_id == league.id, Team.user_id == user.id)
+    ).scalar_one_or_none()
+    my_team_key = my_team.yahoo_team_key if my_team is not None else None
+
+    yahoo_keys = [p.player_key for p in page.results]
+    nba_id_by_yahoo_key = (
+        {
+            row.yahoo_player_key: row.nba_player_id
+            for row in db.execute(
+                select(PlayerIdMap).where(
+                    PlayerIdMap.yahoo_player_key.in_(yahoo_keys),
+                    PlayerIdMap.nba_player_id.is_not(None),
+                )
+            )
+            .scalars()
+            .all()
+        }
+        if yahoo_keys
+        else {}
+    )
+
+    picks_out = []
+    unmapped_out = []
+    for p in sorted(page.results, key=lambda pick: pick.pick):
+        nba_player_id = nba_id_by_yahoo_key.get(p.player_key)
+        if nba_player_id is None:
+            # surfaced explicitly rather than silently dropped from the available
+            # pool -- the frontend needs to know this pick happened even though
+            # we can't yet resolve which internal player it took off the board
+            unmapped_out.append({"yahoo_player_key": p.player_key, "pick": p.pick})
+        picks_out.append(
+            {
+                "pick": p.pick,
+                "round": p.round,
+                "team_key": p.team_key,
+                "is_mine": my_team_key is not None and p.team_key == my_team_key,
+                "player_key": str(nba_player_id) if nba_player_id is not None else None,
+                "yahoo_player_key": p.player_key,
+            }
+        )
+
+    overall_pick = max((p.pick for p in page.results), default=0) + 1
+    my_slot = next(
+        (
+            p.pick
+            for p in page.results
+            if p.round == 1 and my_team_key is not None and p.team_key == my_team_key
+        ),
+        None,
+    )
+
+    return {
+        "draft_status": page.draft_status,
+        # yahoo's draftresults metadata only documents league_key/name/num_teams/
+        # draft_status (no draft_type field) -- null until WP1's live re-record
+        # confirms whether/where yahoo actually reports auction vs. snake
+        "draft_type": None,
+        "num_teams": page.num_teams,
+        "my_team_key": my_team_key,
+        "my_slot": my_slot,
+        "overall_pick": overall_pick,
+        "picks": picks_out,
+        "unmapped": unmapped_out,
         "stale": stale,
         "synced_at": synced_at,
     }

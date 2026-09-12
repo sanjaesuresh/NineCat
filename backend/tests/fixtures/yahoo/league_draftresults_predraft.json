@@ -1,0 +1,17 @@
+{
+  "fantasy_content": {
+    "league": [
+      {
+        "league_key": "466.l.12345",
+        "name": "Nine Cat Nation",
+        "num_teams": "10",
+        "draft_status": "predraft"
+      },
+      {
+        "draft_results": {
+          "count": 0
+        }
+      }
+    ]
+  }
+}

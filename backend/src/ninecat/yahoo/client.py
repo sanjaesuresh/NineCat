@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import Protocol
 
 from ninecat.yahoo.parsers import (
+    DraftResultsPage,
     LeagueInfo,
     LeagueSettings,
     Matchup,
@@ -18,6 +19,7 @@ from ninecat.yahoo.parsers import (
     StandingEntry,
     TeamInfo,
     UserTeamInfo,
+    parse_draft_results,
     parse_league_settings,
     parse_league_teams,
     parse_scoreboard,
@@ -36,6 +38,10 @@ TEAMS_CACHE_TTL_SECONDS = 6 * 60 * 60
 ROSTER_CACHE_TTL_SECONDS = 60 * 60
 STANDINGS_CACHE_TTL_SECONDS = 60 * 60
 SCOREBOARD_CACHE_TTL_SECONDS = 15 * 60
+# short on purpose: this is client-driven polling (the draft page, not the
+# scheduler), so 20s just means N open tabs still cost Yahoo at most one call
+# per 20s window -- respectful of Yahoo's rate limits without staling a live pick
+DRAFT_CACHE_TTL_SECONDS = 20
 
 
 class _GatewayLike(Protocol):
@@ -87,3 +93,7 @@ class YahooClient:
             path = f"{path};week={week}"
         raw = self._gateway.get(path, SCOREBOARD_CACHE_TTL_SECONDS)
         return parse_scoreboard(raw)
+
+    def get_draft_results(self, league_key: str) -> DraftResultsPage:
+        raw = self._gateway.get(f"league/{league_key}/draftresults", DRAFT_CACHE_TTL_SECONDS)
+        return parse_draft_results(raw)

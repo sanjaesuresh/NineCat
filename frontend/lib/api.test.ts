@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ApiError,
   getDraftBoard,
+  getDraftLive,
   getLeagueAdds,
   getLeagueMatchup,
   getLeagueTrades,
@@ -182,6 +183,40 @@ describe("api client", () => {
     await expect(
       postDraftRecommend(7, { my_player_keys: [], taken_player_keys: [], overall_pick: 0 })
     ).rejects.toMatchObject({ status: 400 });
+  });
+
+  it("getDraftLive hits the live-draft endpoint and returns parsed JSON", async () => {
+    const payload = {
+      draft_status: "draft",
+      draft_type: "snake",
+      num_teams: 8,
+      my_team_key: "1.t.1",
+      my_slot: 1,
+      overall_pick: 3,
+      picks: [],
+      unmapped: [],
+      stale: false,
+      synced_at: "x",
+    };
+    const fetchMock = vi.fn().mockResolvedValue(mockResponse({ ok: true, status: 200, json: payload }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await getDraftLive(7);
+
+    expect(result).toEqual(payload);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/leagues/7/draft/live",
+      expect.objectContaining({ cache: "no-store" })
+    );
+  });
+
+  it("getDraftLive surfaces a 401 (yahoo_reauth_required) as ApiError", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      mockResponse({ ok: false, status: 401, json: { detail: "yahoo_reauth_required" } })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(getDraftLive(7)).rejects.toMatchObject({ status: 401 });
   });
 
   it("getLeagueMatchup hits the matchup endpoint with no query string when opts omitted", async () => {
