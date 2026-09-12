@@ -1,0 +1,15 @@
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "build": {
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "Dockerfile"
+  },
+  "deploy": {
+    "preDeployCommand": ".venv/bin/alembic -c alembic.ini upgrade head",
+    "startCommand": "sh -c '.venv/bin/uvicorn ninecat.main:create_app --factory --host 0.0.0.0 --port ${PORT}'",
+    "healthcheckPath": "/api/health",
+    "healthcheckTimeout": 120,
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 3
+  }
+}
