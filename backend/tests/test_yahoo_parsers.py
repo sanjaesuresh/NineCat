@@ -7,7 +7,9 @@ can use small hand-built payloads instead of editing a shared fixture for
 every case.
 """
 
+import json
 from datetime import date
+from pathlib import Path
 
 from ninecat.yahoo.parsers import (
     parse_draft_results,
@@ -15,6 +17,8 @@ from ninecat.yahoo.parsers import (
     parse_standings,
     parse_user_teams,
 )
+
+FIXTURE_DIR = Path(__file__).parent / "fixtures" / "yahoo"
 
 
 def _raw_with_matchup(matchup_overrides: dict) -> dict:
@@ -198,3 +202,20 @@ def test_parse_standings_treats_preseason_empty_rank_as_zero():
     assert len(entries) == 1
     assert entries[0].rank == 0
     assert entries[0].wins == 0
+
+
+def test_parse_standings_preseason_fixture_pins_real_rank_zero_shape():
+    # league_standings_preseason.json is the live-recorded, sanitized capture
+    # this hand-built test above was modeled on -- load it through the real
+    # parser path (not an inline dict) so the pinned shape can't silently drift
+    raw = json.loads((FIXTURE_DIR / "league_standings_preseason.json").read_text())
+
+    entries = parse_standings(raw)
+
+    assert len(entries) == 1
+    assert entries[0].team_key == "478.l.11111.t.1"
+    assert entries[0].name == "Team Alpha"
+    assert entries[0].rank == 0
+    assert entries[0].wins == 0
+    assert entries[0].losses == 0
+    assert entries[0].ties == 0

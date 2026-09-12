@@ -28,6 +28,7 @@ from ninecat.advisor import (
     build_advisor_client,
     explain,
 )
+from ninecat.auth.routes import DEV_LEAGUE_KEY, DEV_POOL_NBA_PERSON_IDS
 from ninecat.auth.sessions import SESSION_COOKIE_NAME, current_user
 from ninecat.config import get_settings
 from ninecat.db import get_session
@@ -297,11 +298,19 @@ def _resolve_projection_source(db: Session, season: str, source: str | None) -> 
     return sources[0] if sources else None
 
 
-def _draftable_rows(db: Session, season: str, source: str | None) -> dict[int, _DraftableRow]:
+def _draftable_rows(
+    db: Session, season: str, source: str | None, *, include_dev_pool: bool = False
+) -> dict[int, _DraftableRow]:
     """Every NbaPlayer with a `source` projection or a season average for
     `season`, keyed by nba_player_id -- independent of roster status, since a
     rostered player's own stat row is still needed to z-score their
-    contribution to punt suggestions. Callers exclude rostered ids separately."""
+    contribution to punt suggestions. Callers exclude rostered ids separately.
+
+    include_dev_pool: the dev-login seed's fake players (real star names,
+    seeded season averages) must never surface on a REAL league's board or in
+    its z-score population, but the dev league needs them -- its rosters are
+    made of them (phase-3 wp1 finding: first live board showed a seeded
+    "Nikola Jokic" beside the real one)."""
     projections_by_player: dict[int, PlayerProjection] = {}
     if source is not None:
         projections_by_player = {
@@ -335,6 +344,8 @@ def _draftable_rows(db: Session, season: str, source: str | None) -> dict[int, _
     for player_id in candidate_ids:
         nba_player = nba_players_by_id.get(player_id)
         if nba_player is None:
+            continue
+        if not include_dev_pool and nba_player.nba_person_id in DEV_POOL_NBA_PERSON_IDS:
             continue
         projection = projections_by_player.get(player_id)
         season_avg = season_avgs_by_player.get(player_id)
@@ -825,7 +836,12 @@ def draft_board(
     season = get_settings().current_season
     resolved_source = _resolve_projection_source(db, season, source)
 
-    rows = _draftable_rows(db, season, resolved_source)
+    rows = _draftable_rows(
+        db,
+        season,
+        resolved_source,
+        include_dev_pool=league.yahoo_league_key == DEV_LEAGUE_KEY,
+    )
     zscores = _zscores_for(rows)
 
     # ?my_player_key= lets a mock draft (Yahoo roster still empty pre-draft)
@@ -1078,7 +1094,12 @@ def draft_recommend(
     settings = get_settings()
     season = settings.current_season
     resolved_source = _resolve_projection_source(db, season, body.source)
-    rows = _draftable_rows(db, season, resolved_source)
+    rows = _draftable_rows(
+        db,
+        season,
+        resolved_source,
+        include_dev_pool=league.yahoo_league_key == DEV_LEAGUE_KEY,
+    )
 
     requested_keys = [*body.my_player_keys, *body.taken_player_keys]
     unknown_keys = sorted({k for k in requested_keys if not k.isdigit() or int(k) not in rows})
@@ -1642,7 +1663,12 @@ def league_matchup(
 
     season = get_settings().current_season
     resolved_source = _resolve_projection_source(db, season, None)
-    rows = _draftable_rows(db, season, resolved_source)
+    rows = _draftable_rows(
+        db,
+        season,
+        resolved_source,
+        include_dev_pool=league.yahoo_league_key == DEV_LEAGUE_KEY,
+    )
     zscores = _zscores_for(rows)
     abbr_to_nba_id, internal_id_to_nba_id = _nba_team_id_maps(db)
 
@@ -1893,7 +1919,12 @@ def league_adds(
 
     season = get_settings().current_season
     resolved_source = _resolve_projection_source(db, season, None)
-    rows = _draftable_rows(db, season, resolved_source)
+    rows = _draftable_rows(
+        db,
+        season,
+        resolved_source,
+        include_dev_pool=league.yahoo_league_key == DEV_LEAGUE_KEY,
+    )
     zscores = _zscores_for(rows)
     abbr_to_nba_id, internal_id_to_nba_id = _nba_team_id_maps(db)
 
@@ -2151,7 +2182,12 @@ def league_trades(
 
     season = get_settings().current_season
     resolved_source = _resolve_projection_source(db, season, None)
-    rows = _draftable_rows(db, season, resolved_source)
+    rows = _draftable_rows(
+        db,
+        season,
+        resolved_source,
+        include_dev_pool=league.yahoo_league_key == DEV_LEAGUE_KEY,
+    )
     # one shared z population for BOTH rosters, per the task brief -- two
     # independently-scaled rosters would not be comparable on the same axis
     zscores = _zscores_for(rows)

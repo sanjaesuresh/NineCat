@@ -1179,6 +1179,11 @@ def test_draft_board_ranks_elite_players_plausibly(db_session):
     user = _seed_user(db_session)
     league, _team, _rival = _seed_league_with_team(db_session, user)
     league.num_teams = 12  # DEFAULT_ROSTER_SLOTS applies automatically (settings_json={})
+    # this test's pool IS the dev seed's 900xxx block, which real leagues now
+    # filter out (wp1 dev-pool exclusion) -- run it as the dev league
+    from ninecat.auth.routes import DEV_LEAGUE_KEY
+
+    league.yahoo_league_key = DEV_LEAGUE_KEY
     db_session.flush()
 
     ids_by_name = _seed_dev_pool_with_positions(db_session)
@@ -3270,3 +3275,62 @@ def test_trades_over_the_real_dev_seed_proposes_guards_for_bigs(
         assert all("C" in pos or "PF" in pos for pos in received), (
             f"the fix for a big-thin roster must be a big: {received}"
         )
+
+
+def test_draft_board_excludes_dev_pool_players_for_real_leagues(db_session):
+    # the dev-login seed's fake players (nba_person_id 900001-900199) carry
+    # real star names and season averages under the current season -- without
+    # this filter a real league's board shows an ascii "Nikola Jokic" beside
+    # the real one (found at first live sync, phase 3 wp1)
+    user = _seed_user(db_session)
+    league, _team, _rival = _seed_league_with_team(db_session, user)
+    real = _seed_draft_player(db_session, 900222, "Real Source Player", "C", source="real-source")
+    # dev-range player with ONLY a season average (the fallback path)
+    dev_player = NbaPlayer(nba_person_id=900101, full_name="Dev Pool Star", position="C")
+    db_session.add(dev_player)
+    db_session.flush()
+    db_session.add(
+        PlayerSeasonAverage(
+            nba_player_id=dev_player.id,
+            season=get_settings().current_season,
+            games_played=70,
+            fgm=5, fga=10, ftm=3, fta=4, tpm=1, pts=14, reb=5, ast=3, stl=1, blk=1, tov=2,
+        )
+    )
+    db_session.flush()
+
+    client = _authed_client(db_session, user)
+    response = client.get(f"/api/leagues/{league.id}/draft/board")
+
+    assert response.status_code == 200
+    keys = {p["player_key"] for p in response.json()["players"]}
+    assert str(real.id) in keys
+    assert str(dev_player.id) not in keys
+
+
+def test_draft_board_keeps_dev_pool_players_for_the_dev_league(db_session):
+    from ninecat.auth.routes import DEV_LEAGUE_KEY
+
+    user = _seed_user(db_session)
+    league, _team, _rival = _seed_league_with_team(db_session, user)
+    league.yahoo_league_key = DEV_LEAGUE_KEY
+    db_session.flush()
+    dev_player = NbaPlayer(nba_person_id=900102, full_name="Dev Pool Star Two", position="C")
+    db_session.add(dev_player)
+    db_session.flush()
+    db_session.add(
+        PlayerSeasonAverage(
+            nba_player_id=dev_player.id,
+            season=get_settings().current_season,
+            games_played=70,
+            fgm=5, fga=10, ftm=3, fta=4, tpm=1, pts=14, reb=5, ast=3, stl=1, blk=1, tov=2,
+        )
+    )
+    db_session.flush()
+
+    client = _authed_client(db_session, user)
+    response = client.get(f"/api/leagues/{league.id}/draft/board")
+
+    assert response.status_code == 200
+    keys = {p["player_key"] for p in response.json()["players"]}
+    assert str(dev_player.id) in keys

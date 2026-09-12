@@ -45,6 +45,8 @@ class _StubGateway:
 
 
 def test_get_user_leagues_parses_two_leagues_with_season_and_scoring_type():
+    # user_leagues.json is a live-recorded, sanitized capture: one game (478)
+    # with two pre-season leagues, each still showing num_teams == 1
     gateway = _StubGateway(
         {"users;use_login=1/games;game_keys=nba/leagues": _load("user_leagues.json")}
     )
@@ -53,13 +55,14 @@ def test_get_user_leagues_parses_two_leagues_with_season_and_scoring_type():
     leagues = client.get_user_leagues()
 
     assert len(leagues) == 2
-    assert leagues[0].league_key == "466.l.12345"
-    assert leagues[0].name == "Nine Cat Nation"
-    assert leagues[0].season == "2024"
+    assert leagues[0].league_key == "478.l.11111"
+    assert leagues[0].name == "Sample League A"
+    assert leagues[0].season == "2026"
     assert leagues[0].scoring_type == "head"
-    assert leagues[0].num_teams == 10
-    assert leagues[1].league_key == "454.l.67890"
-    assert leagues[1].season == "2023"
+    assert leagues[0].num_teams == 1
+    assert leagues[1].league_key == "478.l.22222"
+    assert leagues[1].name == "Sample League B"
+    assert leagues[1].season == "2026"
     assert gateway.calls == [
         ("users;use_login=1/games;game_keys=nba/leagues", LEAGUES_CACHE_TTL_SECONDS)
     ]
@@ -69,6 +72,9 @@ def test_get_user_leagues_parses_two_leagues_with_season_and_scoring_type():
 
 
 def test_get_league_settings_parses_nine_categories_to_flagged_negative_and_positions():
+    # league_settings.json is a live-recorded, sanitized capture -- its numbers
+    # (max_weekly_adds/playoff_*/roster_positions incl. a separate IL+ slot)
+    # come straight from a real Yahoo league, not a hand-built round number
     gateway = _StubGateway({f"league/{LEAGUE_KEY}/settings": _load("league_settings.json")})
     client = YahooClient(gateway)
 
@@ -85,13 +91,17 @@ def test_get_league_settings_parses_nine_categories_to_flagged_negative_and_posi
     pts_category = next(c for c in settings.categories if c.stat_id == 12)
     assert pts_category.is_negative is False
 
-    assert settings.max_weekly_adds == 4
-    assert settings.playoff_start_week == 20
-    assert settings.num_playoff_teams == 4
+    assert settings.max_weekly_adds == 5
+    assert settings.playoff_start_week == 18
+    assert settings.num_playoff_teams == 8
 
-    assert len(settings.roster_positions) == 10
+    # 11 slots: PG/SG/G/SF/PF/F/C/Util/BN/IL/IL+ (the real fixture carries both
+    # IL and IL+ as separate roster slots)
+    assert len(settings.roster_positions) == 11
     bench = next(rp for rp in settings.roster_positions if rp.position == "BN")
     assert bench.count == 3
+    il_plus = next(rp for rp in settings.roster_positions if rp.position == "IL+")
+    assert il_plus.count == 2
     assert gateway.calls == [(f"league/{LEAGUE_KEY}/settings", SETTINGS_CACHE_TTL_SECONDS)]
 
 
@@ -225,6 +235,10 @@ def test_get_scoreboard_without_week_omits_week_param_and_uses_response_week():
 
 
 def test_get_user_teams_derives_league_key_from_team_key_prefix():
+    # user_teams.json is a live-recorded, sanitized capture: one game (478)
+    # whose two teams (one per pre-season league) arrive as a numeric-key+count
+    # dict with empty-list attr padding -- the real yahoo shape _merge_attrs
+    # tolerates, not the plain-array shape the old hand-built fixture used
     gateway = _StubGateway(
         {"users;use_login=1/games;game_keys=nba/teams": _load("user_teams.json")}
     )
@@ -233,12 +247,10 @@ def test_get_user_teams_derives_league_key_from_team_key_prefix():
     teams = client.get_user_teams()
 
     assert len(teams) == 2
-    # first game's teams arrive as a numeric-key+count dict in the fixture
-    assert teams[0].team_key == "466.l.12345.t.1"
-    assert teams[0].league_key == "466.l.12345"
-    # second game's teams arrive as a plain array -- exercises the other branch
-    assert teams[1].team_key == "454.l.67890.t.7"
-    assert teams[1].league_key == "454.l.67890"
+    assert teams[0].team_key == "478.l.11111.t.1"
+    assert teams[0].league_key == "478.l.11111"
+    assert teams[1].team_key == "478.l.22222.t.1"
+    assert teams[1].league_key == "478.l.22222"
     assert gateway.calls == [
         ("users;use_login=1/games;game_keys=nba/teams", TEAMS_CACHE_TTL_SECONDS)
     ]
