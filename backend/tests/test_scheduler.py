@@ -227,6 +227,10 @@ def test_nightly_warehouse_sync_runs_schedule_then_averages_then_positions(monke
         lambda session, season: calls.append("averages") or 0,
     )
     monkeypatch.setattr(
+        "ninecat.jobs.scheduler.sync_player_index",
+        lambda session, season: calls.append("index") or 0,
+    )
+    monkeypatch.setattr(
         "ninecat.jobs.scheduler.sync_player_positions",
         lambda session, season: calls.append("positions") or PositionSyncResult(),
     )
@@ -234,7 +238,9 @@ def test_nightly_warehouse_sync_runs_schedule_then_averages_then_positions(monke
     # session is never touched by the stubs above, only passed through
     nightly_warehouse_sync(session=object())
 
-    assert calls == ["schedule", "averages", "positions"]
+    # index runs after averages (identity creation for rookies/sat-out players
+    # the stats feeds can't see) and before positions, which stays last
+    assert calls == ["schedule", "averages", "index", "positions"]
 
 
 def test_nightly_warehouse_sync_uses_current_season_setting_not_hardcoded(monkeypatch):
@@ -255,8 +261,13 @@ def test_nightly_warehouse_sync_uses_current_season_setting_not_hardcoded(monkey
         seasons_used["positions"] = season
         return PositionSyncResult()
 
+    def _stub_index(session, season):
+        seasons_used["index"] = season
+        return 0
+
     monkeypatch.setattr("ninecat.jobs.scheduler.sync_schedule", _stub_schedule)
     monkeypatch.setattr("ninecat.jobs.scheduler.sync_player_averages", _stub_averages)
+    monkeypatch.setattr("ninecat.jobs.scheduler.sync_player_index", _stub_index)
     monkeypatch.setattr("ninecat.jobs.scheduler.sync_player_positions", _stub_positions)
     # a season deliberately unlike the real default ("2025-26"), so this test
     # can't accidentally pass just because it matches Settings' default
@@ -270,6 +281,7 @@ def test_nightly_warehouse_sync_uses_current_season_setting_not_hardcoded(monkey
     assert seasons_used == {
         "schedule": "2099-00",
         "averages": "2099-00",
+        "index": "2099-00",
         "positions": "2099-00",
     }
 
@@ -283,6 +295,9 @@ def test_nightly_warehouse_sync_logs_row_counts_including_zero(monkeypatch, capl
         "ninecat.jobs.scheduler.sync_player_averages", lambda session, season: 450
     )
     monkeypatch.setattr(
+        "ninecat.jobs.scheduler.sync_player_index", lambda session, season: 3
+    )
+    monkeypatch.setattr(
         "ninecat.jobs.scheduler.sync_player_positions",
         lambda session, season: PositionSyncResult(matched=450, skipped=2),
     )
@@ -292,7 +307,36 @@ def test_nightly_warehouse_sync_logs_row_counts_including_zero(monkeypatch, capl
 
     assert "sync_schedule upserted 0 game rows" in caplog.text
     assert "sync_player_averages upserted 450 rows" in caplog.text
+    assert "sync_player_index created 3 players" in caplog.text
     assert "sync_player_positions matched=450 skipped=2" in caplog.text
+
+
+def test_nightly_warehouse_sync_index_sync_failure_is_non_fatal(monkeypatch, caplog):
+    # same rationale as the positions non-fatal rule: identity creation is an
+    # enrichment step and must never take down the schedule/averages the draft
+    # engine depends on, nor stop positions from running after it
+    calls: list[str] = []
+    monkeypatch.setattr(
+        "ninecat.jobs.scheduler.sync_schedule", lambda session, season: 0
+    )
+    monkeypatch.setattr(
+        "ninecat.jobs.scheduler.sync_player_averages", lambda session, season: 0
+    )
+
+    def _boom_index(session, season):
+        raise RuntimeError("boom-index")
+
+    monkeypatch.setattr("ninecat.jobs.scheduler.sync_player_index", _boom_index)
+    monkeypatch.setattr(
+        "ninecat.jobs.scheduler.sync_player_positions",
+        lambda session, season: calls.append("positions") or PositionSyncResult(),
+    )
+
+    with caplog.at_level(logging.ERROR, logger="ninecat.jobs.scheduler"):
+        nightly_warehouse_sync(session=object())
+
+    assert "sync_player_index failed" in caplog.text
+    assert calls == ["positions"]
 
 
 def test_nightly_warehouse_sync_position_sync_failure_is_non_fatal(monkeypatch, caplog):
@@ -314,6 +358,7 @@ def test_nightly_warehouse_sync_position_sync_failure_is_non_fatal(monkeypatch, 
 
     monkeypatch.setattr("ninecat.jobs.scheduler.sync_schedule", _stub_schedule)
     monkeypatch.setattr("ninecat.jobs.scheduler.sync_player_averages", _stub_averages)
+    monkeypatch.setattr("ninecat.jobs.scheduler.sync_player_index", lambda session, season: 0)
     monkeypatch.setattr("ninecat.jobs.scheduler.sync_player_positions", _stub_positions)
 
     try:

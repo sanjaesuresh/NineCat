@@ -74,6 +74,7 @@ from ninecat.sync.league_sync import sync_league_detail, sync_user_leagues
 from ninecat.warehouse.fantasy_weeks import resolve_week, week_date_range
 from ninecat.warehouse.id_mapping import map_yahoo_players
 from ninecat.warehouse.nba_schedule import games_in_range
+from ninecat.warehouse.projections import DEV_SEED_PROJECTION_SOURCE
 from ninecat.yahoo.client import YahooClient
 from ninecat.yahoo.gateway import YahooAuthError, YahooGateway, YahooUnavailableError
 from ninecat.yahoo.parsers import UserTeamInfo
@@ -265,7 +266,11 @@ def _resolve_projection_source(db: Session, season: str, source: str | None) -> 
     if no projections exist yet at all. Ambiguous with no explicit choice, or
     an explicit choice that doesn't exist -> 400 naming the real choices,
     rather than silently picking one or silently degrading to a mislabeled
-    season-average board (plan D2)."""
+    season-average board (plan D2). The dev-login fixture source is not a real
+    choice: it yields to a single real provider instead of manufacturing
+    ambiguity (phase-3 rollover ruling -- seed data falls back, never competes),
+    while staying explicitly selectable and still counting as the only source
+    when nothing real exists."""
     sources = sorted(
         db.execute(
             select(PlayerProjection.source).where(PlayerProjection.season == season).distinct()
@@ -280,6 +285,9 @@ def _resolve_projection_source(db: Session, season: str, source: str | None) -> 
                 detail=f"unknown projection source {source!r} for {season}, valid sources: {sources}",
             )
         return source
+    real_sources = [s for s in sources if s != DEV_SEED_PROJECTION_SOURCE]
+    if real_sources:
+        sources = real_sources
     if len(sources) > 1:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

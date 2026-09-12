@@ -4,7 +4,11 @@ from pathlib import Path
 from sqlalchemy import select
 
 from ninecat.models import NbaPlayer
-from ninecat.warehouse.player_positions import PositionSyncResult, sync_player_positions
+from ninecat.warehouse.player_positions import (
+    PositionSyncResult,
+    sync_player_index,
+    sync_player_positions,
+)
 
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "nba" / "sample_player_positions.json"
 
@@ -152,3 +156,80 @@ def test_sync_player_positions_empty_fetch_returns_zero_result(db_session):
     result = sync_player_positions(db_session, season="2025-26", fetcher=lambda season: [])
 
     assert result == PositionSyncResult(matched=0, skipped=0)
+
+
+# --- sync_player_index (identity creation; phase-3 WP2) ---
+
+# index rows carry names, unlike position rows; a player who sat out the whole
+# prior season (or a rookie) exists nowhere else before games are played, so
+# this is the only pre-season source that can put them on the draft board
+_INDEX_ROWS = [
+    {"nba_person_id": CURRY_PERSON_ID, "first_name": "Stephen", "last_name": "Curry",
+     "position": "F"},  # deliberately different from his stored "G": must NOT be applied
+    {"nba_person_id": 1641706, "first_name": "Rookie", "last_name": "Prospect", "position": "G"},
+    {"nba_person_id": 1641707, "first_name": "Injured", "last_name": "Star", "position": None},
+]
+
+
+def _index_fetcher(season: str) -> list[dict]:
+    return list(_INDEX_ROWS)
+
+
+def test_sync_player_index_creates_missing_players_with_name_and_position(db_session):
+    _seed_known_players(db_session)
+
+    created = sync_player_index(db_session, season="2026-27", fetcher=_index_fetcher)
+    db_session.flush()
+
+    rookie = db_session.execute(
+        select(NbaPlayer).where(NbaPlayer.nba_person_id == 1641706)
+    ).scalar_one()
+    assert rookie.full_name == "Rookie Prospect"
+    assert rookie.position == "G"
+    star = db_session.execute(
+        select(NbaPlayer).where(NbaPlayer.nba_person_id == 1641707)
+    ).scalar_one()
+    assert star.full_name == "Injured Star"
+    assert star.position is None
+    assert created == 2
+
+
+def test_sync_player_index_never_touches_existing_players(db_session):
+    _seed_known_players(db_session)
+    db_session.execute(
+        select(NbaPlayer)  # no-op read; position updates belong to sync_player_positions
+    )
+
+    sync_player_index(db_session, season="2026-27", fetcher=_index_fetcher)
+    db_session.flush()
+
+    curry = db_session.execute(
+        select(NbaPlayer).where(NbaPlayer.nba_person_id == CURRY_PERSON_ID)
+    ).scalar_one()
+    assert curry.full_name == "Stephen Curry"
+    assert curry.position is None  # seeded without one; index row must not write it
+
+
+def test_sync_player_index_is_idempotent_on_rerun(db_session):
+    _seed_known_players(db_session)
+
+    first = sync_player_index(db_session, season="2026-27", fetcher=_index_fetcher)
+    db_session.flush()
+    second = sync_player_index(db_session, season="2026-27", fetcher=_index_fetcher)
+    db_session.flush()
+
+    assert first == 2
+    assert second == 0
+    rookies = db_session.execute(
+        select(NbaPlayer).where(NbaPlayer.nba_person_id == 1641706)
+    ).scalars().all()
+    assert len(rookies) == 1
+
+
+def test_sync_player_index_empty_fetch_creates_nothing(db_session):
+    _seed_known_players(db_session)
+
+    created = sync_player_index(db_session, season="2026-27", fetcher=lambda season: [])
+    db_session.flush()
+
+    assert created == 0

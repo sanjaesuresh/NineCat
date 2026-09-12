@@ -49,18 +49,21 @@ Playwright drives the real stack end to end (landing page → dev-login → dash
 3. `cd frontend && npm run dev` → http://localhost:3000
 4. `cd frontend && npx playwright test` (or `npm run test:e2e`)
 
-Dev-login seeds a fixed dataset (idempotent — safe to re-run) directly into the docker Postgres instance: a demo user/league, a 3-player roster (`nba_person_id` 900001-900003) and a 72-player draftable pool with projections (900101-900199). The seed also grew to include a full demo NBA schedule (all 30 real `nba_teams` rows plus a week of `nba_games`, both keyed by real NBA.com ids) so weekly projections are demo-able. Unlike the pytest fixtures, these are real commits, and most backend tests now scope their row-count assertions to their own fixture's natural keys so they survive an unrelated commit — but if you still see spurious failures after running e2e or dev-login against a shared instance, delete the seeded rows before running the backend suite again:
+Dev-login seeds a fixed dataset (idempotent — safe to re-run) directly into the docker Postgres instance: a demo user/league, a 3-player roster (`nba_person_id` 900001-900003) and a 72-player draftable pool with projections (900101-900199, source `dev-seed`). The seed also includes a full demo NBA schedule (all 30 real `nba_teams` rows plus a demo week of `nba_games` pinned to a fixed fantasy week of the configured season — the `DEMO_WEEK_*` constants in `backend/src/ninecat/auth/routes.py`, which must move with every `fantasy_season_start` bump; a test enforces that).
 
-The seeded **players** are the ones that actually poison later test runs: they land in the draftable pool, so a fixture that expects its own free agent to top a streaming plan or a draft board silently gets a dev-seeded one instead, and the failure points at the assertion rather than at the pollution. Delete them along with everything else — the `nba_players` line below is the one that matters most and the one easiest to forget.
+The backend test suite no longer shares this database: it runs against a dedicated `postgres_test` database on the same docker instance (created and migrated automatically by `tests/conftest.py` on first run, or wherever an exported `DATABASE_URL` points). Committed dev/e2e rows therefore can't poison backend test runs anymore, and there is no routine cleanup step between e2e and pytest.
+
+If you still want to reset the dev database's seeded rows (e.g. after a demo-week rollover leaves stale `dev-*` games behind), delete only what the seed owns:
 
 ```sh
 docker exec $(docker ps -q --filter publish=54329) psql -U postgres -d postgres \
   -c "delete from leagues where yahoo_league_key='nba.l.999999';" \
   -c "delete from users where yahoo_guid='DEVUSER';" \
   -c "delete from nba_games where nba_game_id like 'dev-%';" \
-  -c "delete from nba_players where nba_person_id between 900001 and 900199;" \
-  -c "delete from nba_teams where nba_team_id in (1610612737,1610612738,1610612751,1610612766,1610612741,1610612739,1610612742,1610612743,1610612765,1610612744,1610612745,1610612754,1610612746,1610612747,1610612763,1610612748,1610612749,1610612750,1610612740,1610612752,1610612760,1610612753,1610612755,1610612756,1610612757,1610612758,1610612759,1610612761,1610612762,1610612764);"
+  -c "delete from nba_players where nba_person_id between 900001 and 900199;"
 ```
+
+DO NOT delete from `nba_teams`: the 30 team rows are shared with (and cascade-delete) the REAL synced schedule — an earlier version of this cleanup wiped a full season of live `nba_games` that way. The team rows are harmless to leave; both the seed and the live sync upsert them in place.
 
 ## Data notes
 

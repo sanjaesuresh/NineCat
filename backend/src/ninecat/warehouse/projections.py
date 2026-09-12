@@ -38,6 +38,12 @@ from sqlalchemy.orm import Session
 from ninecat.models.warehouse import NbaPlayer, PlayerProjection
 from ninecat.warehouse.id_mapping import normalize_name
 
+# the dev-login fixture's PlayerProjection.source. shared here (the projections
+# domain module) so the seeder and the api's source resolution can't drift on
+# the literal -- the resolver treats this source as a fallback that yields to a
+# real provider, never as a competing choice
+DEV_SEED_PROJECTION_SOURCE = "dev-seed"
+
 # required CSV header columns; enforced up front so a malformed source file
 # fails fast with a clear message instead of raising deep inside row parsing
 _REQUIRED_COLUMNS = (

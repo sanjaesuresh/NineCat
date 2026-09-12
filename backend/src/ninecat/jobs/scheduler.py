@@ -12,7 +12,7 @@ from ninecat.config import get_settings
 from ninecat.db import get_engine
 from ninecat.models.jobs import JobRun
 from ninecat.warehouse.nba_schedule import sync_schedule
-from ninecat.warehouse.player_positions import sync_player_positions
+from ninecat.warehouse.player_positions import sync_player_index, sync_player_positions
 from ninecat.warehouse.player_stats import sync_player_averages
 
 logger = logging.getLogger(__name__)
@@ -118,6 +118,19 @@ def nightly_warehouse_sync(session: Session) -> None:
         averages_count,
         season,
     )
+    # identity creation for rostered players no stats feed has seen yet
+    # (rookies, players who sat out the whole prior season) -- pre-season this
+    # is the only source that can put them on the draft board. non-fatal for
+    # the same reason positions is, and it must not stop positions from running
+    try:
+        index_created = sync_player_index(session, season)
+        logger.info(
+            "nightly_warehouse_sync: sync_player_index created %d players for season %s",
+            index_created,
+            season,
+        )
+    except Exception:
+        logger.exception("nightly_warehouse_sync: sync_player_index failed, continuing")
     try:
         position_result = sync_player_positions(session, season)
         logger.info(

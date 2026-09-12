@@ -51,6 +51,7 @@ from ninecat.yahoo.parsers import CategoryInfo, LeagueSettings, RosterPosition
 # rows on rerun) instead of hand-rolling a second copy of that logic here --
 # one code path owns "how a schedule row becomes NbaTeam/NbaGame rows"
 from ninecat.warehouse.nba_schedule import sync_schedule
+from ninecat.warehouse.projections import DEV_SEED_PROJECTION_SOURCE
 
 router = APIRouter()
 
@@ -549,10 +550,12 @@ _DEV_POOL_PLAYERS = [_pool_player(row) for row in _DEV_POOL_RAW]
 
 # monday-to-sunday demo week. Fixed, never date.today(), so the seed (and any test
 # pinning it) is deterministic. Chosen to land on a real fantasy-week boundary under
-# Settings.fantasy_season_start (2025-10-20, week 1) + 6*7 days = week 7, so a later
-# week-derivation feature that anchors off that same constant agrees with this seed.
-DEMO_WEEK_START = date(2025, 12, 1)
-DEMO_WEEK_END = date(2025, 12, 7)
+# Settings.fantasy_season_start (2026-10-19, week 1) + 6*7 days = week 7, so the
+# week derivation that anchors off that setting agrees with this seed. MUST move
+# with every fantasy_season_start bump -- test_auth_routes pins the invariant so
+# a rollover that forgets this fails loudly instead of silently desyncing the demo.
+DEMO_WEEK_START = date(2026, 11, 30)
+DEMO_WEEK_END = date(2026, 12, 6)
 DEMO_WEEK_NUMBER = 7
 
 # real NBA.com team ids (the stable, public constants nba_api and every stats.nba.com
@@ -1197,7 +1200,7 @@ def dev_login(db: Session = Depends(get_session)) -> Response:
             db,
             nba_player_id=nba_player.id,
             season=settings.current_season,
-            source="dev-seed",
+            source=DEV_SEED_PROJECTION_SOURCE,
             projected_games=spec["games"],
             averages=spec["averages"],
         )

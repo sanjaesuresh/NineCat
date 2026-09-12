@@ -784,6 +784,9 @@ def test_dev_login_heals_league_season_on_setting_bump(
     # season forever -- re-login is the natural point to bring it current,
     # same self-heal rationale as settings_json
     monkeypatch.setenv("DEV_AUTH_ENABLED", "true")
+    # pin the stale season explicitly so this test keeps proving the heal
+    # regardless of what the Settings default has been bumped to
+    monkeypatch.setenv("CURRENT_SEASON", "2025-26")
     get_settings.cache_clear()
     client = _client(_app(db_session))
     client.post("/api/auth/dev-login")
@@ -1353,3 +1356,19 @@ def test_dev_login_prunes_roster_slots_the_seed_no_longer_assigns(
         select(RosterSlot).where(RosterSlot.team_id == other_team.id)
     ).scalars().all()
     assert [slot.yahoo_player_key for slot in survivors] == ["nba.l.424242.p.1"]
+
+
+def test_demo_week_constants_track_the_fantasy_season_anchor():
+    # the demo week must be week DEMO_WEEK_NUMBER under the Settings DEFAULT
+    # fantasy_season_start (week 1 = monday of the anchor's week, monday-to-
+    # sunday) -- a season rollover that bumps the anchor but forgets these
+    # constants would silently desync the seeded schedule from week derivation
+    from datetime import timedelta
+
+    from ninecat.config import Settings
+
+    anchor = Settings.model_fields["fantasy_season_start"].default
+    week_one_monday = anchor - timedelta(days=anchor.weekday())
+    expected_start = week_one_monday + timedelta(weeks=DEMO_WEEK_NUMBER - 1)
+    assert DEMO_WEEK_START == expected_start
+    assert DEMO_WEEK_END == expected_start + timedelta(days=6)

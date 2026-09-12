@@ -915,6 +915,67 @@ def test_draft_board_ambiguous_source_returns_400(db_session):
     assert "source-b" in detail
 
 
+def test_draft_board_dev_seed_source_yields_to_single_real_source(db_session):
+    # phase-3 ruling: the dev-login fixture source is a fallback, not a real
+    # provider -- once exactly one real source exists for the season, a
+    # source-less board must use it instead of 400ing on fixture "ambiguity"
+    user = _seed_user(db_session)
+    league, _team, _rival = _seed_league_with_team(db_session, user)
+    _seed_draft_player(db_session, 900214, "Dev Seed Player", "C", source="dev-seed")
+    real = _seed_draft_player(db_session, 900215, "Real Source Player", "C", source="real-source")
+
+    client = _authed_client(db_session, user)
+    response = client.get(f"/api/leagues/{league.id}/draft/board")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["source"] == "real-source"
+    assert str(real.id) in {p["player_key"] for p in body["players"]}
+
+
+def test_draft_board_dev_seed_alone_still_resolves(db_session):
+    user = _seed_user(db_session)
+    league, _team, _rival = _seed_league_with_team(db_session, user)
+    _seed_draft_player(db_session, 900216, "Dev Seed Player", "C", source="dev-seed")
+
+    client = _authed_client(db_session, user)
+    response = client.get(f"/api/leagues/{league.id}/draft/board")
+
+    assert response.status_code == 200
+    assert response.json()["source"] == "dev-seed"
+
+
+def test_draft_board_two_real_sources_still_400_even_with_dev_seed(db_session):
+    user = _seed_user(db_session)
+    league, _team, _rival = _seed_league_with_team(db_session, user)
+    _seed_draft_player(db_session, 900217, "Dev Seed Player", "C", source="dev-seed")
+    _seed_draft_player(db_session, 900218, "Proj A Player", "C", source="source-a")
+    _seed_draft_player(db_session, 900219, "Proj B Player", "C", source="source-b")
+
+    client = _authed_client(db_session, user)
+    response = client.get(f"/api/leagues/{league.id}/draft/board")
+
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert "source-a" in detail
+    assert "source-b" in detail
+
+
+def test_draft_board_dev_seed_remains_explicitly_selectable(db_session):
+    user = _seed_user(db_session)
+    league, _team, _rival = _seed_league_with_team(db_session, user)
+    dev = _seed_draft_player(db_session, 900220, "Dev Seed Player", "C", source="dev-seed")
+    _seed_draft_player(db_session, 900221, "Real Source Player", "C", source="real-source")
+
+    client = _authed_client(db_session, user)
+    response = client.get(f"/api/leagues/{league.id}/draft/board", params={"source": "dev-seed"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["source"] == "dev-seed"
+    assert str(dev.id) in {p["player_key"] for p in body["players"]}
+
+
 def test_draft_board_source_param_selects_explicitly(db_session):
     user = _seed_user(db_session)
     league, _team, _rival = _seed_league_with_team(db_session, user)
@@ -1702,8 +1763,9 @@ def test_draft_recommend_rejects_unknown_player_keys(db_session):
 # derived-dates test and the explicit-yahoo-dates test share these exact
 # literals rather than risking two independently-computed date sets drifting
 MATCHUP_WEEK = 5
-MATCHUP_WEEK_START = date(2025, 11, 17)
-MATCHUP_WEEK_END = date(2025, 11, 23)
+# week 5 monday from the 2026-27 fantasy_season_start anchor (2026-10-19)
+MATCHUP_WEEK_START = date(2026, 11, 16)
+MATCHUP_WEEK_END = date(2026, 11, 22)
 
 # 3 real NBA teams per side so games_in_range has something to count;
 # distinct abbreviations from the LEAGUE_KEY/TEAM_KEY fixtures used elsewhere
@@ -2017,10 +2079,10 @@ def test_matchup_streaming_full_week_when_as_of_after_week_end(db_session):
     user, league, fa, stub = _seed_streaming_plan_fixture(db_session)
     client = _authed_client(db_session, user, stub)
 
-    # as_of is well after MATCHUP_WEEK_END (2025-11-23) -- the week is
+    # as_of is well after MATCHUP_WEEK_END (2026-11-22) -- the week is
     # entirely in the past relative to this "now"
     response = client.get(
-        f"/api/leagues/{league.id}/matchup", params={"as_of": "2026-01-01"}
+        f"/api/leagues/{league.id}/matchup", params={"as_of": "2027-01-01"}
     )
 
     assert response.status_code == 200

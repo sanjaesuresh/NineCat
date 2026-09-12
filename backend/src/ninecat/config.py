@@ -45,15 +45,16 @@ class Settings(BaseSettings):
     # for the frontend. If a third conversion is ever needed, it should derive
     # from current_season's leading 4 digits rather than reintroducing its own
     # int(season[:4])-style parsing.
-    current_season: str = "2025-26"
+    current_season: str = "2026-27"
     # off by default so tests/dev never spin up a background scheduler thread;
     # production sets SCHEDULER_ENABLED=true to run the nightly warehouse sync
     scheduler_enabled: bool = False
     # anchor for deriving fantasy-week date ranges when yahoo doesn't supply
     # week_start/week_end on the scoreboard: week 1 is the monday of the week
-    # containing this date, monday-to-sunday from there. 2025-10-20 is the
-    # monday of 2025-26 NBA opening week; bump alongside current_season.
-    fantasy_season_start: date = date(2025, 10, 20)
+    # containing this date, monday-to-sunday from there. 2026-10-19 is the
+    # monday of 2026-27 NBA opening week (opening night tue 2026-10-20); bump
+    # alongside current_season.
+    fantasy_season_start: date = date(2026, 10, 19)
     # Claude advisor (docs/claude-advisor-plan.md A2/A7). Declared -- not just
     # read from the environment -- because model_config sets extra="ignore",
     # which silently drops any undeclared key. Absent key is a first-class mode:

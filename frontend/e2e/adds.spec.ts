@@ -59,9 +59,11 @@ test.describe("adds", () => {
     // the seeded demo week (2025-12-01..07) is in the past, so the backend
     // clamps as_of into the week and reports window_basis "full_week" -- the
     // page must say these aren't adds that are still actionable, in the
-    // already-ended direction specifically
+    // the seeded demo week is never the real current week (it's pinned to a
+    // fixed fantasy week of the configured season), so the page must say so --
+    // which direction depends on today's real date, so accept either honest copy
     await expect(
-      page.getByRole("status").filter({ hasText: "already ended" }),
+      page.getByRole("status").filter({ hasText: /already ended|hasn't started yet/ }),
     ).toBeVisible();
 
     // --- ranking basis: what this list is actually optimizing for ----------

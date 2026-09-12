@@ -29,16 +29,19 @@ class GamesInRange(NamedTuple):
     dates: list[date]
 
 
-def _default_fetcher(season: str) -> list[ScheduleRow]:
-    """Pull a season's schedule from nba_api's ScheduleLeagueV2 endpoint.
+def _normalize_schedule_payload(payload: Mapping[str, list]) -> list[ScheduleRow]:
+    """Normalize a raw ScheduleLeagueV2 payload to ScheduleRows, filtered to
+    concrete regular-season games.
 
-    Imported lazily so importing this module (or running the test suite, which
-    always injects a fetcher) never requires nba_api or network access.
+    The published payload mixes in rows fantasy must never count: preseason
+    games (gameId prefix "001", including non-NBA exhibition opponents), TBD
+    NBA Cup knockout placeholders (prefix "002" but teamId 0 / null tricode --
+    real teams get filled in by a later resync), and the Cup final (prefix
+    "006", excluded from regular-season stats by both the NBA and Yahoo). Only
+    prefix-"002" rows with two real teams pass. This NBA.com-specific rule
+    lives here, not in sync_schedule, because other fetchers (the dev seed's)
+    use their own game-id scheme.
     """
-    from nba_api.stats.endpoints import scheduleleaguev2
-
-    response = scheduleleaguev2.ScheduleLeagueV2(season=season)
-    payload = response.season_games.get_dict()
     headers: list[str] = payload["headers"]
 
     def col(row: list, name: str) -> object:
@@ -46,12 +49,17 @@ def _default_fetcher(season: str) -> list[ScheduleRow]:
 
     normalized: list[ScheduleRow] = []
     for row in payload["data"]:
+        game_id = str(col(row, "gameId"))
+        if not game_id.startswith("002"):
+            continue
+        if not (col(row, "homeTeam_teamId") and col(row, "awayTeam_teamId")):
+            continue
         # gameDateEst is the schedule date NBA.com actually publishes games under;
         # only the first 10 chars ("YYYY-MM-DD") are kept, the rest is a time-of-day
         game_date_raw = str(col(row, "gameDateEst"))[:10]
         normalized.append(
             {
-                "game_id": str(col(row, "gameId")),
+                "game_id": game_id,
                 "game_date": game_date_raw,
                 "home_team_id": int(col(row, "homeTeam_teamId")),
                 "home_team_name": (
@@ -66,6 +74,18 @@ def _default_fetcher(season: str) -> list[ScheduleRow]:
             }
         )
     return normalized
+
+
+def _default_fetcher(season: str) -> list[ScheduleRow]:
+    """Pull a season's schedule from nba_api's ScheduleLeagueV2 endpoint.
+
+    Imported lazily so importing this module (or running the test suite, which
+    always injects a fetcher) never requires nba_api or network access.
+    """
+    from nba_api.stats.endpoints import scheduleleaguev2
+
+    response = scheduleleaguev2.ScheduleLeagueV2(season=season)
+    return _normalize_schedule_payload(response.season_games.get_dict())
 
 
 def _parse_date(value: object) -> date:

@@ -5,7 +5,12 @@ from pathlib import Path
 from sqlalchemy import select
 
 from ninecat.models import NbaGame, NbaTeam
-from ninecat.warehouse.nba_schedule import back_to_backs_in_range, games_in_range, sync_schedule
+from ninecat.warehouse.nba_schedule import (
+    _normalize_schedule_payload,
+    back_to_backs_in_range,
+    games_in_range,
+    sync_schedule,
+)
 
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "nba" / "sample_schedule.json"
 
@@ -147,3 +152,44 @@ def test_sync_schedule_rerun_with_changed_row_updates_in_place(db_session):
     # still proves synced_at is driven by the upsert, not left at its
     # original server_default value
     assert updated_game.synced_at >= first_synced_at
+
+
+def test_normalize_schedule_payload_keeps_only_concrete_regular_season_games():
+    # mirrors the real 2026-27 ScheduleLeagueV2 payload, which mixes preseason
+    # (001, incl. non-NBA exhibition opponents), TBD NBA Cup knockout rows
+    # (002 with teamId 0 / null tricode), and the Cup final (006, excluded from
+    # regular-season stats) in with the concrete regular-season games -- only
+    # the last kind may reach the warehouse, or week game counts inflate and
+    # the team upsert dies on the null-abbreviation placeholder
+    headers = [
+        "gameId", "gameDateEst",
+        "homeTeam_teamId", "homeTeam_teamCity", "homeTeam_teamName", "homeTeam_teamTricode",
+        "awayTeam_teamId", "awayTeam_teamCity", "awayTeam_teamName", "awayTeam_teamTricode",
+    ]
+    data = [
+        # preseason vs a non-NBA exhibition team
+        ["0012600042", "2026-10-04T00:00:00", 1610612757, "Portland", "Trail Blazers", "POR",
+         50015, "London", "Lions", "LON"],
+        # concrete regular-season game -- the only row that should survive
+        ["0022600001", "2026-10-20T19:00:00", 1610612752, "New York", "Knicks", "NYK",
+         1610612755, "Philadelphia", "76ers", "PHI"],
+        # TBD cup knockout placeholder
+        ["0022601201", "2026-12-08T00:00:00", 0, None, None, None,
+         0, None, None, None],
+        # cup final: real teams but not a regular-season stat game
+        ["0062600001", "2026-12-15T20:00:00", 1610612752, "New York", "Knicks", "NYK",
+         1610612755, "Philadelphia", "76ers", "PHI"],
+    ]
+    rows = _normalize_schedule_payload({"headers": headers, "data": data})
+
+    assert [row["game_id"] for row in rows] == ["0022600001"]
+    assert rows[0] == {
+        "game_id": "0022600001",
+        "game_date": "2026-10-20",
+        "home_team_id": 1610612752,
+        "home_team_name": "New York Knicks",
+        "home_team_abbreviation": "NYK",
+        "away_team_id": 1610612755,
+        "away_team_name": "Philadelphia 76ers",
+        "away_team_abbreviation": "PHI",
+    }

@@ -21,7 +21,9 @@ def test_get_settings_reads_values_from_env(monkeypatch):
         monkeypatch.setenv(key, value)
     monkeypatch.setenv("FRONTEND_ORIGIN", "https://app.example.test")
     monkeypatch.setenv("DEV_AUTH_ENABLED", "true")
-    monkeypatch.setenv("FANTASY_SEASON_START", "2026-10-19")
+    # deliberately NOT the field's default, so the assertion below can't pass
+    # against a silently-dropped env var falling back to the default
+    monkeypatch.setenv("FANTASY_SEASON_START", "2027-10-18")
     get_settings.cache_clear()
 
     settings = get_settings()
@@ -36,7 +38,7 @@ def test_get_settings_reads_values_from_env(monkeypatch):
     assert settings.dev_auth_enabled is True
     # proves the field is actually declared and read, not silently dropped by
     # the model's extra="ignore" (which would otherwise fall back to the default)
-    assert settings.fantasy_season_start == date(2026, 10, 19)
+    assert settings.fantasy_season_start == date(2027, 10, 18)
 
     get_settings.cache_clear()
 
@@ -68,7 +70,8 @@ def test_frontend_origin_and_dev_auth_enabled_have_defaults(monkeypatch):
 
     assert settings.frontend_origin == "http://localhost:3000"
     assert settings.dev_auth_enabled is False
-    assert settings.fantasy_season_start == date(2025, 10, 20)
+    # 2026-10-19 is the monday of 2026-27 opening week (opening night tue 2026-10-20)
+    assert settings.fantasy_season_start == date(2026, 10, 19)
 
 
 def test_current_season_string_pins_the_league_year_mapping():
@@ -94,7 +97,7 @@ def test_current_season_string_pins_the_league_year_mapping():
     # (sync/league_sync.py: int(info.season)), and what api/routes.py's
     # str(league.season) would hand back to the frontend for it
     league_year = int(start_year)
-    assert league_year == 2025
+    assert league_year == 2026
     assert str(league_year) == start_year
 
 

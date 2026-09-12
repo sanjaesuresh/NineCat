@@ -140,12 +140,14 @@ test.describe("matchup monitor", () => {
     await expect(addSection).toBeVisible();
     await expect(addSection.getByText(/Adds used \d+/)).toBeVisible();
 
-    // the seeded demo week (2025-12-01..07) is in the past, so the backend
-    // clamps as_of into the week and returns window_basis "full_week" -- the
-    // page must say these aren't adds you can still make today, not imply
-    // they're live recommendations
+    // the seeded demo week is pinned to a fixed fantasy week of the configured
+    // season, so it's (almost) never the real current week -- the backend clamps
+    // as_of into the week and the page must say these aren't live adds, in
+    // whichever direction (past or future) today's real date puts the demo week
     await expect(
-      addSection.getByRole("status").filter({ hasText: "not adds you can still make" }),
+      addSection
+        .getByRole("status")
+        .filter({ hasText: /not adds you can (still make|make today)/ }),
     ).toBeVisible();
 
     const addTable = addSection.getByRole("table", { name: "Recommended streaming adds by day" });

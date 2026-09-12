@@ -149,3 +149,78 @@ def sync_player_positions(
         session.execute(update_stmt, writable_rows)
 
     return PositionSyncResult(matched=len(matched_rows), skipped=skipped)
+
+
+# a normalized player-index row: {nba_person_id, first_name, last_name,
+# position (optional)} -- unlike PlayerPositionRow it carries the name, which
+# is what makes identity creation possible
+PlayerIndexRow = Mapping[str, Any]
+IndexFetcher = Callable[[str], Iterable[PlayerIndexRow]]
+
+
+def _default_index_fetcher(season: str) -> list[PlayerIndexRow]:
+    """Pull the season's full player index (ids + names + positions) from
+    nba_api's PlayerIndex -- same endpoint as _default_fetcher, richer rows."""
+    from nba_api.stats.endpoints import playerindex
+
+    response = playerindex.PlayerIndex(season=season)
+    payload = response.player_index.get_dict()
+    headers: list[str] = payload["headers"]
+
+    def col(row: list, name: str) -> object:
+        return row[headers.index(name)]
+
+    return [
+        {
+            "nba_person_id": int(col(row, "PERSON_ID")),
+            "first_name": col(row, "PLAYER_FIRST_NAME"),
+            "last_name": col(row, "PLAYER_LAST_NAME"),
+            "position": col(row, "POSITION"),
+        }
+        for row in payload["data"]
+    ]
+
+
+def sync_player_index(
+    session: Session, season: str, fetcher: IndexFetcher | None = None
+) -> int:
+    """Create NbaPlayer identity rows for rostered players we don't know yet.
+
+    Pre-season, rookies and players who sat out the whole prior season exist in
+    no stats feed, so sync_player_averages (which owns row creation from
+    played games) can never surface them before drafts happen -- this is the
+    one source that can. Create-only by design: existing rows are never
+    touched, so sync_player_positions keeps sole ownership of position updates
+    and a transient index glitch can't clobber known data. Returns how many
+    players were created.
+    """
+    fetch = fetcher or _default_index_fetcher
+    rows_by_person_id: dict[int, PlayerIndexRow] = {
+        int(row["nba_person_id"]): row for row in fetch(season)
+    }
+    if not rows_by_person_id:
+        return 0
+
+    existing_person_ids = set(
+        session.execute(
+            select(NbaPlayer.nba_person_id).where(
+                NbaPlayer.nba_person_id.in_(rows_by_person_id)
+            )
+        ).scalars()
+    )
+    created = 0
+    for person_id, row in rows_by_person_id.items():
+        if person_id in existing_person_ids:
+            continue
+        full_name = f"{row.get('first_name') or ''} {row.get('last_name') or ''}".strip()
+        if not full_name:
+            continue  # a nameless identity row could never be matched by anything
+        session.add(
+            NbaPlayer(
+                nba_person_id=person_id,
+                full_name=full_name,
+                position=(row.get("position") or "").strip() or None,
+            )
+        )
+        created += 1
+    return created
