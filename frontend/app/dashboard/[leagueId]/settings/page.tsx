@@ -50,8 +50,12 @@ export default function SettingsPage() {
           so this narrows just this page's own content the way a form
           benefits from a narrow measure. That's an inner cap, not a revival
           of the per-tab container-width inconsistency this redesign removed:
-          no max-w- class lives on the <main> or its immediate wrapper here. */}
-      <div className={`max-w-[640px] ${pageStackClasses()}`}>
+          no max-w- class lives on the <main> or its immediate wrapper here.
+          mx-auto centers that inner column deliberately: the other five tabs
+          fill the page width with grids/tables and have no "resting" position
+          to be lopsided against, but a fixed-width form column left-pinned
+          inside a 1600px shell reads as off-center at wide viewports. */}
+      <div className={`mx-auto max-w-[640px] ${pageStackClasses()}`}>
         {/* Panel titles below deliberately avoid the substring "Settings":
             PageHeader already renders the page's one h1 "Settings", and
             e2e/smoke.spec.ts:67 looks up a heading by that name with no

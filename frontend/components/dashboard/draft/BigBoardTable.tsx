@@ -21,8 +21,8 @@ import { captionClasses, columnHeaderClasses, controlClasses, eyebrowClasses, nu
  * table underwater at every viewport width). Because the panel supplies no
  * padding, this component owns its own horizontal inset for the descriptive
  * text above the table, while the table's scroll container runs edge to
- * edge and borrows the panel's own left/right border instead of drawing its
- * own (hence border-y, not border, below).
+ * edge and borrows the panel's own left/right and bottom border instead of
+ * drawing its own (hence border-t, not border, below).
  */
 export default function BigBoardTable({
   players,
@@ -74,13 +74,15 @@ export default function BigBoardTable({
       {/* relative: makes this the positioning context for the sr-only caption
           so it stays clipped inside the scroll container instead of
           escaping to the initial containing block and stretching the page.
-          border-y (not border): the panel's own left/right border already
-          runs flush against this container, so a left/right border here
-          would just double it.
+          border-t (not border, not border-y): the panel's own left/right
+          border already runs flush against this container (a left/right
+          border here would double it), and this table is the last element
+          in the panel, so the panel's own bottom border already closes it --
+          a border-b here would double that too.
           tabIndex + named region: keyboard scroll access once the table
           overflows (WCAG 2.1.1) -- see RosterTable for the full reasoning */}
       <div
-        className="relative overflow-x-auto border-y border-rule"
+        className="relative overflow-x-auto border-t border-rule"
         aria-busy={puntPending}
         tabIndex={0}
         role="region"

@@ -26,10 +26,19 @@ type PanelOptions = {
 // --panel is the committed section backdrop; --rule is globals.css's
 // documented translucent 24% hairline token (used here as a divider, not as
 // text -- it is not on the TEXT-SAFE list) and --alert is the only
-// text/border-safe destructive token, per that same list.
-const PANEL_BORDER: Record<PanelTone, string> = {
-  default: "border-rule",
-  destructive: "border-alert",
+// text/border-safe destructive token, per that same list. destructive also
+// steps the border to 2px and tints the fill with --alert-fill (fill-only,
+// used here at low opacity exactly like MatchupSection's bg-alert-fill/[0.28]
+// decorative tint) so the zone reads as categorically different at a glance,
+// before the copy is read -- a 1px color-only border read as a stray
+// hairline, not a warning.
+const PANEL_TONE: Record<PanelTone, { border: string; background: string; divider: string }> = {
+  default: { border: "border border-rule", background: "bg-panel", divider: "border-rule" },
+  destructive: {
+    border: "border-2 border-alert",
+    background: "bg-alert-fill/[0.12]",
+    divider: "border-alert",
+  },
 };
 // 20px, up from 16px: the type scale raised the floor to 13px and gave panel
 // titles 18px, so the old inset left the content crowding its own border
@@ -38,8 +47,19 @@ const PANEL_PADDING = "p-5";
 /** Container classes for the dashboard's Panel primitive. */
 export function panelClasses(options: PanelOptions = {}): string {
   const { flush = false, tone = "default" } = options;
-  const base = `border ${PANEL_BORDER[tone]} bg-panel`;
+  const { border, background } = PANEL_TONE[tone];
+  const base = `${border} ${background}`;
   return flush ? base : `${base} ${PANEL_PADDING}`;
+}
+
+/**
+ * Border-color class for a panel's internal header divider (the rule under
+ * the title), matched to the same tone as panelClasses' outer border so a
+ * destructive panel reads as one red-framed zone rather than a red outline
+ * around an otherwise-neutral interior.
+ */
+export function panelDividerClasses(tone: PanelTone = "default"): string {
+  return PANEL_TONE[tone].divider;
 }
 
 /**

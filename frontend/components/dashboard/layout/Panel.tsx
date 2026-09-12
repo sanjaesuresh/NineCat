@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { panelClasses, panelHeadingId } from "./layoutTokens";
+import { panelClasses, panelDividerClasses, panelHeadingId } from "./layoutTokens";
 import { captionClasses, headingClasses } from "./typography";
 
 /**
@@ -50,7 +50,7 @@ export default function Panel({
           panel's standard 16px inset; non-flush panels already get that
           inset from the section, so the header only needs the gap below it */}
       <div
-        className={`flex items-baseline justify-between gap-3 border-b border-rule pb-2.5 ${
+        className={`flex items-baseline justify-between gap-3 border-b ${panelDividerClasses(tone)} pb-2.5 ${
           flush ? "px-5 pt-5" : "mb-4"
         }`}
       >

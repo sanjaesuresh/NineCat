@@ -14,13 +14,6 @@ describe("buildNavItems", () => {
     ]);
   });
 
-  it("builds hrefs off the league root for My Team and root + segment for the rest", () => {
-    const items = buildNavItems("8252");
-    const byLabel = Object.fromEntries(items.map((item) => [item.label, item.href]));
-    expect(byLabel["My Team"]).toBe("/dashboard/8252");
-    expect(byLabel["Draft"]).toBe("/dashboard/8252/draft");
-  });
-
   it("pins all six hrefs, not just My Team and Draft", () => {
     const items = buildNavItems("8252");
     expect(items.map((item) => item.href)).toEqual([
@@ -71,6 +64,14 @@ describe("isActiveNavItem", () => {
     for (const pathname of items.map((item) => item.href)) {
       const activeCount = items.filter((item) => isActiveNavItem(item, pathname)).length;
       expect(activeCount).toBe(1);
+    }
+  });
+
+  it("marks no item active for a foreign league's route or a non-dashboard path", () => {
+    const items = buildNavItems("8252");
+    for (const pathname of ["/dashboard/99999/draft", "/settings"]) {
+      const activeCount = items.filter((item) => isActiveNavItem(item, pathname)).length;
+      expect(activeCount).toBe(0);
     }
   });
 });

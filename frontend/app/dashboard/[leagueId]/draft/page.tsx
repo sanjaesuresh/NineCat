@@ -347,8 +347,12 @@ export default function DraftPage() {
                 see BigBoardTable's docstring for how it owns its own inset
                 on the descriptive text above the table */}
             <Panel title="Big board" headingId="board-heading" flush>
+              {/* no pb here: BigBoardTable's own description block already
+                  supplies pt-4 (the panel's standard 16px inset) right
+                  below this, so a bottom pad here would double that gap to
+                  28px instead of the 16px flush-panel rhythm used elsewhere */}
               {(appliedPunt.length > 0 || pendingPunt !== null || puntError) && (
-                <div className="space-y-3 px-4 pt-4 pb-3">
+                <div className="space-y-3 px-4 pt-4">
                   {appliedPunt.length > 0 && (
                     <div className={noticeClasses()}>
                       <span className={noticeDotClasses("warn")} aria-hidden="true" />

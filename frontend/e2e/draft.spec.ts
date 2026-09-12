@@ -26,7 +26,7 @@ async function devLoginAndOpenDraftTab(page: Page) {
   // prove the Draft tab is a real link. Every tool is unlocked now (Trades
   // was the last coming-soon badge), so the original "a Soon chip still
   // exists" companion assertion is replaced by the whole link set: that keeps
-  // the intent -- proving DashboardNav actually renders its tools as links --
+  // the intent -- proving the sidebar nav actually renders its tools as links --
   // rather than proving one <a> happens to exist.
   const draftLink = page.getByRole("link", { name: "Draft", exact: true });
   await expect(draftLink).toBeVisible();

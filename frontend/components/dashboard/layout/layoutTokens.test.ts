@@ -5,6 +5,7 @@ import {
   noticeDotClasses,
   pageStackClasses,
   panelClasses,
+  panelDividerClasses,
   panelHeadingId,
   statRowClasses,
   statTileClasses,
@@ -43,6 +44,25 @@ describe("panelClasses", () => {
     const classes = panelClasses().split(" ");
     expect(classes).toContain("border-rule");
     expect(classes).not.toContain("border-alert");
+  });
+
+  it("steps the destructive border to 2px and tints the fill, so the zone reads as different before the copy does", () => {
+    const classes = panelClasses({ tone: "destructive" }).split(" ");
+    expect(classes).toContain("border-2");
+    expect(classes.some((c) => c.startsWith("bg-alert-fill/"))).toBe(true);
+    // the default tone must not pick up either treatment
+    expect(panelClasses({ tone: "default" }).split(" ")).not.toContain("border-2");
+  });
+});
+
+describe("panelDividerClasses", () => {
+  it("matches the header divider color to the panel's own tone", () => {
+    expect(panelDividerClasses("default")).toBe("border-rule");
+    expect(panelDividerClasses("destructive")).toBe("border-alert");
+  });
+
+  it("defaults to the hairline divider when no tone is passed", () => {
+    expect(panelDividerClasses()).toBe("border-rule");
   });
 });
 

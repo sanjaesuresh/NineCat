@@ -6,11 +6,7 @@ export type NavItem = {
   key: string;
 };
 
-/**
- * Builds the six dashboard section entries for a given league. Hrefs follow
- * the dashboard's established URL scheme exactly: the league root for My
- * Team, and the root plus a lowercase segment for the rest.
- */
+// hrefs follow the dashboard's established URL scheme exactly, so links and routes never drift
 export function buildNavItems(leagueId: string): NavItem[] {
   const root = `/dashboard/${leagueId}`;
   return [
