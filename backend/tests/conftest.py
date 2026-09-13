@@ -98,6 +98,13 @@ def _dummy_required_settings_env(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv(key, value)
     if "DATABASE_URL" not in os.environ:
         monkeypatch.setenv("DATABASE_URL", _DOCKER_DEFAULT_DATABASE_URL)
+    # force the advisor's no-key mode: a real ANTHROPIC_API_KEY in the repo-root
+    # .env would otherwise reach Settings and make tests place LIVE api calls
+    # (found the day the key landed -- the suite slowed 4x and a "no key" test
+    # received a real claude response). empty string overrides the .env value
+    # and is falsy for explanations_available.
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "")
+    monkeypatch.setenv("ANTHROPIC_WORKSPACE_ID", "")
 
 
 @pytest.fixture(autouse=True)

@@ -87,6 +87,7 @@ class AnthropicAdvisorClient:
         api_key: str,
         model: str,
         *,
+        workspace_id: str | None = None,
         timeout: float = ADVISOR_TIMEOUT_SECONDS,
         max_retries: int = ADVISOR_MAX_RETRIES,
         sdk_client: anthropic.Anthropic | None = None,
@@ -97,8 +98,17 @@ class AnthropicAdvisorClient:
         # exception-mapping and response-reading code below be exercised
         # against every typed SDK error without a network call, exactly like
         # YahooGateway's injectable http_client
+        # org-level keys (the console's newer default) are rejected without an
+        # anthropic-workspace-id header; workspace-scoped keys need none, so
+        # the header is opt-in via settings
+        default_headers = (
+            {"anthropic-workspace-id": workspace_id} if workspace_id else None
+        )
         self._client = sdk_client or anthropic.Anthropic(
-            api_key=api_key, timeout=timeout, max_retries=max_retries
+            api_key=api_key,
+            timeout=timeout,
+            max_retries=max_retries,
+            default_headers=default_headers,
         )
 
     def complete(self, *, system: str, user: str, schema: dict) -> AdvisorCompletion:

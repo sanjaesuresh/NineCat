@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 # bump invalidates every stored entry without needing a data migration.
 # v2: shortlist entries became generic items (item_key/label) rather than
 # players, so every v1 prompt and every v1 cached answer is a different shape.
-PROMPT_VERSION = 2
+PROMPT_VERSION = 4
 
 # feature identifiers -- structured tokens, never prose. They key the cache and
 # select prompt wording, so they are a contract, not a display string.

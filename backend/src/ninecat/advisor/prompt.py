@@ -13,6 +13,8 @@ in sorted key order for that reason.
 
 from __future__ import annotations
 
+import re
+
 from ninecat.advisor.types import (
     FEATURE_ADDS,
     FEATURE_DRAFT,
@@ -45,7 +47,12 @@ difference.
 
 Style: direct and concrete. Two sentences per entry at most. No preamble, no \
 restating the question, no hedging filler. Write for someone who already knows the \
-category abbreviations."""
+category abbreviations.
+
+Vocabulary: the nine categories are FG%, FT%, 3PM, PTS, REB, AST, ST, BLK, TO -- \
+always write them exactly that way. Never use internal identifiers in your prose: \
+no snake_case tokens, and never an item_key (item_key belongs only in the structured \
+field you return). Refer to every entry by its name or label."""
 
 # one line of feature-specific framing plus what that feature's shortlist
 # entries actually ARE, so the same generic shape produces advice that sounds
@@ -72,16 +79,50 @@ _FEATURE_FRAMING = {
 }
 
 
+# canonical engine key -> the display name an experienced 9-cat player writes.
+# translation happens HERE, at the prompt boundary, because the model parrots
+# whatever vocabulary it is fed -- raw keys in the input came straight back out
+# in prose and onto the page (wp7 live finding). word-boundary regex so player
+# names and ordinary words are never touched.
+_CATEGORY_DISPLAY = {
+    "fg_pct": "FG%",
+    "ft_pct": "FT%",
+    "tpm": "3PM",
+    "pts": "PTS",
+    "reb": "REB",
+    "ast": "AST",
+    "stl": "ST",
+    "blk": "BLK",
+    "tov": "TO",
+}
+_CATEGORY_KEY_RE = re.compile(
+    r"(?<![A-Za-z0-9_])(" + "|".join(sorted(_CATEGORY_DISPLAY, key=len, reverse=True)) + r")(?![A-Za-z0-9_])"
+)
+
+
+def _display_categories(text: str) -> str:
+    return _CATEGORY_KEY_RE.sub(lambda m: _CATEGORY_DISPLAY[m.group(1)], text)
+
+
+def _display_metric_key(key: str) -> str:
+    # category keys get their display names; anything else drops the
+    # snake_case ("rank_score" read as an identifier and came back verbatim
+    # in live prose -- "rank score" reads as english instead)
+    return _CATEGORY_DISPLAY.get(key, key.replace("_", " "))
+
+
 def build_prompt(request: AdvisorRequest) -> tuple[str, str]:
     """Return (system, user). Pure: no network, no clock, no database."""
     lines: list[str] = [_FEATURE_FRAMING[request.feature], ""]
-    lines.append(f"Situation: {request.situation}")
+    lines.append(f"Situation: {_display_categories(request.situation)}")
 
     if request.context:
         lines.append("")
         lines.append("Context:")
         for label in sorted(request.context):
-            lines.append(f"- {label}: {request.context[label]}")
+            lines.append(
+                f"- {_display_categories(label)}: {_display_categories(str(request.context[label]))}"
+            )
 
     lines.append("")
     lines.append("Shortlist (engine order):")
@@ -99,13 +140,15 @@ def build_prompt(request: AdvisorRequest) -> tuple[str, str]:
 def _render_item(item: ShortlistItem) -> str:
     parts = [f"[{item.item_key}] {item.label}"]
     if item.detail:
-        parts.append(item.detail)
+        parts.append(_display_categories(item.detail))
     if item.metrics:
         # sorted so the same metrics dict always renders the same way
-        metrics = ", ".join(f"{k} {item.metrics[k]}" for k in sorted(item.metrics))
+        metrics = ", ".join(
+            f"{_display_metric_key(k)} {item.metrics[k]}" for k in sorted(item.metrics)
+        )
         parts.append(metrics)
     if item.tags:
         # tags arrive as an ordered tuple from the engine and stay in that
         # order -- it is the engine's own ranking of what matters most
-        parts.append("; ".join(item.tags))
+        parts.append("; ".join(_display_categories(t) for t in item.tags))
     return " | ".join(parts)

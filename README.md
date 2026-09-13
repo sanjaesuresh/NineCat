@@ -45,7 +45,7 @@ Playwright drives the real stack end to end (landing page → dev-login → dash
 `e2e/advisor.spec.ts` covers the Claude advisor's degraded path specifically: the backend command below sets no `ANTHROPIC_API_KEY`, so those tests prove the pages still render their rankings and say why explanations are off. The explanations-present path is deliberately not covered end to end — it needs a real key and a real API call.
 
 1. `cd backend && docker compose up -d && uv run alembic upgrade head`
-2. `cd backend && DEV_AUTH_ENABLED=true uv run uvicorn ninecat.main:create_app --factory` → http://localhost:8000
+2. `cd backend && DEV_AUTH_ENABLED=true ANTHROPIC_API_KEY= uv run uvicorn ninecat.main:create_app --factory` → http://localhost:8000 (the empty `ANTHROPIC_API_KEY=` matters once the repo `.env` carries a real key: the advisor specs pin the NO-key degraded path, and a live key flips those assertions and spends real API credits per run)
 3. `cd frontend && npm run dev` → http://localhost:3000
 4. `cd frontend && npx playwright test` (or `npm run test:e2e`)
 

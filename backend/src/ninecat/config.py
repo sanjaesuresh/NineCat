@@ -60,6 +60,9 @@ class Settings(BaseSettings):
     # which silently drops any undeclared key. Absent key is a first-class mode:
     # every feature degrades to its deterministic engine output and says so.
     anthropic_api_key: str | None = None
+    # required only for org-level (non-workspace-scoped) keys -- see the
+    # advisor client's header comment; workspace-scoped keys leave this unset
+    anthropic_workspace_id: str | None = None
     anthropic_model: str = "claude-opus-5"
 
     @property

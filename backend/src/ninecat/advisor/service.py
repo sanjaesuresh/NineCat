@@ -34,15 +34,21 @@ def build_advisor_client(settings: Settings) -> AdvisorClient | None:
     """
     if not settings.explanations_available:
         return None
-    return _cached_client(settings.anthropic_api_key, settings.anthropic_model)
+    return _cached_client(
+        settings.anthropic_api_key,
+        settings.anthropic_model,
+        settings.anthropic_workspace_id,
+    )
 
 
 @lru_cache(maxsize=1)
-def _cached_client(api_key: str, model: str) -> AnthropicAdvisorClient:
+def _cached_client(
+    api_key: str, model: str, workspace_id: str | None = None
+) -> AnthropicAdvisorClient:
     # one client (and one underlying connection pool) per process rather than
     # one per request. The key only ever comes from Settings, which already
     # holds it in memory, so caching on it adds no new exposure.
-    return AnthropicAdvisorClient(api_key, model)
+    return AnthropicAdvisorClient(api_key, model, workspace_id=workspace_id)
 
 
 def explain(

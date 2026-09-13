@@ -54,7 +54,7 @@ def test_prompt_contains_the_shortlist_and_its_context():
     assert "Beta Big" in user
     assert "201939" in user and "203999" in user
     assert "pick 12 overall in a 12-team 9-cat league" in user
-    assert "punting: ft_pct" in user
+    assert "punting: FT%" in user  # raw keys are translated at the prompt boundary (wp7)
     assert "roster so far: Rudy Gobert" in user
     assert "value 3.4" in user
     assert "may not last to your next pick" in user
@@ -137,3 +137,64 @@ def test_prompt_carries_no_secrets_or_user_identifiers(monkeypatch):
     for value in os.environ.values():
         if len(value) > 8:
             assert value not in rendered
+
+
+def test_prompt_renders_category_display_names_never_raw_keys():
+    # wp7 live finding: raw engine keys fed into the prompt came straight back
+    # out in the model's prose ("fills fg_pct, reb and blk") and onto the page
+    request = AdvisorRequest(
+        feature=FEATURE_TRADES,
+        situation="Testing categories.",
+        context={"deficits": "fg_pct, reb, blk", "surplus": "tpm, ast"},
+        shortlist=(
+            ShortlistItem(
+                item_key="proposal-0",
+                label="give A / get B",
+                detail="fills fg_pct and reb for tpm",
+                metrics={"fg_pct": 0.5, "tov": 2.1},
+                tags=("helps fg_pct, tpm", "costs tov"),
+            ),
+        ),
+    )
+    _system, user = build_prompt(request)
+    for raw in ("fg_pct", "tpm", "tov"):
+        assert raw not in user, f"raw key {raw!r} reached the prompt"
+    assert "FG%" in user
+    assert "3PM" in user
+    assert "TO" in user
+
+
+def test_prompt_humanizes_non_category_metric_keys():
+    # "rank_score 6.6" in the prompt came back as "Top rank_score on the
+    # board" in live prose -- snake_case metric names read as identifiers to
+    # the model, so they are spaced at the boundary too
+    request = AdvisorRequest(
+        feature=FEATURE_DRAFT,
+        situation="s",
+        context={},
+        shortlist=(
+            ShortlistItem(
+                item_key="1",
+                label="Player",
+                detail=None,
+                metrics={"rank_score": 6.6, "games_remaining": 3},
+                tags=(),
+            ),
+        ),
+    )
+    _system, user = build_prompt(request)
+    assert "rank_score" not in user
+    assert "rank score 6.6" in user
+    assert "games remaining 3" in user
+
+
+def test_system_prompt_bans_identifier_prose():
+    request = AdvisorRequest(
+        feature=FEATURE_DRAFT,
+        situation="s",
+        context={},
+        shortlist=(ShortlistItem(item_key="1", label="Player", detail=None, metrics={}, tags=()),),
+    )
+    system, _user = build_prompt(request)
+    assert "item_key" in system  # the rule must name what is banned from prose
+    assert "FG%" in system  # the category vocabulary is stated explicitly

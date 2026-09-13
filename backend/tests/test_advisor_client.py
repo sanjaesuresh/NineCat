@@ -218,3 +218,18 @@ def test_does_not_log_prompt_contents(caplog):
     # token usage IS logged -- that is the observability half of plan B8
     assert "input_tokens=1200" in logged
     assert "output_tokens=340" in logged
+
+
+def test_workspace_id_header_sent_when_configured():
+    # org-level anthropic keys (the console's new default) are rejected without
+    # an anthropic-workspace-id header -- live-verified 2026-09-13; a
+    # workspace-scoped key needs no header, so the header is opt-in
+    client = AnthropicAdvisorClient(
+        "key", "model-x", workspace_id="wrkspc_test123"
+    )
+    assert client._client.default_headers.get("anthropic-workspace-id") == "wrkspc_test123"
+
+
+def test_no_workspace_header_by_default():
+    client = AnthropicAdvisorClient("key", "model-x")
+    assert "anthropic-workspace-id" not in client._client.default_headers
